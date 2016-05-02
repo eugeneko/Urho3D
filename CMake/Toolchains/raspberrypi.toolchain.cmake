@@ -20,6 +20,10 @@
 # THE SOFTWARE.
 #
 
+# Save the original values of CC and CXX environment variables before they get altered by CMake in the current process (and all the subprocesses later)
+set (SAVED_CC $ENV{CC})
+set (SAVED_CXX $ENV{CXX})
+
 if (CMAKE_TOOLCHAIN_FILE)
     # Reference toolchain variable to suppress "unused variable" warning
     mark_as_advanced (CMAKE_TOOLCHAIN_FILE)
