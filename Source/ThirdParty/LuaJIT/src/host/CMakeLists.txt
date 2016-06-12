@@ -47,6 +47,11 @@ if (NOT CMAKE_PROJECT_NAME STREQUAL Urho3D)
     # Include Urho3D CMake common module
     include (Urho3D-CMake-common)
 
+    # When performing Xcode CI build suppress all the warnings for 3rd party libraries because there are just too many of them
+    if (XCODE AND DEFINED ENV{CI})
+        set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -w")
+    endif ()
+
     # Unescape the variables
     foreach (ESCAPED_VAR HOST_XCFLAGS TARGET_ARCH DASM_FLAGS DASM_ARCH)
         string (REPLACE +D -D ${ESCAPED_VAR} "${${ESCAPED_VAR}}")       # Stringify against empty variable
