@@ -1364,6 +1364,18 @@ bool Node::HasTag(const String& tag) const
     return impl_->tags_.Contains(tag);
 }
 
+bool Node::IsChildOf(Node* node) const
+{
+    Node* parent = parent_;
+    while (parent)
+    {
+        if (parent == node)
+            return true;
+        parent = parent->GetParent();
+    }
+    return false;
+}
+
 const Variant& Node::GetVar(StringHash key) const
 {
     VariantMap::ConstIterator i = vars_.Find(key);
