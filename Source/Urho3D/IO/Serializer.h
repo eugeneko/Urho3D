@@ -32,13 +32,8 @@ namespace Urho3D
 
 class Color;
 class IntRect;
-class IntVector2;
-class IntVector3;
 class Quaternion;
 class Rect;
-class Vector2;
-class Vector3;
-class Vector4;
 
 /// Abstract stream for writing.
 class URHO3D_API Serializer
