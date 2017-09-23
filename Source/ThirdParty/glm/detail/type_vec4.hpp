@@ -268,6 +268,11 @@ namespace glm
 		GLM_FUNC_DECL vec<4, T, Q> & operator>>=(vec<1, U, Q> const& v);
 		template<typename U>
 		GLM_FUNC_DECL vec<4, T, Q> & operator>>=(vec<4, U, Q> const& v);
+
+#define MIXIN_DIM 4
+#include "../urho/mixin_vec.inl"
+#undef MIXIN_DIM
+
 	};
 
 	// -- Unary operators --
@@ -451,3 +456,7 @@ namespace glm
 #ifndef GLM_EXTERNAL_TEMPLATE
 #include "type_vec4.inl"
 #endif//GLM_EXTERNAL_TEMPLATE
+
+#define MIXIN_DIM 4
+#include "../urho/mixin_vec_global.inl"
+#undef MIXIN_DIM

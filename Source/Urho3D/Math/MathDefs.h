@@ -69,7 +69,7 @@ inline bool Equals(T lhs, T rhs) { return lhs + std::numeric_limits<T>::epsilon(
 
 /// Linear interpolation between two values.
 template <class T, class U>
-inline T Lerp(T lhs, T rhs, U t) { return lhs * (1.0 - t) + rhs * t; }
+inline T Lerp(T lhs, T rhs, U t) { return lhs * (1 - t) + rhs * t; }
 
 /// Inverse linear interpolation between two values.
 template <class T>

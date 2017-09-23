@@ -473,19 +473,19 @@ void CrowdAgent::SetNavigationPushiness(NavigationPushiness val)
 Vector3 CrowdAgent::GetPosition() const
 {
     const dtCrowdAgent* agent = GetDetourCrowdAgent();
-    return agent ? Vector3(agent->npos) : node_->GetWorldPosition();
+    return agent ? Vector3::FromData(agent->npos) : node_->GetWorldPosition();
 }
 
 Vector3 CrowdAgent::GetDesiredVelocity() const
 {
     const dtCrowdAgent* agent = GetDetourCrowdAgent();
-    return agent ? Vector3(agent->dvel) : Vector3::ZERO;
+    return agent ? Vector3::FromData(agent->dvel) : Vector3::ZERO;
 }
 
 Vector3 CrowdAgent::GetActualVelocity() const
 {
     const dtCrowdAgent* agent = GetDetourCrowdAgent();
-    return agent ? Vector3(agent->vel) : Vector3::ZERO;
+    return agent ? Vector3::FromData(agent->vel) : Vector3::ZERO;
 }
 
 CrowdAgentState CrowdAgent::GetAgentState() const
@@ -522,8 +522,8 @@ void CrowdAgent::OnCrowdUpdate(dtCrowdAgent* ag, float dt)
         // Use pointer to self to check for destruction after sending events
         WeakPtr<CrowdAgent> self(this);
 
-        Vector3 newPos(ag->npos);
-        Vector3 newVel(ag->vel);
+        Vector3 newPos = Vector3::FromData(ag->npos);
+        Vector3 newVel = Vector3::FromData(ag->vel);
 
         // Notify parent node of the reposition
         if (newPos != previousPosition_)

@@ -148,14 +148,14 @@ IntVector2 Deserializer::ReadIntVector2()
 {
     int data[2];
     Read(data, sizeof data);
-    return IntVector2(data);
+    return IntVector2::FromData(data);
 }
 
 IntVector3 Deserializer::ReadIntVector3()
 {
     int data[3];
     Read(data, sizeof data);
-    return IntVector3(data);
+    return IntVector3::FromData(data);
 }
 
 Rect Deserializer::ReadRect()
@@ -169,14 +169,14 @@ Vector2 Deserializer::ReadVector2()
 {
     float data[2];
     Read(data, sizeof data);
-    return Vector2(data);
+    return Vector2::FromData(data);
 }
 
 Vector3 Deserializer::ReadVector3()
 {
     float data[3];
     Read(data, sizeof data);
-    return Vector3(data);
+    return Vector3::FromData(data);
 }
 
 Vector3 Deserializer::ReadPackedVector3(float maxAbsCoord)
@@ -192,7 +192,7 @@ Vector4 Deserializer::ReadVector4()
 {
     float data[4];
     Read(data, sizeof data);
-    return Vector4(data);
+    return Vector4::FromData(data);
 }
 
 Quaternion Deserializer::ReadQuaternion()
@@ -241,9 +241,9 @@ Color Deserializer::ReadColor()
 
 BoundingBox Deserializer::ReadBoundingBox()
 {
-    float data[6];
-    Read(data, sizeof data);
-    return BoundingBox(Vector3(&data[0]), Vector3(&data[3]));
+    Vector3 min = ReadVector3();
+    Vector3 max = ReadVector3();
+    return BoundingBox(min, max);
 }
 
 String Deserializer::ReadString()

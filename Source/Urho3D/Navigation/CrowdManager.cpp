@@ -396,20 +396,20 @@ Vector3 CrowdManager::FindNearestPoint(const Vector3& point, int queryFilterType
     if (nearestRef)
         *nearestRef = 0;
     return crowd_ && navigationMesh_ ?
-        navigationMesh_->FindNearestPoint(point, Vector3(crowd_->getQueryExtents()), crowd_->getFilter(queryFilterType), nearestRef) : point;
+        navigationMesh_->FindNearestPoint(point, Vector3::FromData(crowd_->getQueryExtents()), crowd_->getFilter(queryFilterType), nearestRef) : point;
 }
 
 Vector3 CrowdManager::MoveAlongSurface(const Vector3& start, const Vector3& end, int queryFilterType, int maxVisited)
 {
     return crowd_ && navigationMesh_ ?
-        navigationMesh_->MoveAlongSurface(start, end, Vector3(crowd_->getQueryExtents()), maxVisited, crowd_->getFilter(queryFilterType)) :
+        navigationMesh_->MoveAlongSurface(start, end, Vector3::FromData(crowd_->getQueryExtents()), maxVisited, crowd_->getFilter(queryFilterType)) :
         end;
 }
 
 void CrowdManager::FindPath(PODVector<Vector3>& dest, const Vector3& start, const Vector3& end, int queryFilterType)
 {
     if (crowd_ && navigationMesh_)
-        navigationMesh_->FindPath(dest, start, end, Vector3(crowd_->getQueryExtents()), crowd_->getFilter(queryFilterType));
+        navigationMesh_->FindPath(dest, start, end, Vector3::FromData(crowd_->getQueryExtents()), crowd_->getFilter(queryFilterType));
 }
 
 Vector3 CrowdManager::GetRandomPoint(int queryFilterType, dtPolyRef* randomRef)
@@ -425,7 +425,7 @@ Vector3 CrowdManager::GetRandomPointInCircle(const Vector3& center, float radius
     if (randomRef)
         *randomRef = 0;
     return crowd_ && navigationMesh_ ?
-        navigationMesh_->GetRandomPointInCircle(center, radius, Vector3(crowd_->getQueryExtents()),
+        navigationMesh_->GetRandomPointInCircle(center, radius, Vector3::FromData(crowd_->getQueryExtents()),
             crowd_->getFilter(queryFilterType), randomRef) : center;
 }
 
@@ -436,7 +436,7 @@ float CrowdManager::GetDistanceToWall(const Vector3& point, float radius, int qu
     if (hitNormal)
         *hitNormal = Vector3::DOWN;
     return crowd_ && navigationMesh_ ?
-        navigationMesh_->GetDistanceToWall(point, radius, Vector3(crowd_->getQueryExtents()), crowd_->getFilter(queryFilterType),
+        navigationMesh_->GetDistanceToWall(point, radius, Vector3::FromData(crowd_->getQueryExtents()), crowd_->getFilter(queryFilterType),
             hitPos, hitNormal) : radius;
 }
 
@@ -445,7 +445,7 @@ Vector3 CrowdManager::Raycast(const Vector3& start, const Vector3& end, int quer
     if (hitNormal)
         *hitNormal = Vector3::DOWN;
     return crowd_ && navigationMesh_ ?
-        navigationMesh_->Raycast(start, end, Vector3(crowd_->getQueryExtents()), crowd_->getFilter(queryFilterType), hitNormal)
+        navigationMesh_->Raycast(start, end, Vector3::FromData(crowd_->getQueryExtents()), crowd_->getFilter(queryFilterType), hitNormal)
             : end;
 }
 

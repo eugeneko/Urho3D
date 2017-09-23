@@ -459,11 +459,11 @@ void DebugRenderer::AddCross(const Vector3& center, float size, const Color& col
     float halfSize = size / 2.0f;
     for (int i = 0; i < 3; ++i)
     {
-        float start[3] = { center.x, center.y, center.z };
-        float end[3] = { center.x, center.y, center.z };
+        Vector3 start = { center.x, center.y, center.z };
+        Vector3 end = { center.x, center.y, center.z };
         start[i] -= halfSize;
         end[i] += halfSize;
-        AddLine(Vector3(start), Vector3(end), uintColor, depthTest);
+        AddLine(start, end, uintColor, depthTest);
     }
 }
 
