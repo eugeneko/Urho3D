@@ -138,7 +138,7 @@ void CreateRagdoll::CreateRagdollBone(const String& boneName, ShapeType type, co
     if (type == SHAPE_BOX)
         shape->SetBox(size, position, rotation);
     else
-        shape->SetCapsule(size.x_, size.y_, position, rotation);
+        shape->SetCapsule(size.x, size.y, position, rotation);
 }
 
 void CreateRagdoll::CreateRagdollConstraint(const String& boneName, const String& parentName, ConstraintType type,

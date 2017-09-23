@@ -55,16 +55,16 @@ struct GlyphLocation
 {
     /// Construct.
     GlyphLocation(float x, float y, const FontGlyph* glyph) :
-        x_(x),
-        y_(y),
+        x(x),
+        y(y),
         glyph_(glyph)
     {
     }
 
     /// X coordinate.
-    float x_;
+    float x;
     /// Y coordinate.
-    float y_;
+    float y;
     /// Glyph.
     const FontGlyph* glyph_;
 };

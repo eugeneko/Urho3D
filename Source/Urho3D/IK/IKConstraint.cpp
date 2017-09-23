@@ -101,8 +101,8 @@ void IKConstraint::SetLengthConstraints(const Vector2& lengthConstraints)
     if (ikConstraintNode_ != nullptr)
     {
         /* TODO
-        ikNode_->min_length = lengthConstraints_.x_;
-        ikNode_->max_length = lengthConstraints_.y_;*/
+        ikNode_->min_length = lengthConstraints_.x;
+        ikNode_->max_length = lengthConstraints_.y;*/
     }
 }
 
@@ -115,8 +115,8 @@ void IKConstraint::SetIKConstraintNode(ik_node_t* constraintNode)
         /* TODO
         node->stiffness = stiffness_;
         node->stretchiness = stretchiness_;
-        node->min_length = lengthConstraints_.x_;
-        node->max_length = lengthConstraints_.y_;*/
+        node->min_length = lengthConstraints_.x;
+        node->max_length = lengthConstraints_.y;*/
     }
 }
 

@@ -319,12 +319,12 @@ function printDescriptions(filename, directory)
     line = line:gsub("%c", "")
     -- Entering Class
     if line:find("^%s*[Cc]lass%s+(.+)") ~= nil then
-      local classDefine = line:gsub("^%s*[Cc]lass%s+([%w_][^:;]*)%s*:*.*", "%1")
-      className = classDefine:gsub("[%w_]+%s+([%w_]+).*", "%1")
+      local classDefine = line:gsub("^%s*[Cc]lass%s+([%w][^:;]*)%s*:*.*", "%1")
+      className = classDefine:gsub("[%w]+%s+([%w]+).*", "%1")
     -- Struct Defined (same as Class)
     elseif line:find("^%s*[Ss]truct%s+(.+)") ~= nil then
-      local classDefine = line:gsub("^%s*[Ss]truct%s+([%w_][^:;]*)%s*:*.*", "%1")
-      className = classDefine:gsub("[%w_]+%s+([%w_]+).*", "%1")
+      local classDefine = line:gsub("^%s*[Ss]truct%s+([%w][^:;]*)%s*:*.*", "%1")
+      className = classDefine:gsub("[%w]+%s+([%w]+).*", "%1")
     elseif className ~= nil then
       -- Detecting Scope
       if line:find("^%s*(%w+)%s*:%s*$") ~= nil then
@@ -355,8 +355,8 @@ function getElementFromLine(line)
   element.params = nil
   element.type = nil
   -- Type Detect (Function)
-  if line:find("^.*%s*([%w_~]+)%s*%(.*%).*$") ~= nil then
-    element.name = line:gsub("^.*%s+([%w_~]+)%s*%(.*%).*$", "%1")
+  if line:find("^.*%s*([%w~]+)%s*%(.*%).*$") ~= nil then
+    element.name = line:gsub("^.*%s+([%w~]+)%s*%(.*%).*$", "%1")
     element.type = "functions"
     if line:find("^.+%(.*%)") ~= nil then
       element.params = {}
@@ -370,9 +370,9 @@ function getElementFromLine(line)
             param.type = "const "
             param_str = param_str:gsub("^%s*((const%s+)", "")
           end
-          param.type = param.type..param_str:gsub("^%s*([%w_]+).*$", "%1")
-          param.ptr = param_str:gsub("^%s*[%w_]+([%*&]?).*$", "%1")
-          param.name = param_str:gsub("^%s*[%w_]+[%*&]?%s+([%w_]+).*$", "%1")
+          param.type = param.type..param_str:gsub("^%s*([%w]+).*$", "%1")
+          param.ptr = param_str:gsub("^%s*[%w]+([%*&]?).*$", "%1")
+          param.name = param_str:gsub("^%s*[%w]+[%*&]?%s+([%w]+).*$", "%1")
           param.def = ""
           if param_str:find(".+=.+") then
             param.def = param_str:gsub("^.*=%s*(.*)$", "%1")
@@ -389,8 +389,8 @@ function getElementFromLine(line)
       end
     end
   -- Type Detect (Property)
-  elseif line:find("^.*%s+([%w_]+)%s*.*;%s*$") ~= nil then
-    element.name = line:gsub("^.*%s+([%w_]+)%s*.*;%s*$", "%1")
+  elseif line:find("^.*%s+([%w]+)%s*.*;%s*$") ~= nil then
+    element.name = line:gsub("^.*%s+([%w]+)%s*.*;%s*$", "%1")
     element.type = "properties"
   end
   return element

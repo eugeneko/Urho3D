@@ -371,7 +371,7 @@ public:
     const Vector3& GetPosition() const { return position_; }
 
     /// Return position in parent space (for Urho2D).
-    Vector2 GetPosition2D() const { return Vector2(position_.x_, position_.y_); }
+    Vector2 GetPosition2D() const { return Vector2(position_.x, position_.y); }
 
     /// Return rotation in parent space.
     const Quaternion& GetRotation() const { return rotation_; }
@@ -392,7 +392,7 @@ public:
     const Vector3& GetScale() const { return scale_; }
 
     /// Return scale in parent space (for Urho2D).
-    Vector2 GetScale2D() const { return Vector2(scale_.x_, scale_.y_); }
+    Vector2 GetScale2D() const { return Vector2(scale_.x, scale_.y); }
 
     /// Return parent space transform matrix.
     Matrix3x4 GetTransform() const { return Matrix3x4(position_, rotation_, scale_); }
@@ -410,7 +410,7 @@ public:
     Vector2 GetWorldPosition2D() const
     {
         Vector3 worldPosition = GetWorldPosition();
-        return Vector2(worldPosition.x_, worldPosition.y_);
+        return Vector2(worldPosition.x, worldPosition.y);
     }
 
     /// Return rotation in world space.
@@ -471,7 +471,7 @@ public:
     Vector2 GetWorldScale2D() const
     {
         Vector3 worldScale = GetWorldScale();
-        return Vector2(worldScale.x_, worldScale.y_);
+        return Vector2(worldScale.x, worldScale.y);
     }
 
     /// Return world space transform matrix.

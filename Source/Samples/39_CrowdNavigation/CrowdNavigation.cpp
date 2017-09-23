@@ -291,8 +291,8 @@ void CrowdNavigation::CreateMushroom(const Vector3& pos)
 
     // Create the navigation Obstacle component and set its height & radius proportional to scale
     Obstacle* obstacle = mushroomNode->CreateComponent<Obstacle>();
-    obstacle->SetRadius(mushroomNode->GetScale().x_);
-    obstacle->SetHeight(mushroomNode->GetScale().y_);
+    obstacle->SetRadius(mushroomNode->GetScale().x);
+    obstacle->SetHeight(mushroomNode->GetScale().y);
 }
 
 void CrowdNavigation::CreateBoxOffMeshConnections(DynamicNavigationMesh* navMesh, Node* boxGroup)
@@ -302,7 +302,7 @@ void CrowdNavigation::CreateBoxOffMeshConnections(DynamicNavigationMesh* navMesh
     {
         Node* box = boxes[i];
         Vector3 boxPos = box->GetPosition();
-        float boxHalfSize = box->GetScale().x_ / 2;
+        float boxHalfSize = box->GetScale().x / 2;
 
         // Create 2 empty nodes for the start & end points of the connection. Note that order matters only when using one-way/unidirectional connection.
         Node* connectionStart = box->CreateChild("ConnectionStart");
@@ -333,7 +333,7 @@ void CrowdNavigation::CreateMovingBarrels(DynamicNavigationMesh* navMesh)
         clone->SetScale(Vector3(size / 1.5f, size * 2.0f, size / 1.5f));
         clone->SetPosition(navMesh->FindNearestPoint(Vector3(Random(80.0f) - 40.0f, size * 0.5f, Random(80.0f) - 40.0f)));
         CrowdAgent* agent = clone->CreateComponent<CrowdAgent>();
-        agent->SetRadius(clone->GetScale().x_ * 0.5f);
+        agent->SetRadius(clone->GetScale().x * 0.5f);
         agent->SetHeight(size);
         agent->SetNavigationQuality(NAVIGATIONQUALITY_LOW);
     }
@@ -391,7 +391,7 @@ bool CrowdNavigation::Raycast(float maxDistance, Vector3& hitPos, Drawable*& hit
 
     Graphics* graphics = GetSubsystem<Graphics>();
     Camera* camera = cameraNode_->GetComponent<Camera>();
-    Ray cameraRay = camera->GetScreenRay((float)pos.x_ / graphics->GetWidth(), (float)pos.y_ / graphics->GetHeight());
+    Ray cameraRay = camera->GetScreenRay((float)pos.x / graphics->GetWidth(), (float)pos.y / graphics->GetHeight());
     // Pick only geometry objects, not eg. zones or lights, only get the first (closest) hit
     PODVector<RayQueryResult> results;
     RayOctreeQuery query(results, cameraRay, RAY_TRIANGLE, maxDistance, DRAWABLE_GEOMETRY);
@@ -428,8 +428,8 @@ void CrowdNavigation::MoveCamera(float timeStep)
     if (!ui->GetCursor()->IsVisible())
     {
         IntVector2 mouseMove = input->GetMouseMove();
-        yaw_ += MOUSE_SENSITIVITY * mouseMove.x_;
-        pitch_ += MOUSE_SENSITIVITY * mouseMove.y_;
+        yaw_ += MOUSE_SENSITIVITY * mouseMove.x;
+        pitch_ += MOUSE_SENSITIVITY * mouseMove.y;
         pitch_ = Clamp(pitch_, -90.0f, 90.0f);
 
         // Construct new orientation for the camera scene node from yaw and pitch. Roll is fixed to zero
@@ -514,7 +514,7 @@ void CrowdNavigation::UpdateStreaming()
     for (HashSet<IntVector2>::Iterator i = addedTiles_.Begin(); i != addedTiles_.End();)
     {
         const IntVector2 tileIdx = *i;
-        if (beginTile.x_ <= tileIdx.x_ && tileIdx.x_ <= endTile.x_ && beginTile.y_ <= tileIdx.y_ && tileIdx.y_ <= endTile.y_)
+        if (beginTile.x <= tileIdx.x && tileIdx.x <= endTile.x && beginTile.y <= tileIdx.y && tileIdx.y <= endTile.y)
             ++i;
         else
         {
@@ -524,8 +524,8 @@ void CrowdNavigation::UpdateStreaming()
     }
 
     // Add tiles
-    for (int z = beginTile.y_; z <= endTile.y_; ++z)
-        for (int x = beginTile.x_; x <= endTile.x_; ++x)
+    for (int z = beginTile.y; z <= endTile.y; ++z)
+        for (int x = beginTile.x; x <= endTile.x; ++x)
         {
             const IntVector2 tileIdx(x, z);
             if (!navMesh->HasTile(tileIdx) && tileData_.Contains(tileIdx))
@@ -542,8 +542,8 @@ void CrowdNavigation::SaveNavigationData()
     tileData_.Clear();
     addedTiles_.Clear();
     const IntVector2 numTiles = navMesh->GetNumTiles();
-    for (int z = 0; z < numTiles.y_; ++z)
-        for (int x = 0; x <= numTiles.x_; ++x)
+    for (int z = 0; z < numTiles.y; ++z)
+        for (int x = 0; x <= numTiles.x; ++x)
         {
             const IntVector2 tileIdx = IntVector2(x, z);
             tileData_[tileIdx] = navMesh->GetTileData(tileIdx);

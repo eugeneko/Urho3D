@@ -361,15 +361,15 @@ void Sample::HandleSceneUpdate(StringHash /*eventType*/, VariantMap& eventData)
             TouchState* state = input->GetTouch(i);
             if (!state->touchedElement_)    // Touch on empty space
             {
-                if (state->delta_.x_ ||state->delta_.y_)
+                if (state->delta_.x ||state->delta_.y)
                 {
                     Camera* camera = cameraNode_->GetComponent<Camera>();
                     if (!camera)
                         return;
 
                     Graphics* graphics = GetSubsystem<Graphics>();
-                    yaw_ += TOUCH_SENSITIVITY * camera->GetFov() / graphics->GetHeight() * state->delta_.x_;
-                    pitch_ += TOUCH_SENSITIVITY * camera->GetFov() / graphics->GetHeight() * state->delta_.y_;
+                    yaw_ += TOUCH_SENSITIVITY * camera->GetFov() / graphics->GetHeight() * state->delta_.x;
+                    pitch_ += TOUCH_SENSITIVITY * camera->GetFov() / graphics->GetHeight() * state->delta_.y;
 
                     // Construct new orientation for the camera scene node from yaw and pitch; roll is fixed to zero
                     cameraNode_->SetRotation(Quaternion(pitch_, yaw_, 0.0f));

@@ -32,8 +32,8 @@ class Vector2
 
     String ToString() const;
 
-    float x_ @ x;
-    float y_ @ y;
+    float x @ x;
+    float y @ y;
 
     static const Vector2 ZERO;
     static const Vector2 LEFT;
@@ -63,8 +63,8 @@ class IntVector2
     unsigned ToHash() const;
     float Length() const;
 
-    int x_ @ x;
-    int y_ @ y;
+    int x @ x;
+    int y @ y;
 
     static const IntVector2 ZERO;
     static const IntVector2 LEFT;

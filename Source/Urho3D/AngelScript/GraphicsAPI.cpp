@@ -1936,7 +1936,7 @@ static Renderer* GetRenderer()
 
 static void RendererSetVSMShadowParameters(const Vector2& parameters, Renderer* ptr)
 {
-    ptr->SetVSMShadowParameters(parameters.x_, parameters.y_);
+    ptr->SetVSMShadowParameters(parameters.x, parameters.y);
 }
 
 static void RegisterRenderer(asIScriptEngine* engine)

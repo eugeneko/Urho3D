@@ -362,7 +362,7 @@ void WriteIES(unsigned char* data, unsigned width, unsigned height, PODVector<fl
                     if (height > 1)
                     {
                         Vector3 normalized = dirVec.Normalized();
-                        float angle = Atan2(normalized.x_, normalized.y_) - maxHoriz;
+                        float angle = Atan2(normalized.x, normalized.y) - maxHoriz;
                         while (angle < 0)
                             angle += 360.0f;
                         const float moddedAngle = fmodf(angle, maxVert);

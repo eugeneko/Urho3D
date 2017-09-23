@@ -203,8 +203,8 @@ static void RegisterIntVector2(asIScriptEngine* engine)
     engine->RegisterObjectMethod("IntVector2", "String ToString() const", asMETHOD(IntVector2, ToString), asCALL_THISCALL);
     engine->RegisterObjectMethod("IntVector2", "uint ToHash() const", asMETHOD(IntVector2, ToHash), asCALL_THISCALL);
     engine->RegisterObjectMethod("IntVector2", "float Length() const", asMETHOD(IntVector2, Length), asCALL_THISCALL);
-    engine->RegisterObjectProperty("IntVector2", "int x", offsetof(IntVector2, x_));
-    engine->RegisterObjectProperty("IntVector2", "int y", offsetof(IntVector2, y_));
+    engine->RegisterObjectProperty("IntVector2", "int x", offsetof(IntVector2, x));
+    engine->RegisterObjectProperty("IntVector2", "int y", offsetof(IntVector2, y));
     engine->RegisterGlobalFunction("IntVector2 VectorMin(const IntVector2&in, const IntVector2&in)", asFUNCTIONPR(VectorMin, (const IntVector2&, const IntVector2&), IntVector2), asCALL_CDECL);
     engine->RegisterGlobalFunction("IntVector2 VectorMax(const IntVector2&in, const IntVector2&in)", asFUNCTIONPR(VectorMax, (const IntVector2&, const IntVector2&), IntVector2), asCALL_CDECL);
 
@@ -269,9 +269,9 @@ static void RegisterIntVector3(asIScriptEngine* engine)
     engine->RegisterObjectMethod("IntVector3", "String ToString() const", asMETHOD(IntVector3, ToString), asCALL_THISCALL);
     engine->RegisterObjectMethod("IntVector3", "uint ToHash() const", asMETHOD(IntVector3, ToHash), asCALL_THISCALL);
     engine->RegisterObjectMethod("IntVector3", "float Length() const", asMETHOD(IntVector3, Length), asCALL_THISCALL);
-    engine->RegisterObjectProperty("IntVector3", "int x", offsetof(IntVector3, x_));
-    engine->RegisterObjectProperty("IntVector3", "int y", offsetof(IntVector3, y_));
-    engine->RegisterObjectProperty("IntVector3", "int z", offsetof(IntVector3, z_));
+    engine->RegisterObjectProperty("IntVector3", "int x", offsetof(IntVector3, x));
+    engine->RegisterObjectProperty("IntVector3", "int y", offsetof(IntVector3, y));
+    engine->RegisterObjectProperty("IntVector3", "int z", offsetof(IntVector3, z));
     engine->RegisterGlobalFunction("IntVector3 VectorMin(const IntVector3&in, const IntVector3&in)", asFUNCTIONPR(VectorMin, (const IntVector3&, const IntVector3&), IntVector3), asCALL_CDECL);
     engine->RegisterGlobalFunction("IntVector3 VectorMax(const IntVector3&in, const IntVector3&in)", asFUNCTIONPR(VectorMax, (const IntVector3&, const IntVector3&), IntVector3), asCALL_CDECL);
 
@@ -354,8 +354,8 @@ static void RegisterVector2(asIScriptEngine* engine)
     engine->RegisterObjectMethod("Vector2", "String ToString() const", asMETHOD(Vector2, ToString), asCALL_THISCALL);
     engine->RegisterObjectMethod("Vector2", "float get_length() const", asMETHOD(Vector2, Length), asCALL_THISCALL);
     engine->RegisterObjectMethod("Vector2", "float get_lengthSquared() const", asMETHOD(Vector2, LengthSquared), asCALL_THISCALL);
-    engine->RegisterObjectProperty("Vector2", "float x", offsetof(Vector2, x_));
-    engine->RegisterObjectProperty("Vector2", "float y", offsetof(Vector2, y_));
+    engine->RegisterObjectProperty("Vector2", "float x", offsetof(Vector2, x));
+    engine->RegisterObjectProperty("Vector2", "float y", offsetof(Vector2, y));
 
     engine->RegisterGlobalFunction("float StableRandom(const Vector2&in)", asFUNCTIONPR(StableRandom, (const Vector2&), float), asCALL_CDECL);
     engine->RegisterGlobalFunction("float StableRandom(float)", asFUNCTIONPR(StableRandom, (float), float), asCALL_CDECL);
@@ -466,9 +466,9 @@ static void RegisterVector3(asIScriptEngine* engine)
     engine->RegisterObjectMethod("Vector3", "String ToString() const", asMETHOD(Vector3, ToString), asCALL_THISCALL);
     engine->RegisterObjectMethod("Vector3", "float get_length() const", asMETHOD(Vector3, Length), asCALL_THISCALL);
     engine->RegisterObjectMethod("Vector3", "float get_lengthSquared() const", asMETHOD(Vector3, LengthSquared), asCALL_THISCALL);
-    engine->RegisterObjectProperty("Vector3", "float x", offsetof(Vector3, x_));
-    engine->RegisterObjectProperty("Vector3", "float y", offsetof(Vector3, y_));
-    engine->RegisterObjectProperty("Vector3", "float z", offsetof(Vector3, z_));
+    engine->RegisterObjectProperty("Vector3", "float x", offsetof(Vector3, x));
+    engine->RegisterObjectProperty("Vector3", "float y", offsetof(Vector3, y));
+    engine->RegisterObjectProperty("Vector3", "float z", offsetof(Vector3, z));
 
     engine->RegisterGlobalFunction("float StableRandom(const Vector3&in)", asFUNCTIONPR(StableRandom, (const Vector3&), float), asCALL_CDECL);
     engine->RegisterGlobalFunction("Vector3 VectorLerp(const Vector3&in, const Vector3&in, const Vector3&in)", asFUNCTIONPR(VectorLerp, (const Vector3&, const Vector3&, const Vector3&), Vector3), asCALL_CDECL);
@@ -555,10 +555,10 @@ static void RegisterVector4(asIScriptEngine* engine)
     engine->RegisterObjectMethod("Vector4", "bool Equals(const Vector4&in) const", asMETHOD(Vector4, Equals), asCALL_THISCALL);
     engine->RegisterObjectMethod("Vector4", "bool IsNaN() const", asMETHOD(Vector4, IsNaN), asCALL_THISCALL);
     engine->RegisterObjectMethod("Vector4", "String ToString() const", asMETHOD(Vector4, ToString), asCALL_THISCALL);
-    engine->RegisterObjectProperty("Vector4", "float x", offsetof(Vector4, x_));
-    engine->RegisterObjectProperty("Vector4", "float y", offsetof(Vector4, y_));
-    engine->RegisterObjectProperty("Vector4", "float z", offsetof(Vector4, z_));
-    engine->RegisterObjectProperty("Vector4", "float w", offsetof(Vector4, w_));
+    engine->RegisterObjectProperty("Vector4", "float x", offsetof(Vector4, x));
+    engine->RegisterObjectProperty("Vector4", "float y", offsetof(Vector4, y));
+    engine->RegisterObjectProperty("Vector4", "float z", offsetof(Vector4, z));
+    engine->RegisterObjectProperty("Vector4", "float w", offsetof(Vector4, w));
 
     engine->RegisterGlobalFunction("Vector4 VectorLerp(const Vector4&in, const Vector4&in, const Vector4&in)", asFUNCTIONPR(VectorLerp, (const Vector4&, const Vector4&, const Vector4&), Vector4), asCALL_CDECL);
     engine->RegisterGlobalFunction("Vector4 VectorMin(const Vector4&in, const Vector4&in)", asFUNCTIONPR(VectorMin, (const Vector4&, const Vector4&), Vector4), asCALL_CDECL);
@@ -600,7 +600,7 @@ static void ConstructQuaternionEuler(float angleX, float angleY, float angleZ, Q
 
 static void ConstructQuaternionEulerVector(const Vector3& angles, Quaternion* ptr)
 {
-    new(ptr) Quaternion(angles.x_, angles.y_, angles.z_);
+    new(ptr) Quaternion(angles.x, angles.y, angles.z);
 }
 
 static void ConstructQuaternionRotation(const Vector3& start, const Vector3& end, Quaternion* ptr)
@@ -664,10 +664,10 @@ static void RegisterQuaternion(asIScriptEngine* engine)
     engine->RegisterObjectMethod("Quaternion", "Quaternion Slerp(const Quaternion&in, float) const", asMETHOD(Quaternion, Slerp), asCALL_THISCALL);
     engine->RegisterObjectMethod("Quaternion", "Quaternion Nlerp(const Quaternion&in, float, bool) const", asMETHOD(Quaternion, Nlerp), asCALL_THISCALL);
     engine->RegisterObjectMethod("Quaternion", "String ToString() const", asMETHOD(Quaternion, ToString), asCALL_THISCALL);
-    engine->RegisterObjectProperty("Quaternion", "float w", offsetof(Quaternion, w_));
-    engine->RegisterObjectProperty("Quaternion", "float x", offsetof(Quaternion, x_));
-    engine->RegisterObjectProperty("Quaternion", "float y", offsetof(Quaternion, y_));
-    engine->RegisterObjectProperty("Quaternion", "float z", offsetof(Quaternion, z_));
+    engine->RegisterObjectProperty("Quaternion", "float w", offsetof(Quaternion, w));
+    engine->RegisterObjectProperty("Quaternion", "float x", offsetof(Quaternion, x));
+    engine->RegisterObjectProperty("Quaternion", "float y", offsetof(Quaternion, y));
+    engine->RegisterObjectProperty("Quaternion", "float z", offsetof(Quaternion, z));
 }
 
 static void ConstructMatrix3(Matrix3* ptr)
@@ -1054,10 +1054,10 @@ static void RegisterRect(asIScriptEngine* engine)
     engine->RegisterObjectMethod("Rect", "Vector2 get_halfSize() const", asMETHOD(Rect, HalfSize), asCALL_THISCALL);
     engine->RegisterObjectProperty("Rect", "Vector2 min", offsetof(Rect, min_));
     engine->RegisterObjectProperty("Rect", "Vector2 max", offsetof(Rect, max_));
-    engine->RegisterObjectProperty("Rect", "float left", offsetof(Rect, min_.x_));
-    engine->RegisterObjectProperty("Rect", "float top", offsetof(Rect, min_.y_));
-    engine->RegisterObjectProperty("Rect", "float right", offsetof(Rect, max_.x_));
-    engine->RegisterObjectProperty("Rect", "float bottom", offsetof(Rect, max_.y_));
+    engine->RegisterObjectProperty("Rect", "float left", offsetof(Rect, min_.x));
+    engine->RegisterObjectProperty("Rect", "float top", offsetof(Rect, min_.y));
+    engine->RegisterObjectProperty("Rect", "float right", offsetof(Rect, max_.x));
+    engine->RegisterObjectProperty("Rect", "float bottom", offsetof(Rect, max_.y));
 }
 
 static void ConstructBoundingBox(BoundingBox* ptr)

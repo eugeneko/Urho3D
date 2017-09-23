@@ -468,12 +468,12 @@ void Node::SetScale(const Vector3& scale)
     scale_ = scale;
     // Prevent exact zero scale e.g. from momentary edits as this may cause division by zero
     // when decomposing the world transform matrix
-    if (scale_.x_ == 0.0f)
-        scale_.x_ = M_EPSILON;
-    if (scale_.y_ == 0.0f)
-        scale_.y_ = M_EPSILON;
-    if (scale_.z_ == 0.0f)
-        scale_.z_ = M_EPSILON;
+    if (scale_.x == 0.0f)
+        scale_.x = M_EPSILON;
+    if (scale_.y == 0.0f)
+        scale_.y = M_EPSILON;
+    if (scale_.z == 0.0f)
+        scale_.z = M_EPSILON;
 
     MarkDirty();
     MarkNetworkUpdate();
@@ -1192,7 +1192,7 @@ Vector3 Node::LocalToWorld(const Vector4& vector) const
 Vector2 Node::LocalToWorld2D(const Vector2& vector) const
 {
     Vector3 result = LocalToWorld(Vector3(vector));
-    return Vector2(result.x_, result.y_);
+    return Vector2(result.x, result.y);
 }
 
 Vector3 Node::WorldToLocal(const Vector3& position) const
@@ -1208,7 +1208,7 @@ Vector3 Node::WorldToLocal(const Vector4& vector) const
 Vector2 Node::WorldToLocal2D(const Vector2& vector) const
 {
     Vector3 result = WorldToLocal(Vector3(vector));
-    return Vector2(result.x_, result.y_);
+    return Vector2(result.x, result.y);
 }
 
 unsigned Node::GetNumChildren(bool recursive) const

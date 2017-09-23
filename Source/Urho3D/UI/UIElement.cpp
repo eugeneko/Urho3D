@@ -416,13 +416,13 @@ void UIElement::GetDebugDrawBatches(PODVector<UIBatch>& batches, PODVector<float
 
     batch.SetColor(Color::BLUE, true);
     // Left
-    batch.AddQuad(0, 0, horizontalThickness, size_.y_, 0, 0);
+    batch.AddQuad(0, 0, horizontalThickness, size_.y, 0, 0);
     // Top
-    batch.AddQuad(0, 0, size_.x_, verticalThickness, 0, 0);
+    batch.AddQuad(0, 0, size_.x, verticalThickness, 0, 0);
     // Right
-    batch.AddQuad(size_.x_ - horizontalThickness, 0, horizontalThickness, size_.y_, 0, 0);
+    batch.AddQuad(size_.x - horizontalThickness, 0, horizontalThickness, size_.y, 0, 0);
     // Bottom
-    batch.AddQuad(0, size_.y_ - verticalThickness, size_.x_, verticalThickness, 0, 0);
+    batch.AddQuad(0, size_.y - verticalThickness, size_.x, verticalThickness, 0, 0);
 
     UIBatch::AddOrMerge(batch, batches);
 }
@@ -433,8 +433,8 @@ bool UIElement::IsWithinScissor(const IntRect& currentScissor)
         return false;
 
     const IntVector2& screenPos = GetScreenPosition();
-    return screenPos.x_ < currentScissor.right_ && screenPos.x_ + GetWidth() > currentScissor.left_ &&
-           screenPos.y_ < currentScissor.bottom_ && screenPos.y_ + GetHeight() > currentScissor.top_;
+    return screenPos.x < currentScissor.right_ && screenPos.x + GetWidth() > currentScissor.left_ &&
+           screenPos.y < currentScissor.bottom_ && screenPos.y + GetHeight() > currentScissor.top_;
 }
 
 const IntVector2& UIElement::GetScreenPosition() const
@@ -448,10 +448,10 @@ const IntVector2& UIElement::GetScreenPosition() const
         {
             const IntVector2& parentScreenPos = parent->GetScreenPosition();
 
-            pos.x_ += parentScreenPos.x_ + (int)Lerp(0.0f, (float)parent->size_.x_, anchorMin_.x_);
-            pos.y_ += parentScreenPos.y_ + (int)Lerp(0.0f, (float)parent->size_.y_, anchorMin_.y_);
-            pos.x_ -= (int)(size_.x_ * pivot_.x_);
-            pos.y_ -= (int)(size_.y_ * pivot_.y_);
+            pos.x += parentScreenPos.x + (int)Lerp(0.0f, (float)parent->size_.x, anchorMin_.x);
+            pos.y += parentScreenPos.y + (int)Lerp(0.0f, (float)parent->size_.y, anchorMin_.y);
+            pos.x -= (int)(size_.x * pivot_.x);
+            pos.y -= (int)(size_.y * pivot_.y);
 
             pos += parent_->childOffset_;
         }
@@ -579,8 +579,8 @@ void UIElement::SetPosition(const IntVector2& position)
 
         VariantMap& eventData = GetEventDataMap();
         eventData[P_ELEMENT] = this;
-        eventData[P_X] = position.x_;
-        eventData[P_Y] = position.y_;
+        eventData[P_X] = position.x;
+        eventData[P_Y] = position.y;
         SendEvent(E_POSITIONED, eventData);
     }
 }
@@ -597,8 +597,8 @@ void UIElement::SetSize(const IntVector2& size)
     IntVector2 oldSize = size_;
     IntVector2 validatedSize;
     IntVector2 effectiveMinSize = GetEffectiveMinSize();
-    validatedSize.x_ = Clamp(size.x_, effectiveMinSize.x_, maxSize_.x_);
-    validatedSize.y_ = Clamp(size.y_, effectiveMinSize.y_, maxSize_.y_);
+    validatedSize.x = Clamp(size.x, effectiveMinSize.x, maxSize_.x);
+    validatedSize.y = Clamp(size.y, effectiveMinSize.y, maxSize_.y);
 
     if (validatedSize != size_)
     {
@@ -619,10 +619,10 @@ void UIElement::SetSize(const IntVector2& size)
 
             VariantMap& eventData = GetEventDataMap();
             eventData[P_ELEMENT] = this;
-            eventData[P_WIDTH] = size_.x_;
-            eventData[P_HEIGHT] = size_.y_;
-            eventData[P_DX] = delta.x_;
-            eventData[P_DY] = delta.y_;
+            eventData[P_WIDTH] = size_.x;
+            eventData[P_HEIGHT] = size_.y;
+            eventData[P_DX] = delta.x;
+            eventData[P_DY] = delta.y;
             SendEvent(E_RESIZED, eventData);
         }
     }
@@ -637,18 +637,18 @@ void UIElement::SetSize(int width, int height)
 
 void UIElement::SetWidth(int width)
 {
-    SetSize(IntVector2(width, size_.y_));
+    SetSize(IntVector2(width, size_.y));
 }
 
 void UIElement::SetHeight(int height)
 {
-    SetSize(IntVector2(size_.x_, height));
+    SetSize(IntVector2(size_.x, height));
 }
 
 void UIElement::SetMinSize(const IntVector2& minSize)
 {
-    minSize_.x_ = Max(minSize.x_, 0);
-    minSize_.y_ = Max(minSize.y_, 0);
+    minSize_.x = Max(minSize.x, 0);
+    minSize_.y = Max(minSize.y, 0);
     SetSize(size_);
 }
 
@@ -659,18 +659,18 @@ void UIElement::SetMinSize(int width, int height)
 
 void UIElement::SetMinWidth(int width)
 {
-    SetMinSize(IntVector2(width, minSize_.y_));
+    SetMinSize(IntVector2(width, minSize_.y));
 }
 
 void UIElement::SetMinHeight(int height)
 {
-    SetMinSize(IntVector2(minSize_.x_, height));
+    SetMinSize(IntVector2(minSize_.x, height));
 }
 
 void UIElement::SetMaxSize(const IntVector2& maxSize)
 {
-    maxSize_.x_ = Max(maxSize.x_, 0);
-    maxSize_.y_ = Max(maxSize.y_, 0);
+    maxSize_.x = Max(maxSize.x, 0);
+    maxSize_.y = Max(maxSize.y, 0);
     SetSize(size_);
 }
 
@@ -681,17 +681,17 @@ void UIElement::SetMaxSize(int width, int height)
 
 void UIElement::SetMaxWidth(int width)
 {
-    SetMaxSize(IntVector2(width, maxSize_.y_));
+    SetMaxSize(IntVector2(width, maxSize_.y));
 }
 
 void UIElement::SetMaxHeight(int height)
 {
-    SetMaxSize(IntVector2(maxSize_.x_, height));
+    SetMaxSize(IntVector2(maxSize_.x, height));
 }
 
 void UIElement::SetFixedSize(const IntVector2& size)
 {
-    minSize_ = maxSize_ = IntVector2(Max(size.x_, 0), Max(size.y_, 0));
+    minSize_ = maxSize_ = IntVector2(Max(size.x, 0), Max(size.y, 0));
     SetSize(size);
 }
 
@@ -702,13 +702,13 @@ void UIElement::SetFixedSize(int width, int height)
 
 void UIElement::SetFixedWidth(int width)
 {
-    minSize_.x_ = maxSize_.x_ = Max(width, 0);
+    minSize_.x = maxSize_.x = Max(width, 0);
     SetWidth(width);
 }
 
 void UIElement::SetFixedHeight(int height)
 {
-    minSize_.y_ = maxSize_.y_ = Max(height, 0);
+    minSize_.y = maxSize_.y = Max(height, 0);
     SetHeight(height);
 }
 
@@ -728,23 +728,23 @@ void UIElement::SetHorizontalAlignment(HorizontalAlignment align)
 
     Vector2 min = anchorMin_;
     Vector2 max = anchorMax_;
-    float pivot = pivot_.x_;
-    float anchorSize = max.x_ - min.x_;
+    float pivot = pivot_.x;
+    float anchorSize = max.x - min.x;
 
     if (align == HA_CENTER)
-        min.x_ = pivot = 0.5f;
+        min.x = pivot = 0.5f;
     else if (align == HA_LEFT)
-        min.x_ = pivot = 0.0f;
+        min.x = pivot = 0.0f;
     else if (align == HA_RIGHT)
-        min.x_ = pivot = 1.0f;
+        min.x = pivot = 1.0f;
 
-    max.x_ = enableAnchor_ ? (min.x_ + anchorSize) : min.x_;
+    max.x = enableAnchor_ ? (min.x + anchorSize) : min.x;
 
-    if (min.x_ != anchorMin_.x_ || max.x_ != anchorMax_.x_ || pivot != pivot_.x_)
+    if (min.x != anchorMin_.x || max.x != anchorMax_.x || pivot != pivot_.x)
     {
-        anchorMin_.x_ = min.x_;
-        anchorMax_.x_ = max.x_;
-        pivot_.x_ = pivot;
+        anchorMin_.x = min.x;
+        anchorMax_.x = max.x;
+        pivot_.x = pivot;
         if (enableAnchor_)
             UpdateAnchoring();
         MarkDirty();
@@ -761,23 +761,23 @@ void UIElement::SetVerticalAlignment(VerticalAlignment align)
 
     Vector2 min = anchorMin_;
     Vector2 max = anchorMax_;
-    float pivot = pivot_.y_;
-    float anchorSize = max.y_ - min.y_;
+    float pivot = pivot_.y;
+    float anchorSize = max.y - min.y;
 
     if (align == VA_CENTER)
-        min.y_ = pivot = 0.5f;
+        min.y = pivot = 0.5f;
     else if (align == VA_TOP)
-        min.y_ = pivot = 0.0f;
+        min.y = pivot = 0.0f;
     else if (align == VA_BOTTOM)
-        min.y_ = pivot = 1.0f;
+        min.y = pivot = 1.0f;
 
-    max.y_ = enableAnchor_ ? (min.y_ + anchorSize) : min.y_;
+    max.y = enableAnchor_ ? (min.y + anchorSize) : min.y;
 
-    if (min.y_ != anchorMin_.y_ || max.y_ != anchorMax_.y_ || pivot != pivot_.y_)
+    if (min.y != anchorMin_.y || max.y != anchorMax_.y || pivot != pivot_.y)
     {
-        anchorMin_.y_ = min.y_;
-        anchorMax_.y_ = max.y_;
-        pivot_.y_ = pivot;
+        anchorMin_.y = min.y;
+        anchorMax_.y = max.y;
+        pivot_.y = pivot;
         if (enableAnchor_)
             UpdateAnchoring();
         MarkDirty();
@@ -1113,7 +1113,7 @@ void UIElement::SetLayoutBorder(const IntRect& border)
 
 void UIElement::SetLayoutFlexScale(const Vector2& scale)
 {
-    layoutFlexScale_ = Vector2(Max(scale.x_, 0.0f), Max(scale.y_, 0.0f));
+    layoutFlexScale_ = Vector2(Max(scale.x, 0.0f), Max(scale.y, 0.0f));
 }
 
 void UIElement::SetIndent(int indent)
@@ -1161,10 +1161,10 @@ void UIElement::UpdateLayout()
             positions.Push(baseIndentWidth);
             unsigned indent = (unsigned)children_[i]->GetIndentWidth();
             sizes.Push(children_[i]->GetWidth() + indent);
-            minSizes.Push(children_[i]->GetEffectiveMinSize().x_ + indent);
+            minSizes.Push(children_[i]->GetEffectiveMinSize().x + indent);
             maxSizes.Push(children_[i]->GetMaxWidth() + indent);
-            flexScales.Push(children_[i]->GetLayoutFlexScale().x_);
-            minChildHeight = Max(minChildHeight, children_[i]->GetEffectiveMinSize().y_);
+            flexScales.Push(children_[i]->GetLayoutFlexScale().x);
+            minChildHeight = Max(minChildHeight, children_[i]->GetEffectiveMinSize().y);
         }
 
         CalculateLayout(positions, sizes, minSizes, maxSizes, flexScales, GetWidth(), layoutBorder_.left_, layoutBorder_.right_,
@@ -1177,15 +1177,15 @@ void UIElement::UpdateLayout()
         layoutMinSize_ = IntVector2(minWidth, minHeight);
         SetSize(width, height);
         // Validate the size before resizing child elements, in case of min/max limits
-        width = size_.x_;
-        height = size_.y_;
+        width = size_.x;
+        height = size_.y;
 
         unsigned j = 0;
         for (unsigned i = 0; i < children_.Size(); ++i)
         {
             if (!children_[i]->IsVisible())
                 continue;
-            children_[i]->SetPosition(positions[j], GetLayoutChildPosition(children_[i]).y_);
+            children_[i]->SetPosition(positions[j], GetLayoutChildPosition(children_[i]).y);
             children_[i]->SetSize(sizes[j], height - layoutBorder_.top_ - layoutBorder_.bottom_);
             ++j;
         }
@@ -1200,10 +1200,10 @@ void UIElement::UpdateLayout()
                 continue;
             positions.Push(0);
             sizes.Push(children_[i]->GetHeight());
-            minSizes.Push(children_[i]->GetEffectiveMinSize().y_);
+            minSizes.Push(children_[i]->GetEffectiveMinSize().y);
             maxSizes.Push(children_[i]->GetMaxHeight());
-            flexScales.Push(children_[i]->GetLayoutFlexScale().y_);
-            minChildWidth = Max(minChildWidth, children_[i]->GetEffectiveMinSize().x_ + children_[i]->GetIndentWidth());
+            flexScales.Push(children_[i]->GetLayoutFlexScale().y);
+            minChildWidth = Max(minChildWidth, children_[i]->GetEffectiveMinSize().x + children_[i]->GetIndentWidth());
         }
 
         CalculateLayout(positions, sizes, minSizes, maxSizes, flexScales, GetHeight(), layoutBorder_.top_, layoutBorder_.bottom_,
@@ -1215,15 +1215,15 @@ void UIElement::UpdateLayout()
         int minWidth = minChildWidth + layoutBorder_.left_ + layoutBorder_.right_;
         layoutMinSize_ = IntVector2(minWidth, minHeight);
         SetSize(width, height);
-        width = size_.x_;
-        height = size_.y_;
+        width = size_.x;
+        height = size_.y;
 
         unsigned j = 0;
         for (unsigned i = 0; i < children_.Size(); ++i)
         {
             if (!children_[i]->IsVisible())
                 continue;
-            children_[i]->SetPosition(GetLayoutChildPosition(children_[i]).x_ + baseIndentWidth, positions[j]);
+            children_[i]->SetPosition(GetLayoutChildPosition(children_[i]).x + baseIndentWidth, positions[j]);
             children_[i]->SetSize(width - layoutBorder_.left_ - layoutBorder_.right_, sizes[j]);
             ++j;
         }
@@ -1536,11 +1536,11 @@ void UIElement::RemoveAllTags()
 
 HorizontalAlignment UIElement::GetHorizontalAlignment() const
 {
-    if (anchorMin_.x_ == 0.0f && anchorMax_.x_ == 0.0f && (!pivotSet_ || pivot_.x_ == 0.0f))
+    if (anchorMin_.x == 0.0f && anchorMax_.x == 0.0f && (!pivotSet_ || pivot_.x == 0.0f))
         return HA_LEFT;
-    else if (anchorMin_.x_ == 0.5f && anchorMax_.x_ == 0.5f && (!pivotSet_ || pivot_.x_ == 0.5f))
+    else if (anchorMin_.x == 0.5f && anchorMax_.x == 0.5f && (!pivotSet_ || pivot_.x == 0.5f))
         return HA_CENTER;
-    else if (anchorMin_.x_ == 1.0f && anchorMax_.x_ == 1.0f && (!pivotSet_ || pivot_.x_ == 1.0f))
+    else if (anchorMin_.x == 1.0f && anchorMax_.x == 1.0f && (!pivotSet_ || pivot_.x == 1.0f))
         return HA_RIGHT;
 
     return HA_CUSTOM;
@@ -1548,11 +1548,11 @@ HorizontalAlignment UIElement::GetHorizontalAlignment() const
 
 VerticalAlignment UIElement::GetVerticalAlignment() const
 {
-    if (anchorMin_.y_ == 0.0f && anchorMax_.y_ == 0.0f && (!pivotSet_ || pivot_.y_ == 0.0f))
+    if (anchorMin_.y == 0.0f && anchorMax_.y == 0.0f && (!pivotSet_ || pivot_.y == 0.0f))
         return VA_TOP;
-    else if (anchorMin_.y_ == 0.5f && anchorMax_.y_ == 0.5f && (!pivotSet_ || pivot_.y_ == 0.5f))
+    else if (anchorMin_.y == 0.5f && anchorMax_.y == 0.5f && (!pivotSet_ || pivot_.y == 0.5f))
         return VA_CENTER;
-    else if (anchorMin_.y_ == 1.0f && anchorMax_.y_ == 1.0f && (!pivotSet_ || pivot_.y_ == 1.0f))
+    else if (anchorMin_.y == 1.0f && anchorMax_.y == 1.0f && (!pivotSet_ || pivot_.y == 1.0f))
         return VA_BOTTOM;
 
     return VA_CUSTOM;
@@ -1766,7 +1766,7 @@ bool UIElement::IsInside(IntVector2 position, bool isScreen)
 {
     if (isScreen)
         position = ScreenToElement(position);
-    return position.x_ >= 0 && position.y_ >= 0 && position.x_ < size_.x_ && position.y_ < size_.y_;
+    return position.x >= 0 && position.y >= 0 && position.x < size_.x && position.y < size_.y;
 }
 
 bool UIElement::IsInsideCombined(IntVector2 position, bool isScreen)
@@ -1779,14 +1779,14 @@ bool UIElement::IsInsideCombined(IntVector2 position, bool isScreen)
         position = ElementToScreen(position);
 
     IntRect combined = GetCombinedScreenRect();
-    return position.x_ >= combined.left_ && position.y_ >= combined.top_ && position.x_ < combined.right_ &&
-        position.y_ < combined.bottom_;
+    return position.x >= combined.left_ && position.y >= combined.top_ && position.x < combined.right_ &&
+        position.y < combined.bottom_;
 }
 
 IntRect UIElement::GetCombinedScreenRect()
 {
     IntVector2 screenPosition(GetScreenPosition());
-    IntRect combined(screenPosition.x_, screenPosition.y_, screenPosition.x_ + size_.x_, screenPosition.y_ + size_.y_);
+    IntRect combined(screenPosition.x, screenPosition.y, screenPosition.x + size_.x, screenPosition.y + size_.y);
 
     if (!clipChildren_)
     {
@@ -1840,10 +1840,10 @@ void UIElement::AdjustScissor(IntRect& currentScissor)
     if (clipChildren_)
     {
         IntVector2 screenPos = GetScreenPosition();
-        currentScissor.left_ = Max(currentScissor.left_, screenPos.x_ + clipBorder_.left_);
-        currentScissor.top_ = Max(currentScissor.top_, screenPos.y_ + clipBorder_.top_);
-        currentScissor.right_ = Min(currentScissor.right_, screenPos.x_ + size_.x_ - clipBorder_.right_);
-        currentScissor.bottom_ = Min(currentScissor.bottom_, screenPos.y_ + size_.y_ - clipBorder_.bottom_);
+        currentScissor.left_ = Max(currentScissor.left_, screenPos.x + clipBorder_.left_);
+        currentScissor.top_ = Max(currentScissor.top_, screenPos.y + clipBorder_.top_);
+        currentScissor.right_ = Min(currentScissor.right_, screenPos.x + size_.x - clipBorder_.right_);
+        currentScissor.bottom_ = Min(currentScissor.bottom_, screenPos.y + size_.y - clipBorder_.bottom_);
 
         if (currentScissor.right_ < currentScissor.left_)
             currentScissor.right_ = currentScissor.left_;
@@ -1855,14 +1855,14 @@ void UIElement::AdjustScissor(IntRect& currentScissor)
 void UIElement::GetBatchesWithOffset(IntVector2& offset, PODVector<UIBatch>& batches, PODVector<float>& vertexData,
     IntRect currentScissor)
 {
-    Vector2 floatOffset((float)offset.x_, (float)offset.y_);
+    Vector2 floatOffset((float)offset.x, (float)offset.y);
     unsigned initialSize = vertexData.Size();
 
     GetBatches(batches, vertexData, currentScissor);
     for (unsigned i = initialSize; i < vertexData.Size(); i += 6)
     {
-        vertexData[i] += floatOffset.x_;
-        vertexData[i + 1] += floatOffset.y_;
+        vertexData[i] += floatOffset.x;
+        vertexData[i + 1] += floatOffset.y;
     }
 
     AdjustScissor(currentScissor);
@@ -1895,7 +1895,7 @@ IntVector2 UIElement::GetEffectiveMinSize() const
     if (IsFixedSize() || layoutMode_ == LM_FREE || layoutMinSize_ == IntVector2::ZERO)
         return minSize_;
     else
-        return IntVector2(Max(minSize_.x_, layoutMinSize_.x_), Max(minSize_.y_, layoutMinSize_.y_));
+        return IntVector2(Max(minSize_.x, layoutMinSize_.x), Max(minSize_.y, layoutMinSize_.y));
 }
 
 void UIElement::OnAttributeAnimationAdded()
@@ -2065,8 +2065,8 @@ void UIElement::UpdateAnchoring()
     if (parent_ && enableAnchor_)
     {
         IntVector2 newSize;
-        newSize.x_ = (int)(parent_->size_.x_ * Clamp(anchorMax_.x_ - anchorMin_.x_, 0.0f, 1.0f)) + maxOffset_.x_ - minOffset_.x_;
-        newSize.y_ = (int)(parent_->size_.y_ * Clamp(anchorMax_.y_ - anchorMin_.y_, 0.0f, 1.0f)) + maxOffset_.y_ - minOffset_.y_;
+        newSize.x = (int)(parent_->size_.x * Clamp(anchorMax_.x - anchorMin_.x, 0.0f, 1.0f)) + maxOffset_.x - minOffset_.x;
+        newSize.y = (int)(parent_->size_.y * Clamp(anchorMax_.y - anchorMin_.y, 0.0f, 1.0f)) + maxOffset_.y - minOffset_.y;
 
         if (position_ != minOffset_)
             SetPosition(minOffset_);
@@ -2213,11 +2213,11 @@ IntVector2 UIElement::GetLayoutChildPosition(UIElement* child)
     switch (ha)
     {
     case HA_LEFT:
-        ret.x_ = layoutBorder_.left_;
+        ret.x = layoutBorder_.left_;
         break;
 
     case HA_RIGHT:
-        ret.x_ = -layoutBorder_.right_;
+        ret.x = -layoutBorder_.right_;
         break;
 
     default:
@@ -2228,11 +2228,11 @@ IntVector2 UIElement::GetLayoutChildPosition(UIElement* child)
     switch (va)
     {
     case VA_TOP:
-        ret.y_ = layoutBorder_.top_;
+        ret.y = layoutBorder_.top_;
         break;
 
     case VA_BOTTOM:
-        ret.y_ = -layoutBorder_.bottom_;
+        ret.y = -layoutBorder_.bottom_;
         break;
 
     default:

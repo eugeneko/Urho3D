@@ -356,7 +356,7 @@ bool Graphics::SetMode(int width, int height, bool fullscreen, bool borderless, 
 
             for (unsigned i = 0; i < resolutions.Size(); ++i)
             {
-                unsigned error = Abs(resolutions[i].x_ - width) + Abs(resolutions[i].y_ - height);
+                unsigned error = Abs(resolutions[i].x - width) + Abs(resolutions[i].y - height);
                 if (error < bestError)
                 {
                     best = i;
@@ -364,9 +364,9 @@ bool Graphics::SetMode(int width, int height, bool fullscreen, bool borderless, 
                 }
             }
 
-            width = resolutions[best].x_;
-            height = resolutions[best].y_;
-            refreshRate = resolutions[best].z_;
+            width = resolutions[best].x;
+            height = resolutions[best].y;
+            refreshRate = resolutions[best].z;
         }
     }
 #endif
@@ -431,8 +431,8 @@ bool Graphics::SetMode(int width, int height, bool fullscreen, bool borderless, 
         SDL_SetWindowPosition(window_, display_rect.x, display_rect.y);
         bool reposition = fullscreen || (borderless && width >= display_rect.w && height >= display_rect.h);
 
-        int x = reposition ? display_rect.x : position_.x_;
-        int y = reposition ? display_rect.y : position_.y_;
+        int x = reposition ? display_rect.x : position_.x;
+        int y = reposition ? display_rect.y : position_.y;
 
         unsigned flags = SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN;
         if (fullscreen)
@@ -513,7 +513,7 @@ bool Graphics::SetMode(int width, int height, bool fullscreen, bool borderless, 
 
     SDL_GL_GetDrawableSize(window_, &width_, &height_);
     if (!fullscreen)
-        SDL_GetWindowPosition(window_, &position_.x_, &position_.y_);
+        SDL_GetWindowPosition(window_, &position_.x, &position_.y);
 
     int logicalWidth, logicalHeight;
     SDL_GetWindowSize(window_, &logicalWidth, &logicalHeight);
@@ -726,7 +726,7 @@ void Graphics::Clear(unsigned flags, const Color& color, float depth, unsigned s
     // If viewport is less than full screen, set a scissor to limit the clear
     /// \todo Any user-set scissor test will be lost
     IntVector2 viewSize = GetRenderTargetDimensions();
-    if (viewport_.left_ != 0 || viewport_.top_ != 0 || viewport_.right_ != viewSize.x_ || viewport_.bottom_ != viewSize.y_)
+    if (viewport_.left_ != 0 || viewport_.top_ != 0 || viewport_.right_ != viewSize.x || viewport_.bottom_ != viewSize.y)
         SetScissorTest(true, IntRect(0, 0, viewport_.Width(), viewport_.Height()));
     else
         SetScissorTest(false);
@@ -1781,13 +1781,13 @@ void Graphics::SetViewport(const IntRect& rect)
         rectCopy.right_ = rectCopy.left_ + 1;
     if (rectCopy.bottom_ <= rectCopy.top_)
         rectCopy.bottom_ = rectCopy.top_ + 1;
-    rectCopy.left_ = Clamp(rectCopy.left_, 0, rtSize.x_);
-    rectCopy.top_ = Clamp(rectCopy.top_, 0, rtSize.y_);
-    rectCopy.right_ = Clamp(rectCopy.right_, 0, rtSize.x_);
-    rectCopy.bottom_ = Clamp(rectCopy.bottom_, 0, rtSize.y_);
+    rectCopy.left_ = Clamp(rectCopy.left_, 0, rtSize.x);
+    rectCopy.top_ = Clamp(rectCopy.top_, 0, rtSize.y);
+    rectCopy.right_ = Clamp(rectCopy.right_, 0, rtSize.x);
+    rectCopy.bottom_ = Clamp(rectCopy.bottom_, 0, rtSize.y);
 
     // Use Direct3D convention with the vertical coordinates ie. 0 is top
-    glViewport(rectCopy.left_, rtSize.y_ - rectCopy.bottom_, rectCopy.Width(), rectCopy.Height());
+    glViewport(rectCopy.left_, rtSize.y - rectCopy.bottom_, rectCopy.Width(), rectCopy.Height());
     viewport_ = rectCopy;
 
     // Disable scissor test, needs to be re-enabled by the user
@@ -1920,7 +1920,7 @@ void Graphics::SetScissorTest(bool enable, const Rect& rect, bool borderInclusiv
 {
     // During some light rendering loops, a full rect is toggled on/off repeatedly.
     // Disable scissor in that case to reduce state changes
-    if (rect.min_.x_ <= 0.0f && rect.min_.y_ <= 0.0f && rect.max_.x_ >= 1.0f && rect.max_.y_ >= 1.0f)
+    if (rect.min_.x <= 0.0f && rect.min_.y <= 0.0f && rect.max_.x >= 1.0f && rect.max_.y >= 1.0f)
         enable = false;
 
     if (enable)
@@ -1931,10 +1931,10 @@ void Graphics::SetScissorTest(bool enable, const Rect& rect, bool borderInclusiv
         IntRect intRect;
         int expand = borderInclusive ? 1 : 0;
 
-        intRect.left_ = Clamp((int)((rect.min_.x_ + 1.0f) * 0.5f * viewSize.x_) + viewPos.x_, 0, rtSize.x_ - 1);
-        intRect.top_ = Clamp((int)((-rect.max_.y_ + 1.0f) * 0.5f * viewSize.y_) + viewPos.y_, 0, rtSize.y_ - 1);
-        intRect.right_ = Clamp((int)((rect.max_.x_ + 1.0f) * 0.5f * viewSize.x_) + viewPos.x_ + expand, 0, rtSize.x_);
-        intRect.bottom_ = Clamp((int)((-rect.min_.y_ + 1.0f) * 0.5f * viewSize.y_) + viewPos.y_ + expand, 0, rtSize.y_);
+        intRect.left_ = Clamp((int)((rect.min_.x + 1.0f) * 0.5f * viewSize.x) + viewPos.x, 0, rtSize.x - 1);
+        intRect.top_ = Clamp((int)((-rect.max_.y + 1.0f) * 0.5f * viewSize.y) + viewPos.y, 0, rtSize.y - 1);
+        intRect.right_ = Clamp((int)((rect.max_.x + 1.0f) * 0.5f * viewSize.x) + viewPos.x + expand, 0, rtSize.x);
+        intRect.bottom_ = Clamp((int)((-rect.min_.y + 1.0f) * 0.5f * viewSize.y) + viewPos.y + expand, 0, rtSize.y);
 
         if (intRect.right_ == intRect.left_)
             intRect.right_++;
@@ -1947,7 +1947,7 @@ void Graphics::SetScissorTest(bool enable, const Rect& rect, bool borderInclusiv
         if (enable && scissorRect_ != intRect)
         {
             // Use Direct3D convention with the vertical coordinates ie. 0 is top
-            glScissor(intRect.left_, rtSize.y_ - intRect.bottom_, intRect.Width(), intRect.Height());
+            glScissor(intRect.left_, rtSize.y - intRect.bottom_, intRect.Width(), intRect.Height());
             scissorRect_ = intRect;
         }
     }
@@ -1972,10 +1972,10 @@ void Graphics::SetScissorTest(bool enable, const IntRect& rect)
     if (enable)
     {
         IntRect intRect;
-        intRect.left_ = Clamp(rect.left_ + viewPos.x_, 0, rtSize.x_ - 1);
-        intRect.top_ = Clamp(rect.top_ + viewPos.y_, 0, rtSize.y_ - 1);
-        intRect.right_ = Clamp(rect.right_ + viewPos.x_, 0, rtSize.x_);
-        intRect.bottom_ = Clamp(rect.bottom_ + viewPos.y_, 0, rtSize.y_);
+        intRect.left_ = Clamp(rect.left_ + viewPos.x, 0, rtSize.x - 1);
+        intRect.top_ = Clamp(rect.top_ + viewPos.y, 0, rtSize.y - 1);
+        intRect.right_ = Clamp(rect.right_ + viewPos.x, 0, rtSize.x);
+        intRect.bottom_ = Clamp(rect.bottom_ + viewPos.y, 0, rtSize.y);
 
         if (intRect.right_ == intRect.left_)
             intRect.right_++;
@@ -1988,7 +1988,7 @@ void Graphics::SetScissorTest(bool enable, const IntRect& rect)
         if (enable && scissorRect_ != intRect)
         {
             // Use Direct3D convention with the vertical coordinates ie. 0 is top
-            glScissor(intRect.left_, rtSize.y_ - intRect.bottom_, intRect.Width(), intRect.Height());
+            glScissor(intRect.left_, rtSize.y - intRect.bottom_, intRect.Width(), intRect.Height());
             scissorRect_ = intRect;
         }
     }
@@ -2026,10 +2026,10 @@ void Graphics::SetClipPlane(bool enable, const Plane& clipPlane, const Matrix3x4
         if (!gl3Support)
         {
             GLdouble planeData[4];
-            planeData[0] = clipPlane_.x_;
-            planeData[1] = clipPlane_.y_;
-            planeData[2] = clipPlane_.z_;
-            planeData[3] = clipPlane_.w_;
+            planeData[0] = clipPlane_.x;
+            planeData[1] = clipPlane_.y;
+            planeData[2] = clipPlane_.z;
+            planeData[3] = clipPlane_.w;
 
             glClipPlane(GL_CLIP_PLANE0, &planeData[0]);
         }
@@ -2295,19 +2295,19 @@ void Graphics::OnWindowMoved()
     int newX, newY;
 
     SDL_GetWindowPosition(window_, &newX, &newY);
-    if (newX == position_.x_ && newY == position_.y_)
+    if (newX == position_.x && newY == position_.y)
         return;
 
-    position_.x_ = newX;
-    position_.y_ = newY;
+    position_.x = newX;
+    position_.y = newY;
 
-    URHO3D_LOGDEBUGF("Window was moved to %d,%d", position_.x_, position_.y_);
+    URHO3D_LOGDEBUGF("Window was moved to %d,%d", position_.x, position_.y);
 
     using namespace WindowPos;
 
     VariantMap& eventData = GetEventDataMap();
-    eventData[P_X] = position_.x_;
-    eventData[P_Y] = position_.y_;
+    eventData[P_X] = position_.x;
+    eventData[P_Y] = position_.y;
     SendEvent(E_WINDOWPOS, eventData);
 }
 
@@ -2924,7 +2924,7 @@ void Graphics::PrepareDraw()
         else if (depthStencil_)
             format = depthStencil_->GetParentTexture()->GetFormat();
 
-        unsigned long long fboKey = (rtSize.x_ << 16 | rtSize.y_) | (((unsigned long long)format) << 32);
+        unsigned long long fboKey = (rtSize.x << 16 | rtSize.y) | (((unsigned long long)format) << 32);
 
         HashMap<unsigned long long, FrameBufferObject>::Iterator i = impl_->frameBuffers_.Find(fboKey);
         if (i == impl_->frameBuffers_.End())

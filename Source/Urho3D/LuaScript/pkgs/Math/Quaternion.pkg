@@ -54,10 +54,10 @@ class Quaternion
     Quaternion Nlerp(const Quaternion& rhs, float t, bool shortestPath) const;
     String ToString() const;
 
-    float w_ @ w;
-    float x_ @ x;
-    float y_ @ y;
-    float z_ @ z;
+    float w @ w;
+    float x @ x;
+    float y @ y;
+    float z @ z;
 
     static const Quaternion IDENTITY;
 };

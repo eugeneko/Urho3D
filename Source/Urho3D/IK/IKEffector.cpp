@@ -145,7 +145,7 @@ Vector3 IKEffector::GetTargetRotationEuler() const
 // ----------------------------------------------------------------------------
 void IKEffector::SetTargetRotationEuler(const Vector3& targetRotation)
 {
-    SetTargetRotation(Quaternion(targetRotation.x_, targetRotation.y_, targetRotation.z_));
+    SetTargetRotation(Quaternion(targetRotation.x, targetRotation.y, targetRotation.z));
 }
 
 // ----------------------------------------------------------------------------

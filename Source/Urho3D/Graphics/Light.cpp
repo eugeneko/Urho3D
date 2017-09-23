@@ -442,13 +442,13 @@ Color Light::GetColorFromTemperature() const
     float y = 2.0f * v / (2.0f * u - 8.0f * v + 4.0f);
     float z = 1.0f - x - y;
 
-    float y_ = 1.0f;
-    float x_ = y_ / y * x;
-    float z_ = y_ / y * z;
+    float ty = 1.0f;
+    float tx = ty / y * x;
+    float tz = ty / y * z;
 
-    float red = 3.2404542f * x_ + -1.5371385f * y_ + -0.4985314f * z_;
-    float green = -0.9692660f * x_ + 1.8760108f * y_ + 0.0415560f * z_;
-    float blue = 0.0556434f * x_ + -0.2040259f * y_ + 1.0572252f * z_;
+    float red = 3.2404542f * tx + -1.5371385f * ty + -0.4985314f * tz;
+    float green = -0.9692660f * tx + 1.8760108f * ty + 0.0415560f * tz;
+    float blue = 0.0556434f * tx + -0.2040259f * ty + 1.0572252f * tz;
 
     return Color(red, green, blue);
 }
@@ -623,8 +623,8 @@ void Light::SetIntensitySortValue(const BoundingBox& box)
             float centerAngle = centerRay.HitDistance(box) / centerDistance;
 
             // Check if a corner of the bounding box is closer to the light ray than the center, use its angle in that case
-            Vector3 cornerPos = centerPos + box.HalfSize() * Vector3(centerPos.x_ < centerProj.x_ ? 1.0f : -1.0f,
-                centerPos.y_ < centerProj.y_ ? 1.0f : -1.0f, centerPos.z_ < centerProj.z_ ? 1.0f : -1.0f);
+            Vector3 cornerPos = centerPos + box.HalfSize() * Vector3(centerPos.x < centerProj.x ? 1.0f : -1.0f,
+                centerPos.y < centerProj.y ? 1.0f : -1.0f, centerPos.z < centerProj.z ? 1.0f : -1.0f);
             Vector3 cornerProj = lightRay.Project(cornerPos);
             float cornerDistance = (cornerProj - lightPos).Length();
             float cornerAngle = (cornerPos - cornerProj).Length() / cornerDistance;
@@ -665,7 +665,7 @@ Matrix3x4 Light::GetFullscreenQuadTransform(Camera* camera)
     // Position the directional light quad in halfway between far & near planes to prevent depth clipping
     camera->GetFrustumSize(near, far);
     quadTransform.SetTranslation(Vector3(0.0f, 0.0f, (camera->GetNearClip() + camera->GetFarClip()) * 0.5f));
-    quadTransform.SetScale(Vector3(far.x_, far.y_, 1.0f)); // Will be oversized, but doesn't matter (gets frustum clipped)
+    quadTransform.SetScale(Vector3(far.x, far.y, 1.0f)); // Will be oversized, but doesn't matter (gets frustum clipped)
     return camera->GetEffectiveWorldTransform() * quadTransform;
 }
 

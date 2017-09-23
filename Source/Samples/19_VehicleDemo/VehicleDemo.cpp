@@ -141,7 +141,7 @@ void VehicleDemo::CreateScene()
     {
         Node* objectNode = scene_->CreateChild("Mushroom");
         Vector3 position(Random(2000.0f) - 1000.0f, 0.0f, Random(2000.0f) - 1000.0f);
-        position.y_ = terrain->GetHeight(position) - 0.1f;
+        position.y = terrain->GetHeight(position) - 0.1f;
         objectNode->SetPosition(position);
         // Create a rotation quaternion from up vector to terrain normal
         objectNode->SetRotation(Quaternion(Vector3::UP, terrain->GetNormal(position)));
@@ -233,8 +233,8 @@ void VehicleDemo::HandleUpdate(StringHash eventType, VariantMap& eventData)
                             return;
 
                         Graphics* graphics = GetSubsystem<Graphics>();
-                        vehicle_->controls_.yaw_ += TOUCH_SENSITIVITY * camera->GetFov() / graphics->GetHeight() * state->delta_.x_;
-                        vehicle_->controls_.pitch_ += TOUCH_SENSITIVITY * camera->GetFov() / graphics->GetHeight() * state->delta_.y_;
+                        vehicle_->controls_.yaw_ += TOUCH_SENSITIVITY * camera->GetFov() / graphics->GetHeight() * state->delta_.x;
+                        vehicle_->controls_.pitch_ += TOUCH_SENSITIVITY * camera->GetFov() / graphics->GetHeight() * state->delta_.y;
                     }
                 }
             }

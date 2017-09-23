@@ -985,12 +985,12 @@ void Material::SetShaderParameter(const String& name, const Variant& value)
         if (type == VAR_VECTOR3)
         {
             const Vector3& vec = value.GetVector3();
-            specular_ = vec.x_ > 0.0f || vec.y_ > 0.0f || vec.z_ > 0.0f;
+            specular_ = vec.x > 0.0f || vec.y > 0.0f || vec.z > 0.0f;
         }
         else if (type == VAR_VECTOR4)
         {
             const Vector4& vec = value.GetVector4();
-            specular_ = vec.x_ > 0.0f || vec.y_ > 0.0f || vec.z_ > 0.0f;
+            specular_ = vec.x > 0.0f || vec.y > 0.0f || vec.z > 0.0f;
         }
     }
 
@@ -1063,8 +1063,8 @@ void Material::SetTexture(TextureUnit unit, Texture* texture)
 void Material::SetUVTransform(const Vector2& offset, float rotation, const Vector2& repeat)
 {
     Matrix3x4 transform(Matrix3x4::IDENTITY);
-    transform.m00_ = repeat.x_;
-    transform.m11_ = repeat.y_;
+    transform.m00_ = repeat.x;
+    transform.m11_ = repeat.y;
 
     Matrix3x4 rotationMatrix(Matrix3x4::IDENTITY);
     rotationMatrix.m00_ = Cos(rotation);
@@ -1077,8 +1077,8 @@ void Material::SetUVTransform(const Vector2& offset, float rotation, const Vecto
     transform = transform * rotationMatrix;
 
     Matrix3x4 offsetMatrix = Matrix3x4::IDENTITY;
-    offsetMatrix.m03_ = offset.x_;
-    offsetMatrix.m13_ = offset.y_;
+    offsetMatrix.m03_ = offset.x;
+    offsetMatrix.m13_ = offset.y;
 
     transform = offsetMatrix * transform;
 

@@ -121,7 +121,7 @@ void CollisionPolygon2D::RecreateFixture()
     unsigned count = vertices_.Size();
     b2Vertices.Resize(count);
 
-    Vector2 worldScale(cachedWorldScale_.x_, cachedWorldScale_.y_);
+    Vector2 worldScale(cachedWorldScale_.x, cachedWorldScale_.y);
     for (unsigned i = 0; i < count; ++i)
         b2Vertices[i] = ToB2Vec2(vertices_[i] * worldScale);
 

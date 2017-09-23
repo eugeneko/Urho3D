@@ -175,7 +175,7 @@ bool UIComponent::ScreenToUIPosition(IntVector2 screenPos, IntVector2& result)
         rect.bottom_ = graphics->GetHeight();
     }
 
-    Ray ray(camera->GetScreenRay((float)screenPos.x_ / rect.Width(), (float)screenPos.y_ / rect.Height()));
+    Ray ray(camera->GetScreenRay((float)screenPos.x / rect.Width(), (float)screenPos.y / rect.Height()));
     PODVector<RayQueryResult> queryResultVector;
     RayOctreeQuery query(queryResultVector, ray, RAY_TRIANGLE_UV, M_INFINITY, DRAWABLE_GEOMETRY, DEFAULT_VIEWMASK);
 
@@ -196,8 +196,8 @@ bool UIComponent::ScreenToUIPosition(IntVector2 screenPos, IntVector2& result)
         }
 
         Vector2& uv = queryResult.textureUV_;
-        result = IntVector2(static_cast<int>(uv.x_ * rootElement_->GetWidth()),
-                            static_cast<int>(uv.y_ * rootElement_->GetHeight()));
+        result = IntVector2(static_cast<int>(uv.x * rootElement_->GetWidth()),
+                            static_cast<int>(uv.y * rootElement_->GetHeight()));
         return true;
     }
     return false;

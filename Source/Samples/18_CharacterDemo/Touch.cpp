@@ -56,7 +56,7 @@ void Touch::UpdateTouches(Controls& controls) // Called from HandleUpdate
         TouchState* touch2 = input->GetTouch(1);
 
         // Check for zoom pattern (touches moving in opposite directions and on empty space)
-        if (!touch1->touchedElement_ && !touch2->touchedElement_ && ((touch1->delta_.y_ > 0 && touch2->delta_.y_ < 0) || (touch1->delta_.y_ < 0 && touch2->delta_.y_ > 0)))
+        if (!touch1->touchedElement_ && !touch2->touchedElement_ && ((touch1->delta_.y > 0 && touch2->delta_.y < 0) || (touch1->delta_.y < 0 && touch2->delta_.y > 0)))
             zoom_ = true;
         else
             zoom_ = false;
@@ -65,11 +65,11 @@ void Touch::UpdateTouches(Controls& controls) // Called from HandleUpdate
         {
             int sens = 0;
             // Check for zoom direction (in/out)
-            if (Abs(touch1->position_.y_ - touch2->position_.y_) > Abs(touch1->lastPosition_.y_ - touch2->lastPosition_.y_))
+            if (Abs(touch1->position_.y - touch2->position_.y) > Abs(touch1->lastPosition_.y - touch2->lastPosition_.y))
                 sens = -1;
             else
                 sens = 1;
-            cameraDistance_ += Abs(touch1->delta_.y_ - touch2->delta_.y_) * sens * touchSensitivity_ / 50.0f;
+            cameraDistance_ += Abs(touch1->delta_.y - touch2->delta_.y) * sens * touchSensitivity_ / 50.0f;
             cameraDistance_ = Clamp(cameraDistance_, CAMERA_MIN_DIST, CAMERA_MAX_DIST); // Restrict zoom range to [1;20]
         }
     }

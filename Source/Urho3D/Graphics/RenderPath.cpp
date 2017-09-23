@@ -103,9 +103,9 @@ void RenderTargetInfo::Load(const XMLElement& element)
     }
 
     if (element.HasAttribute("width"))
-        size_.x_ = element.GetFloat("width");
+        size_.x = element.GetFloat("width");
     if (element.HasAttribute("height"))
-        size_.y_ = element.GetFloat("height");
+        size_.y = element.GetFloat("height");
 
     if (element.HasAttribute("multisample"))
         multiSample_ = Clamp(element.GetInt("multisample"), 1, 16);

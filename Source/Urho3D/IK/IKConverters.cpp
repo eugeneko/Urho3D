@@ -28,9 +28,9 @@ namespace Urho3D {
 vec3_t Vec3Urho2IK(const Vector3& urho)
 {
     vec3_t ret;
-    ret.v.x = urho.x_;
-    ret.v.y = urho.y_;
-    ret.v.z = urho.z_;
+    ret.v.x = urho.x;
+    ret.v.y = urho.y;
+    ret.v.z = urho.z;
     return ret;
 }
 
@@ -44,10 +44,10 @@ Vector3 Vec3IK2Urho(const vec3_t* ik)
 quat_t QuatUrho2IK(const Quaternion& urho)
 {
     quat_t ret;
-    ret.q.x = urho.x_;
-    ret.q.y = urho.y_;
-    ret.q.z = urho.z_;
-    ret.q.w = urho.w_;
+    ret.q.x = urho.x;
+    ret.q.y = urho.y;
+    ret.q.z = urho.z;
+    ret.q.w = urho.w;
     return ret;
 }
 

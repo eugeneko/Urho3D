@@ -104,7 +104,7 @@ public:
             overlay->SetVisible(visible);
             if (visible)
             {
-                overlay->SetPosition(position.x_, position.y_);
+                overlay->SetPosition(position.x, position.y);
                 overlay->SetChecked(GetItemExpanded(children_[i]));
             }
         }
@@ -832,7 +832,7 @@ unsigned ListView::FindItem(UIElement* item) const
     // Binary search for list item based on screen coordinate Y
     if (contentElement_->GetLayoutMode() == LM_VERTICAL && item->GetHeight())
     {
-        int itemY = item->GetScreenPosition().y_;
+        int itemY = item->GetScreenPosition().y;
         int left = 0;
         int right = children.Size() - 1;
         while (right >= left)
@@ -840,7 +840,7 @@ unsigned ListView::FindItem(UIElement* item) const
             int mid = (left + right) / 2;
             if (children[mid] == item)
                 return (unsigned)mid;
-            if (itemY < children[mid]->GetScreenPosition().y_)
+            if (itemY < children[mid]->GetScreenPosition().y)
                 right = mid - 1;
             else
                 left = mid + 1;
@@ -983,10 +983,10 @@ void ListView::EnsureItemVisibility(UIElement* item)
     IntVector2 windowSize(scrollPanel_->GetWidth() - clipBorder.left_ - clipBorder.right_,
         scrollPanel_->GetHeight() - clipBorder.top_ - clipBorder.bottom_);
 
-    if (currentOffset.y_ < 0)
-        newView.y_ += currentOffset.y_;
-    if (currentOffset.y_ + item->GetHeight() > windowSize.y_)
-        newView.y_ += currentOffset.y_ + item->GetHeight() - windowSize.y_;
+    if (currentOffset.y < 0)
+        newView.y += currentOffset.y;
+    if (currentOffset.y + item->GetHeight() > windowSize.y)
+        newView.y += currentOffset.y + item->GetHeight() - windowSize.y;
 
     SetViewPosition(newView);
 }

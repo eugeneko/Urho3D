@@ -28,10 +28,10 @@ class Vector4
 
     String ToString() const;
 
-    float x_ @ x;
-    float y_ @ y;
-    float z_ @ z;
-    float w_ @ w;
+    float x @ x;
+    float y @ y;
+    float z @ z;
+    float w @ w;
 
     static const Vector4 ZERO;
     static const Vector4 ONE;

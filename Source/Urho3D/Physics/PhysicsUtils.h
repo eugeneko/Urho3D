@@ -33,12 +33,12 @@ namespace Urho3D
 
 inline btVector3 ToBtVector3(const Vector3& vector)
 {
-    return btVector3(vector.x_, vector.y_, vector.z_);
+    return btVector3(vector.x, vector.y, vector.z);
 }
 
 inline btQuaternion ToBtQuaternion(const Quaternion& quaternion)
 {
-    return btQuaternion(quaternion.x_, quaternion.y_, quaternion.z_, quaternion.w_);
+    return btQuaternion(quaternion.x, quaternion.y, quaternion.z, quaternion.w);
 }
 
 inline Vector3 ToVector3(const btVector3& vector)

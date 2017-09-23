@@ -131,8 +131,8 @@ bool FontFaceBitmap::Load(const unsigned char* fontData, unsigned fontDataSize, 
         int id = charElem.GetInt("id");
 
         FontGlyph glyph;
-        glyph.x_ = (short)charElem.GetInt("x");
-        glyph.y_ = (short)charElem.GetInt("y");
+        glyph.x = (short)charElem.GetInt("x");
+        glyph.y = (short)charElem.GetInt("y");
         glyph.width_ = glyph.texWidth_ = (short)charElem.GetInt("width");
         glyph.height_ = glyph.texHeight_ = (short)charElem.GetInt("height");
         glyph.offsetX_ = (short)charElem.GetInt("xoffset");
@@ -205,8 +205,8 @@ bool FontFaceBitmap::Load(FontFace* fontFace, bool usedGlyphs)
                 return false;
         }
 
-        fontGlyph.x_ = (short)x;
-        fontGlyph.y_ = (short)y;
+        fontGlyph.x = (short)x;
+        fontGlyph.y = (short)y;
         fontGlyph.page_ = numPages - 1;
 
         glyphMapping_[i->first_] = fontGlyph;
@@ -243,8 +243,8 @@ bool FontFaceBitmap::Load(FontFace* fontFace, bool usedGlyphs)
     {
         FontGlyph& newGlyph = i->second_;
         const FontGlyph& oldGlyph = fontFace->glyphMapping_[i->first_];
-        Blit(newImages[newGlyph.page_], newGlyph.x_, newGlyph.y_, newGlyph.width_, newGlyph.height_, oldImages[oldGlyph.page_],
-            oldGlyph.x_, oldGlyph.y_, components);
+        Blit(newImages[newGlyph.page_], newGlyph.x, newGlyph.y, newGlyph.width_, newGlyph.height_, oldImages[oldGlyph.page_],
+            oldGlyph.x, oldGlyph.y, components);
     }
 
     textures_.Resize(newImages.Size());
@@ -316,8 +316,8 @@ bool FontFaceBitmap::Save(Serializer& dest, int pointSize, const String& indenta
         charElem.SetInt("id", i->first_);
 
         const FontGlyph& glyph = i->second_;
-        charElem.SetInt("x", glyph.x_);
-        charElem.SetInt("y", glyph.y_);
+        charElem.SetInt("x", glyph.x);
+        charElem.SetInt("y", glyph.y);
         charElem.SetInt("width", glyph.width_);
         charElem.SetInt("height", glyph.height_);
         charElem.SetInt("xoffset", glyph.offsetX_);

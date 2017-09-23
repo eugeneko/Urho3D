@@ -510,7 +510,7 @@ void Urho2DConstraints::HandleMouseButtonDown(StringHash eventType, VariantMap& 
 {
     Input* input = GetSubsystem<Input>();
     PhysicsWorld2D* physicsWorld = scene_->GetComponent<PhysicsWorld2D>();
-    RigidBody2D* rigidBody = physicsWorld->GetRigidBody(input->GetMousePosition().x_, input->GetMousePosition().y_, M_MAX_UNSIGNED); // Raycast for RigidBody2Ds to pick
+    RigidBody2D* rigidBody = physicsWorld->GetRigidBody(input->GetMousePosition().x, input->GetMousePosition().y, M_MAX_UNSIGNED); // Raycast for RigidBody2Ds to pick
     if (rigidBody)
     {
         pickedNode = rigidBody->GetNode();
@@ -547,9 +547,9 @@ Vector2 Urho2DConstraints::GetMousePositionXY()
 {
     Input* input = GetSubsystem<Input>();
     Graphics* graphics = GetSubsystem<Graphics>();
-    Vector3 screenPoint = Vector3((float)input->GetMousePosition().x_ / graphics->GetWidth(), (float)input->GetMousePosition().y_ / graphics->GetHeight(), 0.0f);
+    Vector3 screenPoint = Vector3((float)input->GetMousePosition().x / graphics->GetWidth(), (float)input->GetMousePosition().y / graphics->GetHeight(), 0.0f);
     Vector3 worldPoint = camera_->ScreenToWorldPoint(screenPoint);
-    return Vector2(worldPoint.x_, worldPoint.y_);
+    return Vector2(worldPoint.x, worldPoint.y);
 }
 
 void Urho2DConstraints::HandleMouseMove(StringHash eventType, VariantMap& eventData)
@@ -577,7 +577,7 @@ void Urho2DConstraints::HandleTouchBegin3(StringHash eventType, VariantMap& even
         // Create a ConstraintMouse2D - Temporary apply this constraint to the pickedNode to allow grasping and moving with touch
         ConstraintMouse2D* constraintMouse = pickedNode->CreateComponent<ConstraintMouse2D>();
         Vector3 pos = camera_->ScreenToWorldPoint(Vector3((float)eventData[P_X].GetInt() / graphics->GetWidth(), (float)eventData[P_Y].GetInt() / graphics->GetHeight(), 0.0f));
-        constraintMouse->SetTarget(Vector2(pos.x_, pos.y_));
+        constraintMouse->SetTarget(Vector2(pos.x, pos.y));
         constraintMouse->SetMaxForce(1000 * rigidBody->GetMass());
         constraintMouse->SetCollideConnected(true);
         constraintMouse->SetOtherBody(dummyBody);  // Use dummy body instead of rigidBody. It's better to create a dummy body automatically in ConstraintMouse2D
@@ -595,7 +595,7 @@ void Urho2DConstraints::HandleTouchMove3(StringHash eventType, VariantMap& event
         ConstraintMouse2D* constraintMouse = pickedNode->GetComponent<ConstraintMouse2D>();
         using namespace TouchMove;
         Vector3 pos = camera_->ScreenToWorldPoint(Vector3(float(eventData[P_X].GetInt()) / graphics->GetWidth(), float(eventData[P_Y].GetInt()) / graphics->GetHeight(), 0.0f));
-        constraintMouse->SetTarget(Vector2(pos.x_, pos.y_));
+        constraintMouse->SetTarget(Vector2(pos.x, pos.y));
     }
 }
 

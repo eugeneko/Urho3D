@@ -76,7 +76,7 @@ MessageBox::MessageBox(Context* context, const String& messageString, const Stri
     if (window)
     {
         const IntVector2& size = window->GetSize();
-        window->SetPosition((root->GetWidth() - size.x_) / 2, (root->GetHeight() - size.y_) / 2);
+        window->SetPosition((root->GetWidth() - size.x) / 2, (root->GetHeight() - size.y) / 2);
         window->SetModal(true);
         SubscribeToEvent(window, E_MODALCHANGED, URHO3D_HANDLER(MessageBox, HandleMessageAcknowledged));
     }

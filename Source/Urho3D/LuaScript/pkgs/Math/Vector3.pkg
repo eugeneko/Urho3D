@@ -37,9 +37,9 @@ class Vector3
 
     String ToString() const;
 
-    float x_ @ x;
-    float y_ @ y;
-    float z_ @ z;
+    float x @ x;
+    float y @ y;
+    float z @ z;
 
     static const Vector3 ZERO;
     static const Vector3 LEFT;
@@ -71,9 +71,9 @@ class IntVector3
     unsigned ToHash() const;
     float Length() const;
 
-    int x_ @ x;
-    int y_ @ y;
-    int z_ @ z;
+    int x @ x;
+    int y @ y;
+    int z @ z;
 
     static const IntVector3 ZERO;
     static const IntVector3 LEFT;

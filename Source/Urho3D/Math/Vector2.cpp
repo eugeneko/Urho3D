@@ -48,14 +48,14 @@ const IntVector2 IntVector2::ONE(1, 1);
 String Vector2::ToString() const
 {
     char tempBuffer[CONVERSION_BUFFER_LENGTH];
-    sprintf(tempBuffer, "%g %g", x_, y_);
+    sprintf(tempBuffer, "%g %g", x, y);
     return String(tempBuffer);
 }
 
 String IntVector2::ToString() const
 {
     char tempBuffer[CONVERSION_BUFFER_LENGTH];
-    sprintf(tempBuffer, "%d %d", x_, y_);
+    sprintf(tempBuffer, "%d %d", x, y);
     return String(tempBuffer);
 }
 

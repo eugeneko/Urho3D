@@ -593,18 +593,18 @@ void LineEdit::UpdateText()
 
 void LineEdit::UpdateCursor()
 {
-    int x = text_->GetCharPosition(cursorPosition_).x_;
+    int x = text_->GetCharPosition(cursorPosition_).x;
 
     text_->SetPosition(GetIndentWidth() + clipBorder_.left_, clipBorder_.top_);
     cursor_->SetPosition(text_->GetPosition() + IntVector2(x, 0));
     cursor_->SetSize(cursor_->GetWidth(), text_->GetRowHeight());
 
     IntVector2 screenPosition = ElementToScreen(cursor_->GetPosition());
-    SDL_Rect rect = {screenPosition.x_, screenPosition.y_, cursor_->GetSize().x_, cursor_->GetSize().y_};
+    SDL_Rect rect = {screenPosition.x, screenPosition.y, cursor_->GetSize().x, cursor_->GetSize().y};
     SDL_SetTextInputRect(&rect);
 
     // Scroll if necessary
-    int sx = -GetChildOffset().x_;
+    int sx = -GetChildOffset().x;
     int left = clipBorder_.left_;
     int right = GetWidth() - clipBorder_.left_ - clipBorder_.right_ - cursor_->GetWidth();
     if (x - sx > right)
@@ -624,12 +624,12 @@ unsigned LineEdit::GetCharIndex(const IntVector2& position)
     IntVector2 screenPosition = ElementToScreen(position);
     IntVector2 textPosition = text_->ScreenToElement(screenPosition);
 
-    if (textPosition.x_ < 0)
+    if (textPosition.x < 0)
         return 0;
 
     for (int i = text_->GetNumChars(); i >= 0; --i)
     {
-        if (textPosition.x_ >= text_->GetCharPosition((unsigned)i).x_)
+        if (textPosition.x >= text_->GetCharPosition((unsigned)i).x)
             return (unsigned)i;
     }
 

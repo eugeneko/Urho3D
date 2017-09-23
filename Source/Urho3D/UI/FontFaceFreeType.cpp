@@ -484,15 +484,15 @@ bool FontFaceFreeType::LoadCharGlyph(unsigned charCode, Image* image)
             }
         }
 
-        fontGlyph.x_ = (short)x;
-        fontGlyph.y_ = (short)y;
+        fontGlyph.x = (short)x;
+        fontGlyph.y = (short)y;
 
         unsigned char* dest = nullptr;
         unsigned pitch = 0;
         if (image)
         {
             fontGlyph.page_ = 0;
-            dest = image->GetData() + fontGlyph.y_ * image->GetWidth() + fontGlyph.x_;
+            dest = image->GetData() + fontGlyph.y * image->GetWidth() + fontGlyph.x;
             pitch = (unsigned)image->GetWidth();
         }
         else
@@ -526,14 +526,14 @@ bool FontFaceFreeType::LoadCharGlyph(unsigned charCode, Image* image)
 
         if (!image)
         {
-            textures_.Back()->SetData(0, fontGlyph.x_, fontGlyph.y_, fontGlyph.texWidth_, fontGlyph.texHeight_, dest);
+            textures_.Back()->SetData(0, fontGlyph.x, fontGlyph.y, fontGlyph.texWidth_, fontGlyph.texHeight_, dest);
             delete[] dest;
         }
     }
     else
     {
-        fontGlyph.x_ = 0;
-        fontGlyph.y_ = 0;
+        fontGlyph.x = 0;
+        fontGlyph.y = 0;
         fontGlyph.page_ = 0;
     }
 

@@ -1390,8 +1390,8 @@ void BuildAndSaveAnimations(OutModel* model)
                 {
                     float SCALE_EPSILON = 0.000001f;
                     Vector3 scaleVec = ToVector3(channel->mScalingKeys[k].mValue);
-                    if (fabsf(scaleVec.x_ - 1.0f) >= SCALE_EPSILON || fabsf(scaleVec.y_ - 1.0f) >= SCALE_EPSILON ||
-                        fabsf(scaleVec.z_ - 1.0f) >= SCALE_EPSILON)
+                    if (fabsf(scaleVec.x - 1.0f) >= SCALE_EPSILON || fabsf(scaleVec.y - 1.0f) >= SCALE_EPSILON ||
+                        fabsf(scaleVec.z - 1.0f) >= SCALE_EPSILON)
                     {
                         redundantScale = false;
                         break;
@@ -2433,16 +2433,16 @@ void WriteVertex(float*& dest, aiMesh* mesh, unsigned index, bool isSkinned, Bou
 {
     Vector3 vertex = vertexTransform * ToVector3(mesh->mVertices[index]);
     box.Merge(vertex);
-    *dest++ = vertex.x_;
-    *dest++ = vertex.y_;
-    *dest++ = vertex.z_;
+    *dest++ = vertex.x;
+    *dest++ = vertex.y;
+    *dest++ = vertex.z;
 
     if (mesh->HasNormals())
     {
         Vector3 normal = normalTransform * ToVector3(mesh->mNormals[index]);
-        *dest++ = normal.x_;
-        *dest++ = normal.y_;
-        *dest++ = normal.z_;
+        *dest++ = normal.x;
+        *dest++ = normal.y;
+        *dest++ = normal.z;
     }
 
     for (unsigned i = 0; i < mesh->GetNumColorChannels() && i < MAX_CHANNELS; ++i)
@@ -2455,8 +2455,8 @@ void WriteVertex(float*& dest, aiMesh* mesh, unsigned index, bool isSkinned, Bou
     for (unsigned i = 0; i < mesh->GetNumUVChannels() && i < MAX_CHANNELS; ++i)
     {
         Vector3 texCoord = ToVector3(mesh->mTextureCoords[i][index]);
-        *dest++ = texCoord.x_;
-        *dest++ = texCoord.y_;
+        *dest++ = texCoord.x;
+        *dest++ = texCoord.y;
     }
 
     if (mesh->HasTangentsAndBitangents())
@@ -2469,9 +2469,9 @@ void WriteVertex(float*& dest, aiMesh* mesh, unsigned index, bool isSkinned, Bou
         if ((tangent.CrossProduct(normal)).DotProduct(bitangent) < 0.5f)
             w = -1.0f;
 
-        *dest++ = tangent.x_;
-        *dest++ = tangent.y_;
-        *dest++ = tangent.z_;
+        *dest++ = tangent.x;
+        *dest++ = tangent.y;
+        *dest++ = tangent.z;
         *dest++ = w;
     }
 

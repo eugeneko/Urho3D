@@ -107,15 +107,15 @@ void UIBatch::AddQuad(float x, float y, float width, float height, int texOffset
 
     const IntVector2& screenPos = element_->GetScreenPosition();
 
-    float left = x + screenPos.x_ - posAdjust.x_;
+    float left = x + screenPos.x - posAdjust.x;
     float right = left + width;
-    float top = y + screenPos.y_ - posAdjust.x_;
+    float top = y + screenPos.y - posAdjust.x;
     float bottom = top + height;
 
-    float leftUV = texOffsetX * invTextureSize_.x_;
-    float topUV = texOffsetY * invTextureSize_.y_;
-    float rightUV = (texOffsetX + (texWidth ? texWidth : width)) * invTextureSize_.x_;
-    float bottomUV = (texOffsetY + (texHeight ? texHeight : height)) * invTextureSize_.y_;
+    float leftUV = texOffsetX * invTextureSize_.x;
+    float topUV = texOffsetY * invTextureSize_.y;
+    float rightUV = (texOffsetX + (texWidth ? texWidth : width)) * invTextureSize_.x;
+    float bottomUV = (texOffsetY + (texHeight ? texHeight : height)) * invTextureSize_.y;
 
     unsigned begin = vertexData_->Size();
     vertexData_->Resize(begin + 6 * UI_VERTEX_SIZE);
@@ -194,53 +194,53 @@ void UIBatch::AddQuad(const Matrix3x4& transform, int x, int y, int width, int h
     Vector3 v3 = (transform * Vector3((float)x, (float)y + (float)height, 0.0f)) - posAdjust;
     Vector3 v4 = (transform * Vector3((float)x + (float)width, (float)y + (float)height, 0.0f)) - posAdjust;
 
-    float leftUV = ((float)texOffsetX) * invTextureSize_.x_;
-    float topUV = ((float)texOffsetY) * invTextureSize_.y_;
-    float rightUV = ((float)(texOffsetX + (texWidth ? texWidth : width))) * invTextureSize_.x_;
-    float bottomUV = ((float)(texOffsetY + (texHeight ? texHeight : height))) * invTextureSize_.y_;
+    float leftUV = ((float)texOffsetX) * invTextureSize_.x;
+    float topUV = ((float)texOffsetY) * invTextureSize_.y;
+    float rightUV = ((float)(texOffsetX + (texWidth ? texWidth : width))) * invTextureSize_.x;
+    float bottomUV = ((float)(texOffsetY + (texHeight ? texHeight : height))) * invTextureSize_.y;
 
     unsigned begin = vertexData_->Size();
     vertexData_->Resize(begin + 6 * UI_VERTEX_SIZE);
     float* dest = &(vertexData_->At(begin));
     vertexEnd_ = vertexData_->Size();
 
-    dest[0] = v1.x_;
-    dest[1] = v1.y_;
+    dest[0] = v1.x;
+    dest[1] = v1.y;
     dest[2] = 0.0f;
     ((unsigned&)dest[3]) = topLeftColor;
     dest[4] = leftUV;
     dest[5] = topUV;
 
-    dest[6] = v2.x_;
-    dest[7] = v2.y_;
+    dest[6] = v2.x;
+    dest[7] = v2.y;
     dest[8] = 0.0f;
     ((unsigned&)dest[9]) = topRightColor;
     dest[10] = rightUV;
     dest[11] = topUV;
 
-    dest[12] = v3.x_;
-    dest[13] = v3.y_;
+    dest[12] = v3.x;
+    dest[13] = v3.y;
     dest[14] = 0.0f;
     ((unsigned&)dest[15]) = bottomLeftColor;
     dest[16] = leftUV;
     dest[17] = bottomUV;
 
-    dest[18] = v2.x_;
-    dest[19] = v2.y_;
+    dest[18] = v2.x;
+    dest[19] = v2.y;
     dest[20] = 0.0f;
     ((unsigned&)dest[21]) = topRightColor;
     dest[22] = rightUV;
     dest[23] = topUV;
 
-    dest[24] = v4.x_;
-    dest[25] = v4.y_;
+    dest[24] = v4.x;
+    dest[25] = v4.y;
     dest[26] = 0.0f;
     ((unsigned&)dest[27]) = bottomRightColor;
     dest[28] = rightUV;
     dest[29] = bottomUV;
 
-    dest[30] = v3.x_;
-    dest[31] = v3.y_;
+    dest[30] = v3.x;
+    dest[31] = v3.y;
     dest[32] = 0.0f;
     ((unsigned&)dest[33]) = bottomLeftColor;
     dest[34] = leftUV;
@@ -284,77 +284,77 @@ void UIBatch::AddQuad(int x, int y, int width, int height, int texOffsetX, int t
 void UIBatch::AddQuad(const Matrix3x4& transform, const IntVector2& a, const IntVector2& b, const IntVector2& c, const IntVector2& d,
     const IntVector2& texA, const IntVector2& texB, const IntVector2& texC, const IntVector2& texD)
 {
-    Vector3 v1 = (transform * Vector3((float)a.x_, (float)a.y_, 0.0f)) - posAdjust;
-    Vector3 v2 = (transform * Vector3((float)b.x_, (float)b.y_, 0.0f)) - posAdjust;
-    Vector3 v3 = (transform * Vector3((float)c.x_, (float)c.y_, 0.0f)) - posAdjust;
-    Vector3 v4 = (transform * Vector3((float)d.x_, (float)d.y_, 0.0f)) - posAdjust;
+    Vector3 v1 = (transform * Vector3((float)a.x, (float)a.y, 0.0f)) - posAdjust;
+    Vector3 v2 = (transform * Vector3((float)b.x, (float)b.y, 0.0f)) - posAdjust;
+    Vector3 v3 = (transform * Vector3((float)c.x, (float)c.y, 0.0f)) - posAdjust;
+    Vector3 v4 = (transform * Vector3((float)d.x, (float)d.y, 0.0f)) - posAdjust;
 
-    Vector2 uv1((float)texA.x_ * invTextureSize_.x_, (float)texA.y_ * invTextureSize_.y_);
-    Vector2 uv2((float)texB.x_ * invTextureSize_.x_, (float)texB.y_ * invTextureSize_.y_);
-    Vector2 uv3((float)texC.x_ * invTextureSize_.x_, (float)texC.y_ * invTextureSize_.y_);
-    Vector2 uv4((float)texD.x_ * invTextureSize_.x_, (float)texD.y_ * invTextureSize_.y_);
+    Vector2 uv1((float)texA.x * invTextureSize_.x, (float)texA.y * invTextureSize_.y);
+    Vector2 uv2((float)texB.x * invTextureSize_.x, (float)texB.y * invTextureSize_.y);
+    Vector2 uv3((float)texC.x * invTextureSize_.x, (float)texC.y * invTextureSize_.y);
+    Vector2 uv4((float)texD.x * invTextureSize_.x, (float)texD.y * invTextureSize_.y);
 
     unsigned begin = vertexData_->Size();
     vertexData_->Resize(begin + 6 * UI_VERTEX_SIZE);
     float* dest = &(vertexData_->At(begin));
     vertexEnd_ = vertexData_->Size();
 
-    dest[0] = v1.x_;
-    dest[1] = v1.y_;
+    dest[0] = v1.x;
+    dest[1] = v1.y;
     dest[2] = 0.0f;
     ((unsigned&)dest[3]) = color_;
-    dest[4] = uv1.x_;
-    dest[5] = uv1.y_;
+    dest[4] = uv1.x;
+    dest[5] = uv1.y;
 
-    dest[6] = v2.x_;
-    dest[7] = v2.y_;
+    dest[6] = v2.x;
+    dest[7] = v2.y;
     dest[8] = 0.0f;
     ((unsigned&)dest[9]) = color_;
-    dest[10] = uv2.x_;
-    dest[11] = uv2.y_;
+    dest[10] = uv2.x;
+    dest[11] = uv2.y;
     
-    dest[12] = v3.x_;
-    dest[13] = v3.y_;
+    dest[12] = v3.x;
+    dest[13] = v3.y;
     dest[14] = 0.0f;
     ((unsigned&)dest[15]) = color_;
-    dest[16] = uv3.x_;
-    dest[17] = uv3.y_;
+    dest[16] = uv3.x;
+    dest[17] = uv3.y;
 
-    dest[18] = v1.x_;
-    dest[19] = v1.y_;
+    dest[18] = v1.x;
+    dest[19] = v1.y;
     dest[20] = 0.0f;
     ((unsigned&)dest[21]) = color_;
-    dest[22] = uv1.x_;
-    dest[23] = uv1.y_;
+    dest[22] = uv1.x;
+    dest[23] = uv1.y;
 
-    dest[24] = v3.x_;
-    dest[25] = v3.y_;
+    dest[24] = v3.x;
+    dest[25] = v3.y;
     dest[26] = 0.0f;
     ((unsigned&)dest[27]) = color_;
-    dest[28] = uv3.x_;
-    dest[29] = uv3.y_;
+    dest[28] = uv3.x;
+    dest[29] = uv3.y;
 
-    dest[30] = v4.x_;
-    dest[31] = v4.y_;
+    dest[30] = v4.x;
+    dest[31] = v4.y;
     dest[32] = 0.0f;
     ((unsigned&)dest[33]) = color_;
-    dest[34] = uv4.x_;
-    dest[35] = uv4.y_;
+    dest[34] = uv4.x;
+    dest[35] = uv4.y;
 }
 
 void UIBatch::AddQuad(const Matrix3x4& transform, const IntVector2& a, const IntVector2& b, const IntVector2& c, const IntVector2& d,
     const IntVector2& texA, const IntVector2& texB, const IntVector2& texC, const IntVector2& texD, const Color& colA,
     const Color& colB, const Color& colC, const Color& colD)
 {
-    Vector3 v1 = (transform * Vector3((float)a.x_, (float)a.y_, 0.0f)) - posAdjust;
-    Vector3 v2 = (transform * Vector3((float)b.x_, (float)b.y_, 0.0f)) - posAdjust;
-    Vector3 v3 = (transform * Vector3((float)c.x_, (float)c.y_, 0.0f)) - posAdjust;
-    Vector3 v4 = (transform * Vector3((float)d.x_, (float)d.y_, 0.0f)) - posAdjust;
+    Vector3 v1 = (transform * Vector3((float)a.x, (float)a.y, 0.0f)) - posAdjust;
+    Vector3 v2 = (transform * Vector3((float)b.x, (float)b.y, 0.0f)) - posAdjust;
+    Vector3 v3 = (transform * Vector3((float)c.x, (float)c.y, 0.0f)) - posAdjust;
+    Vector3 v4 = (transform * Vector3((float)d.x, (float)d.y, 0.0f)) - posAdjust;
 
-    Vector2 uv1((float)texA.x_ * invTextureSize_.x_, (float)texA.y_ * invTextureSize_.y_);
-    Vector2 uv2((float)texB.x_ * invTextureSize_.x_, (float)texB.y_ * invTextureSize_.y_);
-    Vector2 uv3((float)texC.x_ * invTextureSize_.x_, (float)texC.y_ * invTextureSize_.y_);
-    Vector2 uv4((float)texD.x_ * invTextureSize_.x_, (float)texD.y_ * invTextureSize_.y_);
+    Vector2 uv1((float)texA.x * invTextureSize_.x, (float)texA.y * invTextureSize_.y);
+    Vector2 uv2((float)texB.x * invTextureSize_.x, (float)texB.y * invTextureSize_.y);
+    Vector2 uv3((float)texC.x * invTextureSize_.x, (float)texC.y * invTextureSize_.y);
+    Vector2 uv4((float)texD.x * invTextureSize_.x, (float)texD.y * invTextureSize_.y);
 
     unsigned c1 = colA.ToUInt();
     unsigned c2 = colB.ToUInt();
@@ -366,47 +366,47 @@ void UIBatch::AddQuad(const Matrix3x4& transform, const IntVector2& a, const Int
     float* dest = &(vertexData_->At(begin));
     vertexEnd_ = vertexData_->Size();
 
-    dest[0] = v1.x_;
-    dest[1] = v1.y_;
+    dest[0] = v1.x;
+    dest[1] = v1.y;
     dest[2] = 0.0f;
     ((unsigned&)dest[3]) = c1;
-    dest[4] = uv1.x_;
-    dest[5] = uv1.y_;
+    dest[4] = uv1.x;
+    dest[5] = uv1.y;
 
-    dest[6] = v2.x_;
-    dest[7] = v2.y_;
+    dest[6] = v2.x;
+    dest[7] = v2.y;
     dest[8] = 0.0f;
     ((unsigned&)dest[9]) = c2;
-    dest[10] = uv2.x_;
-    dest[11] = uv2.y_;
+    dest[10] = uv2.x;
+    dest[11] = uv2.y;
     
-    dest[12] = v3.x_;
-    dest[13] = v3.y_;
+    dest[12] = v3.x;
+    dest[13] = v3.y;
     dest[14] = 0.0f;
     ((unsigned&)dest[15]) = c3;
-    dest[16] = uv3.x_;
-    dest[17] = uv3.y_;
+    dest[16] = uv3.x;
+    dest[17] = uv3.y;
 
-    dest[18] = v1.x_;
-    dest[19] = v1.y_;
+    dest[18] = v1.x;
+    dest[19] = v1.y;
     dest[20] = 0.0f;
     ((unsigned&)dest[21]) = c1;
-    dest[22] = uv1.x_;
-    dest[23] = uv1.y_;
+    dest[22] = uv1.x;
+    dest[23] = uv1.y;
 
-    dest[24] = v3.x_;
-    dest[25] = v3.y_;
+    dest[24] = v3.x;
+    dest[25] = v3.y;
     dest[26] = 0.0f;
     ((unsigned&)dest[27]) = c3;
-    dest[28] = uv3.x_;
-    dest[29] = uv3.y_;
+    dest[28] = uv3.x;
+    dest[29] = uv3.y;
 
-    dest[30] = v4.x_;
-    dest[31] = v4.y_;
+    dest[30] = v4.x;
+    dest[31] = v4.y;
     dest[32] = 0.0f;
     ((unsigned&)dest[33]) = c4;
-    dest[34] = uv4.x_;
-    dest[35] = uv4.y_;
+    dest[34] = uv4.x;
+    dest[35] = uv4.y;
 }
 
 bool UIBatch::Merge(const UIBatch& batch)
@@ -426,10 +426,10 @@ unsigned UIBatch::GetInterpolatedColor(float x, float y)
 {
     const IntVector2& size = element_->GetSize();
 
-    if (size.x_ && size.y_)
+    if (size.x && size.y)
     {
-        float cLerpX = Clamp(x / (float)size.x_, 0.0f, 1.0f);
-        float cLerpY = Clamp(y / (float)size.y_, 0.0f, 1.0f);
+        float cLerpX = Clamp(x / (float)size.x, 0.0f, 1.0f);
+        float cLerpY = Clamp(y / (float)size.y, 0.0f, 1.0f);
 
         Color topColor = element_->GetColor(C_TOPLEFT).Lerp(element_->GetColor(C_TOPRIGHT), cLerpX);
         Color bottomColor = element_->GetColor(C_BOTTOMLEFT).Lerp(element_->GetColor(C_BOTTOMRIGHT), cLerpX);

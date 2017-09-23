@@ -427,7 +427,7 @@ VariantVector ParticleEmitter::GetParticleBillboardsAttr() const
     {
         ret.Push(i->position_);
         ret.Push(i->size_);
-        ret.Push(Vector4(i->uv_.min_.x_, i->uv_.min_.y_, i->uv_.max_.x_, i->uv_.max_.y_));
+        ret.Push(Vector4(i->uv_.min_.x, i->uv_.min_.y, i->uv_.max_.x, i->uv_.max_.y));
         ret.Push(i->color_);
         ret.Push(i->rotation_);
         ret.Push(i->direction_);
@@ -480,9 +480,9 @@ bool ParticleEmitter::EmitNewParticle()
         {
             const Vector3& emitterSize = effect_->GetEmitterSize();
             startPos = Vector3(
-                Random(emitterSize.x_) - emitterSize.x_ * 0.5f,
-                Random(emitterSize.y_) - emitterSize.y_ * 0.5f,
-                Random(emitterSize.z_) - emitterSize.z_ * 0.5f
+                Random(emitterSize.x) - emitterSize.x * 0.5f,
+                Random(emitterSize.y) - emitterSize.y * 0.5f,
+                Random(emitterSize.z) - emitterSize.z * 0.5f
             );
         }
         break;
@@ -498,7 +498,7 @@ bool ParticleEmitter::EmitNewParticle()
 
     if (faceCameraMode_ == FC_DIRECTION)
     {
-        startPos += startDir * particle.size_.y_;
+        startPos += startDir * particle.size_.y;
     }
 
     if (!relative_)

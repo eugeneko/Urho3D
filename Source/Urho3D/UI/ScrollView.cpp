@@ -162,8 +162,8 @@ void ScrollView::Update(float timeStep)
 
     // Update view position
     IntVector2 newPosition = viewPosition_;
-    newPosition.x_ += (int)touchScrollSpeed_.x_;
-    newPosition.y_ += (int)touchScrollSpeed_.y_;
+    newPosition.x += (int)touchScrollSpeed_.x;
+    newPosition.y += (int)touchScrollSpeed_.y;
     SetViewPosition(newPosition);
 
     // Smooth deceleration
@@ -417,9 +417,9 @@ void ScrollView::UpdatePanelSize()
 
     IntVector2 panelSize = GetSize();
     if (verticalScrollBar_->IsVisible())
-        panelSize.x_ -= verticalScrollBar_->GetWidth();
+        panelSize.x -= verticalScrollBar_->GetWidth();
     if (horizontalScrollBar_->IsVisible())
-        panelSize.y_ -= horizontalScrollBar_->GetHeight();
+        panelSize.y -= horizontalScrollBar_->GetHeight();
 
     scrollPanel_->SetSize(panelSize);
     horizontalScrollBar_->SetWidth(scrollPanel_->GetWidth());
@@ -442,8 +442,8 @@ void ScrollView::UpdateViewSize()
         size = contentElement_->GetSize();
     IntRect panelBorder = scrollPanel_->GetClipBorder();
 
-    viewSize_.x_ = Max(size.x_, scrollPanel_->GetWidth() - panelBorder.left_ - panelBorder.right_);
-    viewSize_.y_ = Max(size.y_, scrollPanel_->GetHeight() - panelBorder.top_ - panelBorder.bottom_);
+    viewSize_.x = Max(size.x, scrollPanel_->GetWidth() - panelBorder.left_ - panelBorder.right_);
+    viewSize_.y = Max(size.y, scrollPanel_->GetHeight() - panelBorder.top_ - panelBorder.bottom_);
 
     UpdateView(viewPosition_);
     UpdateScrollBars();
@@ -455,22 +455,22 @@ void ScrollView::UpdateScrollBars()
 
     IntVector2 size = scrollPanel_->GetSize();
     IntRect panelBorder = scrollPanel_->GetClipBorder();
-    size.x_ -= panelBorder.left_ + panelBorder.right_;
-    size.y_ -= panelBorder.top_ + panelBorder.bottom_;
+    size.x -= panelBorder.left_ + panelBorder.right_;
+    size.y -= panelBorder.top_ + panelBorder.bottom_;
 
-    if (size.x_ > 0 && viewSize_.x_ > 0)
+    if (size.x > 0 && viewSize_.x > 0)
     {
-        float range = (float)viewSize_.x_ / (float)size.x_ - 1.0f;
+        float range = (float)viewSize_.x / (float)size.x - 1.0f;
         horizontalScrollBar_->SetRange(range);
-        horizontalScrollBar_->SetValue((float)viewPosition_.x_ / (float)size.x_);
-        horizontalScrollBar_->SetStepFactor(STEP_FACTOR / (float)size.x_);
+        horizontalScrollBar_->SetValue((float)viewPosition_.x / (float)size.x);
+        horizontalScrollBar_->SetStepFactor(STEP_FACTOR / (float)size.x);
     }
-    if (size.y_ > 0 && viewSize_.y_ > 0)
+    if (size.y > 0 && viewSize_.y > 0)
     {
-        float range = (float)viewSize_.y_ / (float)size.y_ - 1.0f;
+        float range = (float)viewSize_.y / (float)size.y - 1.0f;
         verticalScrollBar_->SetRange(range);
-        verticalScrollBar_->SetValue((float)viewPosition_.y_ / (float)size.y_);
-        verticalScrollBar_->SetStepFactor(STEP_FACTOR / (float)size.y_);
+        verticalScrollBar_->SetValue((float)viewPosition_.y / (float)size.y);
+        verticalScrollBar_->SetStepFactor(STEP_FACTOR / (float)size.y);
     }
 
     ignoreEvents_ = false;
@@ -483,9 +483,9 @@ void ScrollView::UpdateView(const IntVector2& position)
     IntVector2 panelSize(scrollPanel_->GetWidth() - panelBorder.left_ - panelBorder.right_,
         scrollPanel_->GetHeight() - panelBorder.top_ - panelBorder.bottom_);
 
-    viewPosition_.x_ = Clamp(position.x_, 0, viewSize_.x_ - panelSize.x_);
-    viewPosition_.y_ = Clamp(position.y_, 0, viewSize_.y_ - panelSize.y_);
-    scrollPanel_->SetChildOffset(IntVector2(-viewPosition_.x_ + panelBorder.left_, -viewPosition_.y_ + panelBorder.top_));
+    viewPosition_.x = Clamp(position.x, 0, viewSize_.x - panelSize.x);
+    viewPosition_.y = Clamp(position.y, 0, viewSize_.y - panelSize.y);
+    scrollPanel_->SetChildOffset(IntVector2(-viewPosition_.x + panelBorder.left_, -viewPosition_.y + panelBorder.top_));
 
     if (viewPosition_ != oldPosition)
     {
@@ -493,8 +493,8 @@ void ScrollView::UpdateView(const IntVector2& position)
 
         VariantMap& eventData = GetEventDataMap();
         eventData[P_ELEMENT] = this;
-        eventData[P_X] = viewPosition_.x_;
-        eventData[P_Y] = viewPosition_.y_;
+        eventData[P_X] = viewPosition_.x;
+        eventData[P_Y] = viewPosition_.y;
         SendEvent(E_VIEWCHANGED, eventData);
     }
 }
@@ -505,12 +505,12 @@ void ScrollView::HandleScrollBarChanged(StringHash eventType, VariantMap& eventD
     {
         IntVector2 size = scrollPanel_->GetSize();
         IntRect panelBorder = scrollPanel_->GetClipBorder();
-        size.x_ -= panelBorder.left_ + panelBorder.right_;
-        size.y_ -= panelBorder.top_ + panelBorder.bottom_;
+        size.x -= panelBorder.left_ + panelBorder.right_;
+        size.y -= panelBorder.top_ + panelBorder.bottom_;
 
         UpdateView(IntVector2(
-            (int)(horizontalScrollBar_->GetValue() * (float)size.x_),
-            (int)(verticalScrollBar_->GetValue() * (float)size.y_)
+            (int)(horizontalScrollBar_->GetValue() * (float)size.x),
+            (int)(verticalScrollBar_->GetValue() * (float)size.y)
         ));
     }
 }
@@ -539,10 +539,10 @@ void ScrollView::HandleTouchMove(StringHash eventType, VariantMap& eventData)
         float dX = (float)-eventData[P_DX].GetInt();
         float dY = (float)-eventData[P_DY].GetInt();
 
-        if (Abs(dX) > Abs(touchScrollSpeed_.x_))
-            touchScrollSpeed_.x_ = dX;
-        if (Abs(dY) > Abs(touchScrollSpeed_.y_))
-            touchScrollSpeed_.y_ = dY;
+        if (Abs(dX) > Abs(touchScrollSpeed_.x))
+            touchScrollSpeed_.x = dX;
+        if (Abs(dY) > Abs(touchScrollSpeed_.y))
+            touchScrollSpeed_.y = dY;
 
         // Auto disable children
         touchDistanceSum_ += dX * dX + dY * dY;
@@ -555,8 +555,8 @@ void ScrollView::HandleTouchMove(StringHash eventType, VariantMap& eventData)
             }
         }
 
-        touchScrollSpeedMax_.x_ = dX;
-        touchScrollSpeedMax_.y_ = dY;
+        touchScrollSpeedMax_.x = dX;
+        touchScrollSpeedMax_.y = dY;
     }
     else if (eventType == E_TOUCHBEGIN)
     {
@@ -588,15 +588,15 @@ void ScrollView::HandleTouchMove(StringHash eventType, VariantMap& eventData)
 
         barScrolling_ = false;
         scrollTouchDown_ = false;
-        if (Abs(touchScrollSpeedMax_.x_) > scrollSnapEpsilon_)
-            touchScrollSpeed_.x_ = touchScrollSpeedMax_.x_;
+        if (Abs(touchScrollSpeedMax_.x) > scrollSnapEpsilon_)
+            touchScrollSpeed_.x = touchScrollSpeedMax_.x;
         else
-            touchScrollSpeed_.x_ = 0;
+            touchScrollSpeed_.x = 0;
 
-        if (Abs(touchScrollSpeedMax_.y_) > scrollSnapEpsilon_)
-            touchScrollSpeed_.y_ = touchScrollSpeedMax_.y_;
+        if (Abs(touchScrollSpeedMax_.y) > scrollSnapEpsilon_)
+            touchScrollSpeed_.y = touchScrollSpeedMax_.y;
         else
-            touchScrollSpeed_.y_ = 0;
+            touchScrollSpeed_.y = 0;
         touchScrollSpeedMax_ = Vector2::ZERO;
     }
 }
@@ -604,31 +604,31 @@ void ScrollView::HandleTouchMove(StringHash eventType, VariantMap& eventData)
 void ScrollView::ScrollSmooth(float timeStep)
 {
     // Decay the momentum
-    if (touchScrollSpeedMax_.x_ >= scrollSnapEpsilon_)
+    if (touchScrollSpeedMax_.x >= scrollSnapEpsilon_)
     {
-        touchScrollSpeedMax_.x_ -= scrollDeceleration_ * timeStep;
-        touchScrollSpeedMax_.x_ = touchScrollSpeedMax_.x_ > 0 ? touchScrollSpeedMax_.x_ : 0;
+        touchScrollSpeedMax_.x -= scrollDeceleration_ * timeStep;
+        touchScrollSpeedMax_.x = touchScrollSpeedMax_.x > 0 ? touchScrollSpeedMax_.x : 0;
     }
-    else if (touchScrollSpeedMax_.x_ <= -scrollSnapEpsilon_)
+    else if (touchScrollSpeedMax_.x <= -scrollSnapEpsilon_)
     {
-        touchScrollSpeedMax_.x_ += scrollDeceleration_ * timeStep;
-        touchScrollSpeedMax_.x_ = touchScrollSpeedMax_.x_ < 0 ? touchScrollSpeedMax_.x_ : 0;
+        touchScrollSpeedMax_.x += scrollDeceleration_ * timeStep;
+        touchScrollSpeedMax_.x = touchScrollSpeedMax_.x < 0 ? touchScrollSpeedMax_.x : 0;
     }
     else
-        touchScrollSpeedMax_.x_ = 0;
+        touchScrollSpeedMax_.x = 0;
 
-    if (touchScrollSpeedMax_.y_ >= scrollSnapEpsilon_)
+    if (touchScrollSpeedMax_.y >= scrollSnapEpsilon_)
     {
-        touchScrollSpeedMax_.y_ -= scrollDeceleration_ * timeStep;
-        touchScrollSpeedMax_.y_ = touchScrollSpeedMax_.y_ > 0 ? touchScrollSpeedMax_.y_ : 0;
+        touchScrollSpeedMax_.y -= scrollDeceleration_ * timeStep;
+        touchScrollSpeedMax_.y = touchScrollSpeedMax_.y > 0 ? touchScrollSpeedMax_.y : 0;
     }
-    else if (touchScrollSpeedMax_.y_ <= -scrollSnapEpsilon_)
+    else if (touchScrollSpeedMax_.y <= -scrollSnapEpsilon_)
     {
-        touchScrollSpeedMax_.y_ += scrollDeceleration_ * timeStep;
-        touchScrollSpeedMax_.y_ = touchScrollSpeedMax_.y_ < 0 ? touchScrollSpeedMax_.y_ : 0;
+        touchScrollSpeedMax_.y += scrollDeceleration_ * timeStep;
+        touchScrollSpeedMax_.y = touchScrollSpeedMax_.y < 0 ? touchScrollSpeedMax_.y : 0;
     }
     else
-        touchScrollSpeedMax_.y_ = 0;
+        touchScrollSpeedMax_.y = 0;
 
     // Control vs flick
     if (scrollTouchDown_)
@@ -639,67 +639,67 @@ void ScrollView::ScrollSmooth(float timeStep)
     else
     {
         // Finger is released: flick = smooth deceleration
-        if (touchScrollSpeed_.x_ >= scrollSnapEpsilon_)
+        if (touchScrollSpeed_.x >= scrollSnapEpsilon_)
         {
-            touchScrollSpeed_.x_ -= scrollDeceleration_ * timeStep;
-            if (touchScrollSpeed_.x_ < 0)
+            touchScrollSpeed_.x -= scrollDeceleration_ * timeStep;
+            if (touchScrollSpeed_.x < 0)
             {
-                touchScrollSpeed_.x_ = 0;
+                touchScrollSpeed_.x = 0;
             }
 
             if (horizontalScrollBar_->GetValue() >= horizontalScrollBar_->GetRange() - M_EPSILON)
             {
                 // Stop movement when we reach end of scroll
-                touchScrollSpeed_.x_ = 0;
+                touchScrollSpeed_.x = 0;
             }
         }
-        else if (touchScrollSpeed_.x_ < -scrollSnapEpsilon_)
+        else if (touchScrollSpeed_.x < -scrollSnapEpsilon_)
         {
-            touchScrollSpeed_.x_ += scrollDeceleration_ * timeStep;
-            if (touchScrollSpeed_.x_ > 0)
+            touchScrollSpeed_.x += scrollDeceleration_ * timeStep;
+            if (touchScrollSpeed_.x > 0)
             {
-                touchScrollSpeed_.x_ = 0;
+                touchScrollSpeed_.x = 0;
             }
 
             if (horizontalScrollBar_->GetValue() <= M_EPSILON)
             {
                 // Stop movement when we reach end of scroll
-                touchScrollSpeed_.x_ = 0;
+                touchScrollSpeed_.x = 0;
             }
         }
         else
-            touchScrollSpeed_.x_ = 0;
+            touchScrollSpeed_.x = 0;
 
-        if (touchScrollSpeed_.y_ >= scrollSnapEpsilon_)
+        if (touchScrollSpeed_.y >= scrollSnapEpsilon_)
         {
-            touchScrollSpeed_.y_ -= scrollDeceleration_ * timeStep;
-            if (touchScrollSpeed_.y_ < 0)
+            touchScrollSpeed_.y -= scrollDeceleration_ * timeStep;
+            if (touchScrollSpeed_.y < 0)
             {
-                touchScrollSpeed_.y_ = 0;
+                touchScrollSpeed_.y = 0;
             }
 
             if (verticalScrollBar_->GetValue() >= verticalScrollBar_->GetRange() - M_EPSILON)
             {
                 // Stop movement when we reach end of scroll
-                touchScrollSpeed_.y_ = 0;
+                touchScrollSpeed_.y = 0;
             }
         }
-        else if (touchScrollSpeed_.y_ < -scrollSnapEpsilon_)
+        else if (touchScrollSpeed_.y < -scrollSnapEpsilon_)
         {
-            touchScrollSpeed_.y_ += scrollDeceleration_ * timeStep;
-            if (touchScrollSpeed_.y_ > 0)
+            touchScrollSpeed_.y += scrollDeceleration_ * timeStep;
+            if (touchScrollSpeed_.y > 0)
             {
-                touchScrollSpeed_.y_ = 0;
+                touchScrollSpeed_.y = 0;
             }
 
             if (verticalScrollBar_->GetValue() <= M_EPSILON)
             {
                 // Stop movement when we reach end of scroll
-                touchScrollSpeed_.y_ = 0;
+                touchScrollSpeed_.y = 0;
             }
         }
         else
-            touchScrollSpeed_.y_ = 0;
+            touchScrollSpeed_.y = 0;
     }
 }
 

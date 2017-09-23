@@ -85,7 +85,7 @@ void Graphics::SetWindowIcon(Image* windowIcon)
 void Graphics::SetWindowPosition(const IntVector2& position)
 {
     if (window_)
-        SDL_SetWindowPosition(window_, position.x_, position.y_);
+        SDL_SetWindowPosition(window_, position.x, position.y);
     else
         position_ = position; // Sets as initial position for OpenWindow()
 }
@@ -191,7 +191,7 @@ PODVector<IntVector3> Graphics::GetResolutions(int monitor) const
         bool unique = true;
         for (unsigned j = 0; j < ret.Size(); ++j)
         {
-            if (ret[j].x_ == width && ret[j].y_ == height && ret[j].z_ == rate)
+            if (ret[j].x == width && ret[j].y == height && ret[j].z == rate)
             {
                 unique = false;
                 break;

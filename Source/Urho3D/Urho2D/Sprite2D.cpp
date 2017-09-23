@@ -156,13 +156,13 @@ bool Sprite2D::GetDrawRectangle(Rect& rect, const Vector2& hotSpot, bool flipX, 
     float width = (float)rectangle_.Width() * PIXEL_SIZE;
     float height = (float)rectangle_.Height() * PIXEL_SIZE;
 
-    float hotSpotX = flipX ? (1.0f - hotSpot.x_) : hotSpot.x_;
-    float hotSpotY = flipY ? (1.0f - hotSpot.y_) : hotSpot.y_;
+    float hotSpotX = flipX ? (1.0f - hotSpot.x) : hotSpot.x;
+    float hotSpotY = flipY ? (1.0f - hotSpot.y) : hotSpot.y;
 
-    rect.min_.x_ = -width * hotSpotX;
-    rect.max_.x_ = width * (1.0f - hotSpotX);
-    rect.min_.y_ = -height * hotSpotY;
-    rect.max_.y_ = height * (1.0f - hotSpotY);
+    rect.min_.x = -width * hotSpotX;
+    rect.max_.x = width * (1.0f - hotSpotX);
+    rect.min_.y = -height * hotSpotY;
+    rect.max_.y = height * (1.0f - hotSpotY);
 
     return true;
 }
@@ -175,17 +175,17 @@ bool Sprite2D::GetTextureRectangle(Rect& rect, bool flipX, bool flipY) const
     float invWidth = 1.0f / (float)texture_->GetWidth();
     float invHeight = 1.0f / (float)texture_->GetHeight();
 
-    rect.min_.x_ = ((float)rectangle_.left_ + edgeOffset_) * invWidth;
-    rect.max_.x_ = ((float)rectangle_.right_ - edgeOffset_) * invWidth;
+    rect.min_.x = ((float)rectangle_.left_ + edgeOffset_) * invWidth;
+    rect.max_.x = ((float)rectangle_.right_ - edgeOffset_) * invWidth;
 
-    rect.min_.y_ = ((float)rectangle_.bottom_ - edgeOffset_) * invHeight;
-    rect.max_.y_ = ((float)rectangle_.top_ + edgeOffset_) * invHeight;
+    rect.min_.y = ((float)rectangle_.bottom_ - edgeOffset_) * invHeight;
+    rect.max_.y = ((float)rectangle_.top_ + edgeOffset_) * invHeight;
 
     if (flipX)
-        Swap(rect.min_.x_, rect.max_.x_);
+        Swap(rect.min_.x, rect.max_.x);
 
     if (flipY)
-        Swap(rect.min_.y_, rect.max_.y_);
+        Swap(rect.min_.y, rect.max_.y);
 
     return true;
 }

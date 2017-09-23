@@ -148,12 +148,12 @@ void DebugRenderer::AddBoundingBox(const BoundingBox& box, const Color& color, b
     const Vector3& min = box.min_;
     const Vector3& max = box.max_;
 
-    Vector3 v1(max.x_, min.y_, min.z_);
-    Vector3 v2(max.x_, max.y_, min.z_);
-    Vector3 v3(min.x_, max.y_, min.z_);
-    Vector3 v4(min.x_, min.y_, max.z_);
-    Vector3 v5(max.x_, min.y_, max.z_);
-    Vector3 v6(min.x_, max.y_, max.z_);
+    Vector3 v1(max.x, min.y, min.z);
+    Vector3 v2(max.x, max.y, min.z);
+    Vector3 v3(min.x, max.y, min.z);
+    Vector3 v4(min.x, min.y, max.z);
+    Vector3 v5(max.x, min.y, max.z);
+    Vector3 v6(min.x, max.y, max.z);
 
     unsigned uintColor = color.ToUInt();
 
@@ -189,12 +189,12 @@ void DebugRenderer::AddBoundingBox(const BoundingBox& box, const Matrix3x4& tran
     const Vector3& max = box.max_;
 
     Vector3 v0(transform * min);
-    Vector3 v1(transform * Vector3(max.x_, min.y_, min.z_));
-    Vector3 v2(transform * Vector3(max.x_, max.y_, min.z_));
-    Vector3 v3(transform * Vector3(min.x_, max.y_, min.z_));
-    Vector3 v4(transform * Vector3(min.x_, min.y_, max.z_));
-    Vector3 v5(transform * Vector3(max.x_, min.y_, max.z_));
-    Vector3 v6(transform * Vector3(min.x_, max.y_, max.z_));
+    Vector3 v1(transform * Vector3(max.x, min.y, min.z));
+    Vector3 v2(transform * Vector3(max.x, max.y, min.z));
+    Vector3 v3(transform * Vector3(min.x, max.y, min.z));
+    Vector3 v4(transform * Vector3(min.x, min.y, max.z));
+    Vector3 v5(transform * Vector3(max.x, min.y, max.z));
+    Vector3 v6(transform * Vector3(min.x, max.y, max.z));
     Vector3 v7(transform * max);
 
     unsigned uintColor = color.ToUInt();
@@ -459,8 +459,8 @@ void DebugRenderer::AddCross(const Vector3& center, float size, const Color& col
     float halfSize = size / 2.0f;
     for (int i = 0; i < 3; ++i)
     {
-        float start[3] = { center.x_, center.y_, center.z_ };
-        float end[3] = { center.x_, center.y_, center.z_ };
+        float start[3] = { center.x, center.y, center.z };
+        float end[3] = { center.x, center.y, center.z };
         start[i] -= halfSize;
         end[i] += halfSize;
         AddLine(Vector3(start), Vector3(end), uintColor, depthTest);
@@ -471,10 +471,10 @@ void DebugRenderer::AddQuad(const Vector3& center, float width, float height, co
 {
     unsigned uintColor = color.ToUInt();
 
-    Vector3 v0(center.x_ - width / 2, center.y_, center.z_ - height / 2);
-    Vector3 v1(center.x_ + width / 2, center.y_, center.z_ - height / 2);
-    Vector3 v2(center.x_ + width / 2, center.y_, center.z_ + height / 2);
-    Vector3 v3(center.x_ - width / 2, center.y_, center.z_ + height / 2);
+    Vector3 v0(center.x - width / 2, center.y, center.z - height / 2);
+    Vector3 v1(center.x + width / 2, center.y, center.z - height / 2);
+    Vector3 v2(center.x + width / 2, center.y, center.z + height / 2);
+    Vector3 v3(center.x - width / 2, center.y, center.z + height / 2);
     AddLine(v0, v1, uintColor, depthTest);
     AddLine(v1, v2, uintColor, depthTest);
     AddLine(v2, v3, uintColor, depthTest);
@@ -508,13 +508,13 @@ void DebugRenderer::Render()
     {
         const DebugLine& line = lines_[i];
 
-        dest[0] = line.start_.x_;
-        dest[1] = line.start_.y_;
-        dest[2] = line.start_.z_;
+        dest[0] = line.start_.x;
+        dest[1] = line.start_.y;
+        dest[2] = line.start_.z;
         ((unsigned&)dest[3]) = line.color_;
-        dest[4] = line.end_.x_;
-        dest[5] = line.end_.y_;
-        dest[6] = line.end_.z_;
+        dest[4] = line.end_.x;
+        dest[5] = line.end_.y;
+        dest[6] = line.end_.z;
         ((unsigned&)dest[7]) = line.color_;
 
         dest += 8;
@@ -524,13 +524,13 @@ void DebugRenderer::Render()
     {
         const DebugLine& line = noDepthLines_[i];
 
-        dest[0] = line.start_.x_;
-        dest[1] = line.start_.y_;
-        dest[2] = line.start_.z_;
+        dest[0] = line.start_.x;
+        dest[1] = line.start_.y;
+        dest[2] = line.start_.z;
         ((unsigned&)dest[3]) = line.color_;
-        dest[4] = line.end_.x_;
-        dest[5] = line.end_.y_;
-        dest[6] = line.end_.z_;
+        dest[4] = line.end_.x;
+        dest[5] = line.end_.y;
+        dest[6] = line.end_.z;
         ((unsigned&)dest[7]) = line.color_;
 
         dest += 8;
@@ -540,19 +540,19 @@ void DebugRenderer::Render()
     {
         const DebugTriangle& triangle = triangles_[i];
 
-        dest[0] = triangle.v1_.x_;
-        dest[1] = triangle.v1_.y_;
-        dest[2] = triangle.v1_.z_;
+        dest[0] = triangle.v1_.x;
+        dest[1] = triangle.v1_.y;
+        dest[2] = triangle.v1_.z;
         ((unsigned&)dest[3]) = triangle.color_;
 
-        dest[4] = triangle.v2_.x_;
-        dest[5] = triangle.v2_.y_;
-        dest[6] = triangle.v2_.z_;
+        dest[4] = triangle.v2_.x;
+        dest[5] = triangle.v2_.y;
+        dest[6] = triangle.v2_.z;
         ((unsigned&)dest[7]) = triangle.color_;
 
-        dest[8] = triangle.v3_.x_;
-        dest[9] = triangle.v3_.y_;
-        dest[10] = triangle.v3_.z_;
+        dest[8] = triangle.v3_.x;
+        dest[9] = triangle.v3_.y;
+        dest[10] = triangle.v3_.z;
         ((unsigned&)dest[11]) = triangle.color_;
 
         dest += 12;
@@ -562,19 +562,19 @@ void DebugRenderer::Render()
     {
         const DebugTriangle& triangle = noDepthTriangles_[i];
 
-        dest[0] = triangle.v1_.x_;
-        dest[1] = triangle.v1_.y_;
-        dest[2] = triangle.v1_.z_;
+        dest[0] = triangle.v1_.x;
+        dest[1] = triangle.v1_.y;
+        dest[2] = triangle.v1_.z;
         ((unsigned&)dest[3]) = triangle.color_;
 
-        dest[4] = triangle.v2_.x_;
-        dest[5] = triangle.v2_.y_;
-        dest[6] = triangle.v2_.z_;
+        dest[4] = triangle.v2_.x;
+        dest[5] = triangle.v2_.y;
+        dest[6] = triangle.v2_.z;
         ((unsigned&)dest[7]) = triangle.color_;
 
-        dest[8] = triangle.v3_.x_;
-        dest[9] = triangle.v3_.y_;
-        dest[10] = triangle.v3_.z_;
+        dest[8] = triangle.v3_.x;
+        dest[9] = triangle.v3_.y;
+        dest[10] = triangle.v3_.z;
         ((unsigned&)dest[11]) = triangle.color_;
 
         dest += 12;

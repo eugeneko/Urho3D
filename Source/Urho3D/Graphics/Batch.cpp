@@ -110,22 +110,22 @@ void CalculateShadowMatrix(Matrix4& dest, LightBatchQueue* queue, unsigned split
 
     // Add pixel-perfect offset if needed by the graphics API
     const Vector2& pixelUVOffset = Graphics::GetPixelUVOffset();
-    offset.x_ += scale.x_ + pixelUVOffset.x_ / width;
-    offset.y_ += scale.y_ + pixelUVOffset.y_ / height;
+    offset.x += scale.x + pixelUVOffset.x / width;
+    offset.y += scale.y + pixelUVOffset.y / height;
 
 #ifdef URHO3D_OPENGL
-    offset.z_ = 0.5f;
-    scale.z_ = 0.5f;
-    offset.y_ = 1.0f - offset.y_;
+    offset.z = 0.5f;
+    scale.z = 0.5f;
+    offset.y = 1.0f - offset.y;
 #else
-    scale.y_ = -scale.y_;
+    scale.y = -scale.y;
 #endif
 
     // If using 4 shadow samples, offset the position diagonally by half pixel
     if (renderer->GetShadowQuality() == SHADOWQUALITY_PCF_16BIT || renderer->GetShadowQuality() == SHADOWQUALITY_PCF_24BIT)
     {
-        offset.x_ -= 0.5f / width;
-        offset.y_ -= 0.5f / height;
+        offset.x -= 0.5f / width;
+        offset.y -= 0.5f / height;
     }
     texAdjust.SetTranslation(offset);
     texAdjust.SetScale(scale);
@@ -231,12 +231,12 @@ void Batch::Prepare(View* view, Camera* camera, bool setModelTransform, bool all
     unsigned cameraHash = (unsigned)(size_t)camera;
     IntRect viewport = graphics->GetViewport();
     IntVector2 viewSize = IntVector2(viewport.Width(), viewport.Height());
-    unsigned viewportHash = (unsigned)(viewSize.x_ | (viewSize.y_ << 16));
+    unsigned viewportHash = (unsigned)(viewSize.x | (viewSize.y << 16));
     if (graphics->NeedParameterUpdate(SP_CAMERA, reinterpret_cast<const void*>(cameraHash + viewportHash)))
     {
         view->SetCameraShaderParameters(camera);
         // During renderpath commands the G-Buffer or viewport texture is assumed to always be viewport-sized
-        view->SetGBufferShaderParameters(viewSize, IntRect(0, 0, viewSize.x_, viewSize.y_));
+        view->SetGBufferShaderParameters(viewSize, IntRect(0, 0, viewSize.x, viewSize.y));
     }
 
     // Set model or skinning transforms
@@ -276,7 +276,7 @@ void Batch::Prepare(View* view, Camera* camera, bool setModelTransform, bool all
         const BoundingBox& box = zone_->GetBoundingBox();
         Vector3 boxSize = box.Size();
         Matrix3x4 adjust(Matrix3x4::IDENTITY);
-        adjust.SetScale(Vector3(1.0f / boxSize.x_, 1.0f / boxSize.y_, 1.0f / boxSize.z_));
+        adjust.SetScale(Vector3(1.0f / boxSize.x, 1.0f / boxSize.y, 1.0f / boxSize.z));
         adjust.SetTranslation(Vector3(0.5f, 0.5f, 0.5f));
         Matrix3x4 zoneTransform = adjust * zone_->GetInverseWorldTransform();
         graphics->SetShaderParameter(VSP_ZONE, zoneTransform);
@@ -298,8 +298,8 @@ void Batch::Prepare(View* view, Camera* camera, bool setModelTransform, bool all
         if (zone_->GetHeightFog() && zoneNode)
         {
             Vector3 worldFogHeightVec = zoneNode->GetWorldTransform() * Vector3(0.0f, zone_->GetFogHeight(), 0.0f);
-            fogParams.z_ = worldFogHeightVec.y_;
-            fogParams.w_ = zone_->GetFogHeightScale() / Max(zoneNode->GetWorldScale().y_, M_EPSILON);
+            fogParams.z = worldFogHeightVec.y;
+            fogParams.w = zone_->GetFogHeightScale() / Max(zoneNode->GetWorldScale().y, M_EPSILON);
         }
 
         graphics->SetShaderParameter(PSP_FOGPARAMS, fogParams);
@@ -490,11 +490,11 @@ void Batch::Prepare(View* view, Camera* camera, bool setModelTransform, bool all
 
                 Vector4 lightSplits(M_LARGE_VALUE, M_LARGE_VALUE, M_LARGE_VALUE, M_LARGE_VALUE);
                 if (lightQueue_->shadowSplits_.Size() > 1)
-                    lightSplits.x_ = lightQueue_->shadowSplits_[0].farSplit_ / camera->GetFarClip();
+                    lightSplits.x = lightQueue_->shadowSplits_[0].farSplit_ / camera->GetFarClip();
                 if (lightQueue_->shadowSplits_.Size() > 2)
-                    lightSplits.y_ = lightQueue_->shadowSplits_[1].farSplit_ / camera->GetFarClip();
+                    lightSplits.y = lightQueue_->shadowSplits_[1].farSplit_ / camera->GetFarClip();
                 if (lightQueue_->shadowSplits_.Size() > 3)
-                    lightSplits.z_ = lightQueue_->shadowSplits_[2].farSplit_ / camera->GetFarClip();
+                    lightSplits.z = lightQueue_->shadowSplits_[2].farSplit_ / camera->GetFarClip();
 
                 graphics->SetShaderParameter(PSP_SHADOWSPLITS, lightSplits);
 
@@ -509,17 +509,17 @@ void Batch::Prepare(View* view, Camera* camera, bool setModelTransform, bool all
                     if (light->GetLightType() != LIGHT_DIRECTIONAL)
                     {
                         Camera* shadowCamera = lightQueue_->shadowSplits_[0].shadowCamera_;
-                        normalOffsetScale.x_ = 2.0f * tanf(shadowCamera->GetFov() * M_DEGTORAD * 0.5f) * shadowCamera->GetFarClip();
+                        normalOffsetScale.x = 2.0f * tanf(shadowCamera->GetFov() * M_DEGTORAD * 0.5f) * shadowCamera->GetFarClip();
                     }
                     else
                     {
-                        normalOffsetScale.x_ = lightQueue_->shadowSplits_[0].shadowCamera_->GetOrthoSize();
+                        normalOffsetScale.x = lightQueue_->shadowSplits_[0].shadowCamera_->GetOrthoSize();
                         if (lightQueue_->shadowSplits_.Size() > 1)
-                            normalOffsetScale.y_ = lightQueue_->shadowSplits_[1].shadowCamera_->GetOrthoSize();
+                            normalOffsetScale.y = lightQueue_->shadowSplits_[1].shadowCamera_->GetOrthoSize();
                         if (lightQueue_->shadowSplits_.Size() > 2)
-                            normalOffsetScale.z_ = lightQueue_->shadowSplits_[2].shadowCamera_->GetOrthoSize();
+                            normalOffsetScale.z = lightQueue_->shadowSplits_[2].shadowCamera_->GetOrthoSize();
                         if (lightQueue_->shadowSplits_.Size() > 3)
-                            normalOffsetScale.w_ = lightQueue_->shadowSplits_[3].shadowCamera_->GetOrthoSize();
+                            normalOffsetScale.w = lightQueue_->shadowSplits_[3].shadowCamera_->GetOrthoSize();
                     }
 
                     normalOffsetScale *= light->GetShadowBias().normalOffset_;

@@ -166,23 +166,23 @@ void Text::GetBatches(PODVector<UIBatch>& batches, PODVector<float>& vertexData,
             // Check if row changes, and start a new quad in that case
             if (charLocations_[i].size_ != Vector2::ZERO)
             {
-                if (charLocations_[i].position_.y_ != currentStart.y_)
+                if (charLocations_[i].position_.y != currentStart.y)
                 {
-                    batch.AddQuad(currentStart.x_, currentStart.y_, currentEnd.x_ - currentStart.x_,
-                        currentEnd.y_ - currentStart.y_, 0, 0);
+                    batch.AddQuad(currentStart.x, currentStart.y, currentEnd.x - currentStart.x,
+                        currentEnd.y - currentStart.y, 0, 0);
                     currentStart = charLocations_[i].position_;
                     currentEnd = currentStart + charLocations_[i].size_;
                 }
                 else
                 {
-                    currentEnd.x_ += charLocations_[i].size_.x_;
-                    currentEnd.y_ = Max(currentStart.y_ + charLocations_[i].size_.y_, currentEnd.y_);
+                    currentEnd.x += charLocations_[i].size_.x;
+                    currentEnd.y = Max(currentStart.y + charLocations_[i].size_.y, currentEnd.y);
                 }
             }
         }
         if (currentEnd != currentStart)
         {
-            batch.AddQuad(currentStart.x_, currentStart.y_, currentEnd.x_ - currentStart.x_, currentEnd.y_ - currentStart.y_, 0, 0);
+            batch.AddQuad(currentStart.x, currentStart.y, currentEnd.x - currentStart.x, currentEnd.y - currentStart.y, 0, 0);
         }
 
         UIBatch::AddOrMerge(batch, batches);
@@ -205,7 +205,7 @@ void Text::GetBatches(PODVector<UIBatch>& batches, PODVector<float>& vertexData,
             break;
 
         case TE_SHADOW:
-            ConstructBatch(pageBatch, pageGlyphLocation, shadowOffset_.x_, shadowOffset_.y_, &effectColor_, effectDepthBias_);
+            ConstructBatch(pageBatch, pageGlyphLocation, shadowOffset_.x, shadowOffset_.y, &effectColor_, effectDepthBias_);
             ConstructBatch(pageBatch, pageGlyphLocation, 0, 0);
             break;
 
@@ -724,8 +724,8 @@ void Text::UpdateCharLocations()
 
     unsigned rowIndex = 0;
     unsigned lastFilled = 0;
-    float x = floor(GetRowStartPosition(rowIndex) + offset.x_ + 0.5f);
-    float y = floor(offset.y_ + 0.5f);
+    float x = floor(GetRowStartPosition(rowIndex) + offset.x + 0.5f);
+    float y = floor(offset.y + 0.5f);
 
     for (unsigned i = 0; i < printText_.Size(); ++i)
     {
@@ -801,10 +801,10 @@ int Text::GetRowStartPosition(unsigned rowIndex) const
     case HA_LEFT:
         break;
     case HA_CENTER:
-        ret += (GetSize().x_ - rowWidth) / 2;
+        ret += (GetSize().x - rowWidth) / 2;
         break;
     case HA_RIGHT:
-        ret += GetSize().x_ - rowWidth;
+        ret += GetSize().x - rowWidth;
         break;
     }
 
@@ -825,8 +825,8 @@ void Text::ConstructBatch(UIBatch& pageBatch, const PODVector<GlyphLocation>& pa
     {
         const GlyphLocation& glyphLocation = pageGlyphLocation[i];
         const FontGlyph& glyph = *glyphLocation.glyph_;
-        pageBatch.AddQuad(dx + glyphLocation.x_ + glyph.offsetX_, dy + glyphLocation.y_ + glyph.offsetY_, glyph.width_,
-            glyph.height_, glyph.x_, glyph.y_, glyph.texWidth_, glyph.texHeight_);
+        pageBatch.AddQuad(dx + glyphLocation.x + glyph.offsetX_, dy + glyphLocation.y + glyph.offsetY_, glyph.width_,
+            glyph.height_, glyph.x, glyph.y, glyph.texWidth_, glyph.texHeight_);
     }
 
     if (depthBias != 0.0f)

@@ -320,8 +320,8 @@ void DynamicGeometry::MoveCamera(float timeStep)
 
     // Use this frame's mouse motion to adjust camera node yaw and pitch. Clamp the pitch between -90 and 90 degrees
     IntVector2 mouseMove = input->GetMouseMove();
-    yaw_ += MOUSE_SENSITIVITY * mouseMove.x_;
-    pitch_ += MOUSE_SENSITIVITY * mouseMove.y_;
+    yaw_ += MOUSE_SENSITIVITY * mouseMove.x;
+    pitch_ += MOUSE_SENSITIVITY * mouseMove.y;
     pitch_ = Clamp(pitch_, -90.0f, 90.0f);
 
     // Construct new orientation for the camera scene node from yaw and pitch. Roll is fixed to zero
@@ -363,9 +363,9 @@ void DynamicGeometry::AnimateObjects(float timeStep)
                 float phase = startPhase + vertexDuplicates_[j] * 10.0f;
                 Vector3& src = originalVertices_[j];
                 Vector3& dest = *reinterpret_cast<Vector3*>(vertexData + j * vertexSize);
-                dest.x_ = src.x_ * (1.0f + 0.1f * Sin(phase));
-                dest.y_ = src.y_ * (1.0f + 0.1f * Sin(phase + 60.0f));
-                dest.z_ = src.z_ * (1.0f + 0.1f * Sin(phase + 120.0f));
+                dest.x = src.x * (1.0f + 0.1f * Sin(phase));
+                dest.y = src.y * (1.0f + 0.1f * Sin(phase + 60.0f));
+                dest.z = src.z * (1.0f + 0.1f * Sin(phase + 120.0f));
             }
 
             buffer->Unlock();

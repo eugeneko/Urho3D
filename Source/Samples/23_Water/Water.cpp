@@ -133,7 +133,7 @@ void Water::CreateScene()
     {
         Node* objectNode = scene_->CreateChild("Box");
         Vector3 position(Random(2000.0f) - 1000.0f, 0.0f, Random(2000.0f) - 1000.0f);
-        position.y_ = terrain->GetHeight(position) + 2.25f;
+        position.y = terrain->GetHeight(position) + 2.25f;
         objectNode->SetPosition(position);
         // Create a rotation quaternion from up vector to terrain normal
         objectNode->SetRotation(Quaternion(Vector3(0.0f, 1.0f, 0.0f), terrain->GetNormal(position)));
@@ -248,8 +248,8 @@ void Water::MoveCamera(float timeStep)
 
     // Use this frame's mouse motion to adjust camera node yaw and pitch. Clamp the pitch between -90 and 90 degrees
     IntVector2 mouseMove = input->GetMouseMove();
-    yaw_ += MOUSE_SENSITIVITY * mouseMove.x_;
-    pitch_ += MOUSE_SENSITIVITY * mouseMove.y_;
+    yaw_ += MOUSE_SENSITIVITY * mouseMove.x;
+    pitch_ += MOUSE_SENSITIVITY * mouseMove.y;
     pitch_ = Clamp(pitch_, -90.0f, 90.0f);
 
     // Construct new orientation for the camera scene node from yaw and pitch. Roll is fixed to zero

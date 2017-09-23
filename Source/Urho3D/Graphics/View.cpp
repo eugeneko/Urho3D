@@ -348,7 +348,7 @@ bool View::Define(RenderSurface* renderTarget, Viewport* viewport)
     if (renderTarget_)
     {
         viewRect_.bottom_ = rtHeight - viewRect_.top_;
-        viewRect_.top_ = viewRect_.bottom_ - viewSize_.y_;
+        viewRect_.top_ = viewRect_.bottom_ - viewSize_.y;
     }
 #endif
 
@@ -534,7 +534,7 @@ bool View::Define(RenderSurface* renderTarget, Viewport* viewport)
         maxOccluderTriangles_ = 0;
 
     // Occlusion buffer has constant width. If resulting height would be too large due to aspect ratio, disable occlusion
-    if (viewSize_.y_ > viewSize_.x_ * 4)
+    if (viewSize_.y > viewSize_.x * 4)
         maxOccluderTriangles_ = 0;
 
     return true;
@@ -576,7 +576,7 @@ void View::Update(const FrameInfo& frame)
 
     // Set automatic aspect ratio if required
     if (cullCamera_ && cullCamera_->GetAutoAspectRatio())
-        cullCamera_->SetAspectRatioInternal((float)frame_.viewSize_.x_ / (float)frame_.viewSize_.y_);
+        cullCamera_->SetAspectRatioInternal((float)frame_.viewSize_.x / (float)frame_.viewSize_.y);
 
     GetDrawables();
     GetBatches();
@@ -610,7 +610,7 @@ void View::Render()
     // It is possible, though not recommended, that the same camera is used for multiple main views. Set automatic aspect ratio
     // to ensure correct projection will be used
     if (camera_ && camera_->GetAutoAspectRatio())
-        camera_->SetAspectRatioInternal((float)(viewSize_.x_) / (float)(viewSize_.y_));
+        camera_->SetAspectRatioInternal((float)(viewSize_.x) / (float)(viewSize_.y));
 
     // Bind the face selection and indirection cube maps for point light shadows
 #ifndef GL_ES_VERSION_2_0
@@ -666,8 +666,8 @@ void View::Render()
             graphics_->SetDepthStencil(lastCustomDepthSurface_ ? lastCustomDepthSurface_ : GetDepthStencil(currentRenderTarget_));
 
             IntVector2 rtSizeNow = graphics_->GetRenderTargetDimensions();
-            IntRect viewport = (currentRenderTarget_ == renderTarget_) ? viewRect_ : IntRect(0, 0, rtSizeNow.x_,
-                rtSizeNow.y_);
+            IntRect viewport = (currentRenderTarget_ == renderTarget_) ? viewRect_ : IntRect(0, 0, rtSizeNow.x,
+                rtSizeNow.y);
             graphics_->SetViewport(viewport);
 
             debug->SetView(camera_);
@@ -740,16 +740,16 @@ void View::SetCameraShaderParameters(Camera* camera)
     Vector4 depthMode = Vector4::ZERO;
     if (camera->IsOrthographic())
     {
-        depthMode.x_ = 1.0f;
+        depthMode.x = 1.0f;
 #ifdef URHO3D_OPENGL
-        depthMode.z_ = 0.5f;
-        depthMode.w_ = 0.5f;
+        depthMode.z = 0.5f;
+        depthMode.w = 0.5f;
 #else
-        depthMode.z_ = 1.0f;
+        depthMode.z = 1.0f;
 #endif
     }
     else
-        depthMode.w_ = 1.0f / camera->GetFarClip();
+        depthMode.w = 1.0f / camera->GetFarClip();
 
     graphics_->SetShaderParameter(VSP_DEPTHMODE, depthMode);
 
@@ -786,8 +786,8 @@ void View::SetCommandShaderParameters(const RenderPathCommand& command)
 
 void View::SetGBufferShaderParameters(const IntVector2& texSize, const IntRect& viewRect)
 {
-    float texWidth = (float)texSize.x_;
-    float texHeight = (float)texSize.y_;
+    float texWidth = (float)texSize.x;
+    float texHeight = (float)texSize.y;
     float widthRange = 0.5f * viewRect.Width() / texWidth;
     float heightRange = 0.5f * viewRect.Height() / texHeight;
 
@@ -796,8 +796,8 @@ void View::SetGBufferShaderParameters(const IntVector2& texSize, const IntRect& 
         1.0f - (((float)viewRect.top_) / texHeight + heightRange), widthRange, heightRange);
 #else
     const Vector2& pixelUVOffset = Graphics::GetPixelUVOffset();
-    Vector4 bufferUVOffset((pixelUVOffset.x_ + (float)viewRect.left_) / texWidth + widthRange,
-        (pixelUVOffset.y_ + (float)viewRect.top_) / texHeight + heightRange, widthRange, heightRange);
+    Vector4 bufferUVOffset((pixelUVOffset.x + (float)viewRect.left_) / texWidth + widthRange,
+        (pixelUVOffset.y + (float)viewRect.top_) / texHeight + heightRange, widthRange, heightRange);
 #endif
     graphics_->SetShaderParameter(VSP_GBUFFEROFFSETS, bufferUVOffset);
 
@@ -1076,7 +1076,7 @@ void View::GetLightBatches()
                 // Allocate shadow map now
                 if (shadowSplits > 0)
                 {
-                    lightQueue.shadowMap_ = renderer_->GetShadowMap(light, cullCamera_, (unsigned)viewSize_.x_, (unsigned)viewSize_.y_);
+                    lightQueue.shadowMap_ = renderer_->GetShadowMap(light, cullCamera_, (unsigned)viewSize_.x, (unsigned)viewSize_.y);
                     // If did not manage to get a shadow map, convert the light to unshadowed
                     if (!lightQueue.shadowMap_)
                         shadowSplits = 0;
@@ -1805,8 +1805,8 @@ void View::SetRenderTargets(RenderPathCommand& command)
     // When rendering to the final destination rendertarget, use the actual viewport. Otherwise texture rendertargets should use
     // their full size as the viewport
     IntVector2 rtSizeNow = graphics_->GetRenderTargetDimensions();
-    IntRect viewport = (useViewportOutput && currentRenderTarget_ == renderTarget_) ? viewRect_ : IntRect(0, 0, rtSizeNow.x_,
-        rtSizeNow.y_);
+    IntRect viewport = (useViewportOutput && currentRenderTarget_ == renderTarget_) ? viewRect_ : IntRect(0, 0, rtSizeNow.x,
+        rtSizeNow.y);
 
     if (!useCustomDepth)
         graphics_->SetDepthStencil(GetDepthStencil(graphics_->GetRenderTarget(0)));
@@ -1875,7 +1875,7 @@ void View::RenderQuad(RenderPathCommand& command)
     // During renderpath commands the G-Buffer or viewport texture is assumed to always be viewport-sized
     IntRect viewport = graphics_->GetViewport();
     IntVector2 viewSize = IntVector2(viewport.Width(), viewport.Height());
-    SetGBufferShaderParameters(viewSize, IntRect(0, 0, viewSize.x_, viewSize.y_));
+    SetGBufferShaderParameters(viewSize, IntRect(0, 0, viewSize.x, viewSize.y));
 
     // Set per-rendertarget inverse size / offset shader parameters as necessary
     for (unsigned i = 0; i < renderPath_->renderTargets_.Size(); ++i)
@@ -1895,7 +1895,7 @@ void View::RenderQuad(RenderPathCommand& command)
 
         const Vector2& pixelUVOffset = Graphics::GetPixelUVOffset();
         graphics_->SetShaderParameter(invSizeName, Vector2(1.0f / width, 1.0f / height));
-        graphics_->SetShaderParameter(offsetsName, Vector2(pixelUVOffset.x_ / width, pixelUVOffset.y_ / height));
+        graphics_->SetShaderParameter(offsetsName, Vector2(pixelUVOffset.x / width, pixelUVOffset.y / height));
     }
 
     // Set command's shader parameters last to allow them to override any of the above
@@ -2021,7 +2021,7 @@ void View::AllocateScreenBuffers()
         needSubstitute = true;
     // If viewport is smaller than whole texture/backbuffer in deferred rendering, need to reserve a buffer, as the G-buffer
     // textures will be sized equal to the viewport
-    if (viewSize_.x_ < rtSize_.x_ || viewSize_.y_ < rtSize_.y_)
+    if (viewSize_.x < rtSize_.x || viewSize_.y < rtSize_.y)
     {
         if (deferred_ || hasScenePassToRTs || hasCustomDepth)
             needSubstitute = true;
@@ -2061,7 +2061,7 @@ void View::AllocateScreenBuffers()
 
         // If rendering to a texture, but the viewport is less than the whole texture, use a substitute to ensure
         // postprocessing shaders will never read outside the viewport
-        if (renderTarget_ && (viewSize_.x_ < renderTarget_->GetWidth() || viewSize_.y_ < renderTarget_->GetHeight()))
+        if (renderTarget_ && (viewSize_.x < renderTarget_->GetWidth() || viewSize_.y < renderTarget_->GetHeight()))
             needSubstitute = true;
 
         if (hasPingpong && !needSubstitute)
@@ -2073,11 +2073,11 @@ void View::AllocateScreenBuffers()
     bool sRGB = renderTarget_ ? renderTarget_->GetParentTexture()->GetSRGB() : graphics_->GetSRGB();
     int multiSample = renderTarget_ ? renderTarget_->GetMultiSample() : graphics_->GetMultiSample();
     bool autoResolve = renderTarget_ ? renderTarget_->GetAutoResolve() : true;
-    substituteRenderTarget_ = needSubstitute ? GetRenderSurfaceFromTexture(renderer_->GetScreenBuffer(viewSize_.x_, viewSize_.y_,
+    substituteRenderTarget_ = needSubstitute ? GetRenderSurfaceFromTexture(renderer_->GetScreenBuffer(viewSize_.x, viewSize_.y,
         format, multiSample, autoResolve, false, true, sRGB)) : nullptr;
     for (unsigned i = 0; i < MAX_VIEWPORT_TEXTURES; ++i)
     {
-        viewportTextures_[i] = i < numViewportTextures ? renderer_->GetScreenBuffer(viewSize_.x_, viewSize_.y_, format, multiSample,
+        viewportTextures_[i] = i < numViewportTextures ? renderer_->GetScreenBuffer(viewSize_.x, viewSize_.y, format, multiSample,
             autoResolve, false, true, sRGB) : nullptr;
     }
     // If using a substitute render target and pingponging, the substitute can act as the second viewport texture
@@ -2091,18 +2091,18 @@ void View::AllocateScreenBuffers()
         if (!rtInfo.enabled_)
             continue;
 
-        float width = rtInfo.size_.x_;
-        float height = rtInfo.size_.y_;
+        float width = rtInfo.size_.x;
+        float height = rtInfo.size_.y;
 
         if (rtInfo.sizeMode_ == SIZE_VIEWPORTDIVISOR)
         {
-            width = (float)viewSize_.x_ / Max(width, M_EPSILON);
-            height = (float)viewSize_.y_ / Max(height, M_EPSILON);
+            width = (float)viewSize_.x / Max(width, M_EPSILON);
+            height = (float)viewSize_.y / Max(height, M_EPSILON);
         }
         else if (rtInfo.sizeMode_ == SIZE_VIEWPORTMULTIPLIER)
         {
-            width = (float)viewSize_.x_ * width;
-            height = (float)viewSize_.y_ * height;
+            width = (float)viewSize_.x * width;
+            height = (float)viewSize_.y * height;
         }
 
         int intWidth = (int)(width + 0.5f);
@@ -2129,8 +2129,8 @@ void View::BlitFramebuffer(Texture* source, RenderSurface* destination, bool dep
     IntVector2 destSize = destination ? IntVector2(destination->GetWidth(), destination->GetHeight()) : IntVector2(
         graphics_->GetWidth(), graphics_->GetHeight());
 
-    IntRect srcRect = (GetRenderSurfaceFromTexture(source) == renderTarget_) ? viewRect_ : IntRect(0, 0, srcSize.x_, srcSize.y_);
-    IntRect destRect = (destination == renderTarget_) ? viewRect_ : IntRect(0, 0, destSize.x_, destSize.y_);
+    IntRect srcRect = (GetRenderSurfaceFromTexture(source) == renderTarget_) ? viewRect_ : IntRect(0, 0, srcSize.x, srcSize.y);
+    IntRect destRect = (destination == renderTarget_) ? viewRect_ : IntRect(0, 0, destSize.x, destSize.y);
 
     graphics_->SetBlendMode(BLEND_REPLACE);
     graphics_->SetDepthTest(CMP_ALWAYS);
@@ -2477,7 +2477,7 @@ bool View::IsShadowCasterVisible(Drawable* drawable, BoundingBox lightViewBox, C
     if (shadowCamera->IsOrthographic())
     {
         // Extrude the light space bounding box up to the far edge of the frustum's light space bounding box
-        lightViewBox.max_.z_ = Max(lightViewBox.max_.z_, lightViewFrustumBox.max_.z_);
+        lightViewBox.max_.z = Max(lightViewBox.max_.z, lightViewFrustumBox.max_.z);
         return lightViewFrustum.IsInsideFast(lightViewBox) != OUTSIDE;
     }
     else
@@ -2678,7 +2678,7 @@ void View::SetupDirLightShadowCamera(Camera* shadowCamera, Light* light, float n
     shadowCamera->SetOrthographic(true);
     shadowCamera->SetAspectRatio(1.0f);
     shadowCamera->SetNearClip(0.0f);
-    shadowCamera->SetFarClip(shadowBox.max_.z_);
+    shadowCamera->SetFarClip(shadowBox.max_.z);
 
     // Center shadow camera on the bounding box. Can not snap to texels yet as the shadow map viewport is unknown
     QuantizeDirLightShadowCamera(shadowCamera, light, IntRect(0, 0, 0, 0), shadowBox);
@@ -2694,10 +2694,10 @@ void View::FinalizeShadowCamera(Camera* shadowCamera, Light* light, const IntRec
     if (type == LIGHT_DIRECTIONAL)
     {
         BoundingBox shadowBox;
-        shadowBox.max_.y_ = shadowCamera->GetOrthoSize() * 0.5f;
-        shadowBox.max_.x_ = shadowCamera->GetAspectRatio() * shadowBox.max_.y_;
-        shadowBox.min_.y_ = -shadowBox.max_.y_;
-        shadowBox.min_.x_ = -shadowBox.max_.x_;
+        shadowBox.max_.y = shadowCamera->GetOrthoSize() * 0.5f;
+        shadowBox.max_.x = shadowCamera->GetAspectRatio() * shadowBox.max_.y;
+        shadowBox.min_.y = -shadowBox.max_.y;
+        shadowBox.min_.x = -shadowBox.max_.x;
 
         // Requantize and snap to shadow map texels
         QuantizeDirLightShadowCamera(shadowCamera, light, shadowViewport, shadowBox);
@@ -2705,8 +2705,8 @@ void View::FinalizeShadowCamera(Camera* shadowCamera, Light* light, const IntRec
 
     if (type == LIGHT_SPOT && parameters.focus_)
     {
-        float viewSizeX = Max(Abs(shadowCasterBox.min_.x_), Abs(shadowCasterBox.max_.x_));
-        float viewSizeY = Max(Abs(shadowCasterBox.min_.y_), Abs(shadowCasterBox.max_.y_));
+        float viewSizeX = Max(Abs(shadowCasterBox.min_.x), Abs(shadowCasterBox.max_.x));
+        float viewSizeY = Max(Abs(shadowCasterBox.min_.y), Abs(shadowCasterBox.max_.y));
         float viewSize = Max(viewSizeX, viewSizeY);
         // Scale the quantization parameters, because view size is in projection space (-1.0 - 1.0)
         float invOrthoSize = 1.0f / shadowCamera->GetOrthoSize();
@@ -2742,10 +2742,10 @@ void View::QuantizeDirLightShadowCamera(Camera* shadowCamera, Light* light, cons
     const FocusParameters& parameters = light->GetShadowFocus();
     float shadowMapWidth = (float)(shadowViewport.Width());
 
-    float minX = viewBox.min_.x_;
-    float minY = viewBox.min_.y_;
-    float maxX = viewBox.max_.x_;
-    float maxY = viewBox.max_.y_;
+    float minX = viewBox.min_.x;
+    float minY = viewBox.min_.y;
+    float maxX = viewBox.max_.x;
+    float maxY = viewBox.max_.y;
 
     Vector2 center((minX + maxX) * 0.5f, (minY + maxY) * 0.5f);
     Vector2 viewSize(maxX - minX, maxY - minY);
@@ -2754,24 +2754,24 @@ void View::QuantizeDirLightShadowCamera(Camera* shadowCamera, Light* light, cons
     // Note: if size is uniform and there is no focusing, quantization is unnecessary
     if (parameters.nonUniform_)
     {
-        viewSize.x_ = ceilf(sqrtf(viewSize.x_ / parameters.quantize_));
-        viewSize.y_ = ceilf(sqrtf(viewSize.y_ / parameters.quantize_));
-        viewSize.x_ = Max(viewSize.x_ * viewSize.x_ * parameters.quantize_, parameters.minView_);
-        viewSize.y_ = Max(viewSize.y_ * viewSize.y_ * parameters.quantize_, parameters.minView_);
+        viewSize.x = ceilf(sqrtf(viewSize.x / parameters.quantize_));
+        viewSize.y = ceilf(sqrtf(viewSize.y / parameters.quantize_));
+        viewSize.x = Max(viewSize.x * viewSize.x * parameters.quantize_, parameters.minView_);
+        viewSize.y = Max(viewSize.y * viewSize.y * parameters.quantize_, parameters.minView_);
     }
     else if (parameters.focus_)
     {
-        viewSize.x_ = Max(viewSize.x_, viewSize.y_);
-        viewSize.x_ = ceilf(sqrtf(viewSize.x_ / parameters.quantize_));
-        viewSize.x_ = Max(viewSize.x_ * viewSize.x_ * parameters.quantize_, parameters.minView_);
-        viewSize.y_ = viewSize.x_;
+        viewSize.x = Max(viewSize.x, viewSize.y);
+        viewSize.x = ceilf(sqrtf(viewSize.x / parameters.quantize_));
+        viewSize.x = Max(viewSize.x * viewSize.x * parameters.quantize_, parameters.minView_);
+        viewSize.y = viewSize.x;
     }
 
     shadowCamera->SetOrthoSize(viewSize);
 
     // Center shadow camera to the view space bounding box
     Quaternion rot(shadowCameraNode->GetWorldRotation());
-    Vector3 adjust(center.x_, center.y_, 0.0f);
+    Vector3 adjust(center.x, center.y, 0.0f);
     shadowCameraNode->Translate(rot * adjust, TS_WORLD);
 
     // If the shadow map viewport is known, snap to whole texels
@@ -2780,8 +2780,8 @@ void View::QuantizeDirLightShadowCamera(Camera* shadowCamera, Light* light, cons
         Vector3 viewPos(rot.Inverse() * shadowCameraNode->GetWorldPosition());
         // Take into account that shadow map border will not be used
         float invActualSize = 1.0f / (shadowMapWidth - 2.0f);
-        Vector2 texelSize(viewSize.x_ * invActualSize, viewSize.y_ * invActualSize);
-        Vector3 snap(-fmodf(viewPos.x_, texelSize.x_), -fmodf(viewPos.y_, texelSize.y_), 0.0f);
+        Vector2 texelSize(viewSize.x * invActualSize, viewSize.y * invActualSize);
+        Vector3 snap(-fmodf(viewPos.x, texelSize.x), -fmodf(viewPos.y, texelSize.y), 0.0f);
         shadowCameraNode->Translate(rot * snap, TS_WORLD);
     }
 }

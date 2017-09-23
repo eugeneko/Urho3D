@@ -242,8 +242,8 @@ struct TimelineKey
 /// Spatial info.
 struct SpatialInfo
 {
-    float x_;
-    float y_;
+    float x;
+    float y;
     float angle_;
     float scaleX_;
     float scaleY_;

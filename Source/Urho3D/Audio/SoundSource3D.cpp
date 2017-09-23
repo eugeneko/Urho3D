@@ -171,7 +171,7 @@ void SoundSource3D::CalculateAttenuation()
                 attenuation_ = distance <= nearDistance_ ? 1.0f : 0.0f;
 
             // Panning
-            panning_ = relativePos.Normalized().x_;
+            panning_ = relativePos.Normalized().x;
 
             // Angle attenuation
             if (innerAngle_ < DEFAULT_ANGLE && outerAngle_ > 0.0f)

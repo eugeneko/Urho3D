@@ -585,11 +585,11 @@ void Text3D::UpdateTextBatches()
         break;
 
     case HA_CENTER:
-        offset.x_ -= (float)text_.GetWidth() * 0.5f;
+        offset.x -= (float)text_.GetWidth() * 0.5f;
         break;
 
     case HA_RIGHT:
-        offset.x_ -= (float)text_.GetWidth();
+        offset.x -= (float)text_.GetWidth();
         break;
     }
 
@@ -599,11 +599,11 @@ void Text3D::UpdateTextBatches()
         break;
 
     case VA_CENTER:
-        offset.y_ -= (float)text_.GetHeight() * 0.5f;
+        offset.y -= (float)text_.GetHeight() * 0.5f;
         break;
 
     case VA_BOTTOM:
-        offset.y_ -= (float)text_.GetHeight();
+        offset.y -= (float)text_.GetHeight();
         break;
     }
 
@@ -616,7 +616,7 @@ void Text3D::UpdateTextBatches()
             Vector3& position = *(reinterpret_cast<Vector3*>(&uiVertexData_[i]));
             position += offset;
             position *= TEXT_SCALING;
-            position.y_ = -position.y_;
+            position.y = -position.y;
             boundingBox_.Merge(position);
         }
     }
@@ -741,14 +741,14 @@ void Text3D::CalculateFixedScreenSize(const FrameInfo& frame)
 
     if (fixedScreenSize_)
     {
-        float textScaling = 2.0f / TEXT_SCALING / frame.viewSize_.y_;
+        float textScaling = 2.0f / TEXT_SCALING / frame.viewSize_.y;
         float halfViewWorldSize = frame.camera_->GetHalfViewSize();
 
         if (!frame.camera_->IsOrthographic())
         {
             Matrix4 viewProj(frame.camera_->GetProjection() * frame.camera_->GetView());
             Vector4 projPos(viewProj * Vector4(worldPosition, 1.0f));
-            worldScale *= textScaling * halfViewWorldSize * projPos.w_;
+            worldScale *= textScaling * halfViewWorldSize * projPos.w;
         }
         else
             worldScale *= textScaling * halfViewWorldSize;

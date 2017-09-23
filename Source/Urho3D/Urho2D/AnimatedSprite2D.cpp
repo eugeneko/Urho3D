@@ -459,11 +459,11 @@ void AnimatedSprite2D::UpdateSourceBatchesSpriter()
         Spriter::SpriteTimelineKey* timelineKey = (Spriter::SpriteTimelineKey*)timelineKeys[i];
 
         Spriter::SpatialInfo& info = timelineKey->info_;
-        Vector3 position(info.x_, info.y_, 0.0f);
+        Vector3 position(info.x, info.y, 0.0f);
         if (flipX_)
-            position.x_ = -position.x_;
+            position.x = -position.x;
         if (flipY_)
-            position.y_ = -position.y_;
+            position.y = -position.y;
 
         float angle = info.angle_;
         if (flipX_ != flipY_)
@@ -486,15 +486,15 @@ void AnimatedSprite2D::UpdateSourceBatchesSpriter()
         if (!sprite->GetTextureRectangle(textureRect, flipX_, flipY_))
             return;
 
-        vertex0.position_ = worldTransform * Vector3(drawRect.min_.x_, drawRect.min_.y_, 0.0f);
-        vertex1.position_ = worldTransform * Vector3(drawRect.min_.x_, drawRect.max_.y_, 0.0f);
-        vertex2.position_ = worldTransform * Vector3(drawRect.max_.x_, drawRect.max_.y_, 0.0f);
-        vertex3.position_ = worldTransform * Vector3(drawRect.max_.x_, drawRect.min_.y_, 0.0f);
+        vertex0.position_ = worldTransform * Vector3(drawRect.min_.x, drawRect.min_.y, 0.0f);
+        vertex1.position_ = worldTransform * Vector3(drawRect.min_.x, drawRect.max_.y, 0.0f);
+        vertex2.position_ = worldTransform * Vector3(drawRect.max_.x, drawRect.max_.y, 0.0f);
+        vertex3.position_ = worldTransform * Vector3(drawRect.max_.x, drawRect.min_.y, 0.0f);
 
         vertex0.uv_ = textureRect.min_;
-        vertex1.uv_ = Vector2(textureRect.min_.x_, textureRect.max_.y_);
+        vertex1.uv_ = Vector2(textureRect.min_.x, textureRect.max_.y);
         vertex2.uv_ = textureRect.max_;
-        vertex3.uv_ = Vector2(textureRect.max_.x_, textureRect.min_.y_);
+        vertex3.uv_ = Vector2(textureRect.max_.x, textureRect.min_.y);
 
         vertex0.color_ = vertex1.color_ = vertex2.color_ = vertex3.color_ = color;
 

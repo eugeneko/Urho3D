@@ -224,7 +224,7 @@ Vector2 Urho2DTileMap::GetMousePositionXY()
     Input* input = GetSubsystem<Input>();
     Graphics* graphics = GetSubsystem<Graphics>();
     Camera* camera = cameraNode_->GetComponent<Camera>();
-    Vector3 screenPoint = Vector3((float)input->GetMousePosition().x_ / graphics->GetWidth(), (float)input->GetMousePosition().y_ / graphics->GetHeight(), 10.0f);
+    Vector3 screenPoint = Vector3((float)input->GetMousePosition().x / graphics->GetWidth(), (float)input->GetMousePosition().y / graphics->GetHeight(), 10.0f);
     Vector3 worldPoint = camera->ScreenToWorldPoint(screenPoint);
-    return Vector2(worldPoint.x_, worldPoint.y_);
+    return Vector2(worldPoint.x, worldPoint.y);
 }

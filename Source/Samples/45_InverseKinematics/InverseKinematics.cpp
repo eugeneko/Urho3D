@@ -207,8 +207,8 @@ void InverseKinematics::UpdateCameraAndFloor(float /*timeStep*/)
     if (input->GetMouseButtonDown(MOUSEB_LEFT))
     {
         IntVector2 mouseMove = input->GetMouseMove();
-        yaw_ += MOUSE_SENSITIVITY * mouseMove.x_;
-        pitch_ += MOUSE_SENSITIVITY * mouseMove.y_;
+        yaw_ += MOUSE_SENSITIVITY * mouseMove.x;
+        pitch_ += MOUSE_SENSITIVITY * mouseMove.y;
         pitch_ = Clamp(pitch_, -90.0f, 90.0f);
     }
 
@@ -218,10 +218,10 @@ void InverseKinematics::UpdateCameraAndFloor(float /*timeStep*/)
         Vector2 mouseMove = Matrix2(
             -Cos(yaw_), Sin(yaw_),
             Sin(yaw_),  Cos(yaw_)
-        ) * Vector2(mouseMoveInt.y_, -mouseMoveInt.x_);
-        floorPitch_ += MOUSE_SENSITIVITY * mouseMove.x_;
+        ) * Vector2(mouseMoveInt.y, -mouseMoveInt.x);
+        floorPitch_ += MOUSE_SENSITIVITY * mouseMove.x;
         floorPitch_ = Clamp(floorPitch_, -90.0f, 90.0f);
-        floorRoll_ += MOUSE_SENSITIVITY * mouseMove.y_;
+        floorRoll_ += MOUSE_SENSITIVITY * mouseMove.y;
     }
 
     if (input->GetKeyPress(KEY_SPACE))
@@ -280,7 +280,7 @@ void InverseKinematics::HandleSceneDrawableUpdateFinished(StringHash /*eventType
         // to the ray intersection
         phyWorld->RaycastSingle(result, Ray(leftFootPosition + result.normal_, -result.normal_), 2);
         // The foot node has an offset relative to the root node
-        float footOffset = leftFoot_->GetWorldPosition().y_ - jackNode_->GetWorldPosition().y_;
+        float footOffset = leftFoot_->GetWorldPosition().y - jackNode_->GetWorldPosition().y;
         leftEffector_->SetTargetPosition(result.position_ + result.normal_ * footOffset);
         // Rotate foot according to normal
         leftFoot_->Rotate(Quaternion(Vector3(0, 1, 0), result.normal_), TS_WORLD);
@@ -291,7 +291,7 @@ void InverseKinematics::HandleSceneDrawableUpdateFinished(StringHash /*eventType
     if (result.body_)
     {
         phyWorld->RaycastSingle(result, Ray(rightFootPosition + result.normal_, -result.normal_), 2);
-        float footOffset = rightFoot_->GetWorldPosition().y_ - jackNode_->GetWorldPosition().y_;
+        float footOffset = rightFoot_->GetWorldPosition().y - jackNode_->GetWorldPosition().y;
         rightEffector_->SetTargetPosition(result.position_ + result.normal_ * footOffset);
         rightFoot_->Rotate(Quaternion(Vector3(0, 1, 0), result.normal_), TS_WORLD);
     }

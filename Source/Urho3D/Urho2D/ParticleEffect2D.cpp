@@ -565,8 +565,8 @@ void ParticleEffect2D::WriteColor(XMLElement& element, const String& name, const
 void ParticleEffect2D::WriteVector2(XMLElement& element, const String& name, const Vector2& value) const
 {
     XMLElement child = element.CreateChild(name);
-    child.SetFloat("x", value.x_);
-    child.SetFloat("y", value.y_);
+    child.SetFloat("x", value.x);
+    child.SetFloat("y", value.y);
 }
 
 }

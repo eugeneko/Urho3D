@@ -518,12 +518,12 @@ bool WriteDrawablesToOBJ(PODVector<Drawable*> drawables, File* outputFile, bool 
 
                     // Convert coordinates as requested
                     if (asRightHanded)
-                        vertexPosition.x_ *= -1;
+                        vertexPosition.x *= -1;
                     if (asZUp)
                     {
-                        float yVal = vertexPosition.y_;
-                        vertexPosition.y_ = vertexPosition.z_;
-                        vertexPosition.z_ = yVal;
+                        float yVal = vertexPosition.y;
+                        vertexPosition.y = vertexPosition.z;
+                        vertexPosition.z = yVal;
                     }
                     outputFile->WriteLine("v " + String(vertexPosition));
                 }
@@ -538,12 +538,12 @@ bool WriteDrawablesToOBJ(PODVector<Drawable*> drawables, File* outputFile, bool 
                         vertexNormal.Normalize();
 
                         if (asRightHanded)
-                            vertexNormal.x_ *= -1;
+                            vertexNormal.x *= -1;
                         if (asZUp)
                         {
-                            float yVal = vertexNormal.y_;
-                            vertexNormal.y_ = vertexNormal.z_;
-                            vertexNormal.z_ = yVal;
+                            float yVal = vertexNormal.y;
+                            vertexNormal.y = vertexNormal.z;
+                            vertexNormal.z = yVal;
                         }
 
                         outputFile->WriteLine("vn " + String(vertexNormal));

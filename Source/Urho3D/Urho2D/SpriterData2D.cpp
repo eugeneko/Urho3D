@@ -538,8 +538,8 @@ float TimelineKey::GetTByCurveType(float currentTime, float nextTimelineTime) co
 
 SpatialInfo::SpatialInfo(float x, float y, float angle, float scale_x, float scale_y, float a, int spin)
 {
-    this->x_ = x; 
-    this->y_ = y; 
+    this->x = x; 
+    this->y = y; 
     this->angle_ = angle;
     this->scaleX_ = scale_x; 
     this->scaleY_ = scale_y; 
@@ -556,21 +556,21 @@ SpatialInfo SpatialInfo::UnmapFromParent(const SpatialInfo& parentInfo) const
     float unmappedScaleY = scaleY_ * parentInfo.scaleY_;
     float unmappedAlpha = alpha_ * parentInfo.alpha_;
 
-    if (x_ != 0.0f || y_ != 0.0f)
+    if (x != 0.0f || y != 0.0f)
     {
-        float preMultX = x_ * parentInfo.scaleX_;
-        float preMultY = y_ * parentInfo.scaleY_;
+        float preMultX = x * parentInfo.scaleX_;
+        float preMultY = y * parentInfo.scaleY_;
 
         float s = Sin(parentInfo.angle_);
         float c = Cos(parentInfo.angle_);
 
-        unmappedX = (preMultX * c) - (preMultY * s) + parentInfo.x_;
-        unmappedY = (preMultX * s) + (preMultY * c) + parentInfo.y_;
+        unmappedX = (preMultX * c) - (preMultY * s) + parentInfo.x;
+        unmappedY = (preMultX * s) + (preMultY * c) + parentInfo.y;
     }
     else
     {
-        unmappedX = parentInfo.x_;
-        unmappedY = parentInfo.y_;
+        unmappedX = parentInfo.x;
+        unmappedY = parentInfo.y;
     }
 
     return SpatialInfo(unmappedX, unmappedY, unmappedAngle, unmappedScaleX, unmappedScaleY, unmappedAlpha, spin);
@@ -578,8 +578,8 @@ SpatialInfo SpatialInfo::UnmapFromParent(const SpatialInfo& parentInfo) const
 
 void SpatialInfo::Interpolate(const SpatialInfo& other, float t)
 {
-    x_ = Linear(x_, other.x_, t);
-    y_ = Linear(y_, other.y_, t);
+    x = Linear(x, other.x, t);
+    y = Linear(y, other.y, t);
 
     if (spin > 0.0f && (other.angle_ - angle_ < 0.0f))
     {
@@ -619,8 +619,8 @@ bool SpatialTimelineKey::Load(const xml_node& node)
     if (childNode.empty())
         childNode = node.child("object");
 
-    info_.x_ = childNode.attribute("x").as_float();
-    info_.y_ = childNode.attribute("y").as_float();
+    info_.x = childNode.attribute("x").as_float();
+    info_.y = childNode.attribute("y").as_float();
     info_.angle_ = childNode.attribute("angle").as_float();
     info_.scaleX_ = childNode.attribute("scale_x").as_float(1.0f);
     info_.scaleY_ = childNode.attribute("scale_y").as_float(1.0f);
