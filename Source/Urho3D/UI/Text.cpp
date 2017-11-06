@@ -238,7 +238,7 @@ void Text::GetBatches(PODVector<UIBatch>& batches, PODVector<float>& vertexData,
                         if (x > -thickness && x < thickness &&
                             y > -thickness && y < thickness)
                             continue;
-    
+
                         ConstructBatch(pageBatch, pageGlyphLocation, x, y, &effectColor_, effectDepthBias_);
                     }
                 }
@@ -441,6 +441,14 @@ void Text::SetEffectDepthBias(float bias)
 float Text::GetRowWidth(unsigned index) const
 {
     return index < rowWidths_.Size() ? rowWidths_[index] : 0;
+}
+
+float Text::GetMaxRowWidth() const
+{
+    float maxRowWidth = 0;
+    for (float rowWidth : rowWidths_)
+        maxRowWidth = Max(maxRowWidth, rowWidth);
+    return maxRowWidth;
 }
 
 Vector2 Text::GetCharPosition(unsigned index)
