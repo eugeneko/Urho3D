@@ -72,7 +72,7 @@ bool ShaderVariation::Create()
     // Check for up-to-date bytecode on disk
     String path, name, extension;
     SplitPath(owner_->GetName(), path, name, extension);
-    extension = type_ == VS ? ".vs4" : ".ps4";
+    extension = type_ == VS ? ".vs4" : (type_ == PS ? ".ps4" : ".gs4");
 
     String binaryShaderName = graphics_->GetShaderCacheDir() + name + "_" + StringHash(defines_).ToString() + extension;
 
@@ -102,7 +102,7 @@ bool ShaderVariation::Create()
         else
             compilerOutput_ = "Could not create vertex shader, empty bytecode";
     }
-    else
+    else if (type_ == PS)
     {
         if (device && byteCode_.Size())
         {
@@ -115,6 +115,20 @@ bool ShaderVariation::Create()
         }
         else
             compilerOutput_ = "Could not create pixel shader, empty bytecode";
+    }
+    else // Geometry shader
+    {
+        if (device && byteCode_.Size())
+        {
+            HRESULT hr = device->CreateGeometryShader(&byteCode_[0], byteCode_.Size(), nullptr, (ID3D11GeometryShader**)&object_.ptr_);
+            if (FAILED(hr))
+            {
+                URHO3D_SAFE_RELEASE(object_.ptr_);
+                compilerOutput_ = "Could not create geometry shader (HRESULT " + ToStringHex((unsigned)hr) + ")";
+            }
+        }
+        else
+            compilerOutput_ = "Could not create geometry shader, empty bytecode";
     }
 
     return object_.ptr_ != nullptr;
@@ -134,10 +148,15 @@ void ShaderVariation::Release()
             if (graphics_->GetVertexShader() == this)
                 graphics_->SetShaders(nullptr, nullptr);
         }
-        else
+        else if (type_ == PS)
         {
             if (graphics_->GetPixelShader() == this)
                 graphics_->SetShaders(nullptr, nullptr);
+        }
+        else
+        {
+            if (graphics_->GetGeometryShader() == this)
+                graphics_->SetShaders(nullptr, nullptr, nullptr);
         }
 
         URHO3D_SAFE_RELEASE(object_.ptr_);
@@ -219,8 +238,10 @@ bool ShaderVariation::LoadByteCode(const String& binaryShaderName)
 
         if (type_ == VS)
             URHO3D_LOGDEBUG("Loaded cached vertex shader " + GetFullName());
-        else
+        else if (type_ == PS)
             URHO3D_LOGDEBUG("Loaded cached pixel shader " + GetFullName());
+        else
+            URHO3D_LOGDEBUG("Loaded cached geometry shader " + GetFullName());
 
         CalculateConstantBufferSizes();
         return true;
@@ -250,12 +271,18 @@ bool ShaderVariation::Compile()
         defines.Push("COMPILEVS");
         profile = "vs_4_0";
     }
-    else
+    else if (type_ == PS)
     {
         entryPoint = "PS";
         defines.Push("COMPILEPS");
         profile = "ps_4_0";
         flags |= D3DCOMPILE_PREFER_FLOW_CONTROL;
+    }
+    else // geometry shader
+    {
+        entryPoint = "GS";
+        defines.Push("COMPILEGS");
+        profile = "gs_4_0";
     }
 
     defines.Push("MAXBONES=" + String(Graphics::GetMaxBones()));
@@ -309,8 +336,10 @@ bool ShaderVariation::Compile()
     {
         if (type_ == VS)
             URHO3D_LOGDEBUG("Compiled vertex shader " + GetFullName());
-        else
+        else if (type_ == PS)
             URHO3D_LOGDEBUG("Compiled pixel shader " + GetFullName());
+        else
+            URHO3D_LOGDEBUG("Compiled geometry shader " + GetFullName());
 
         unsigned char* bufData = (unsigned char*)shaderCode->GetBufferPointer();
         unsigned bufSize = (unsigned)shaderCode->GetBufferSize();

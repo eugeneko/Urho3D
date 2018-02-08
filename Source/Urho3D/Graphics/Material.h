@@ -138,6 +138,8 @@ public:
     void SetTechnique(unsigned index, Technique* tech, unsigned qualityLevel = 0, float lodDistance = 0.0f);
     /// Set additional vertex shader defines. Separate multiple defines with spaces. Setting defines at the material level causes technique(s) to be cloned as necessary.
     void SetVertexShaderDefines(const String& defines);
+    /// Set additional geometry shader defines. Separate multiple defines with spaces. Setting defines at the material level causes technique(s) to be cloned as necessary.
+    void SetGeometryShaderDefines(const String& defines);
     /// Set additional pixel shader defines. Separate multiple defines with spaces. Setting defines at the material level causes technique(s) to be cloned as necessary.
     void SetPixelShaderDefines(const String& defines);
     /// Set shader parameter.
@@ -204,6 +206,8 @@ public:
 
     /// Return additional vertex shader defines.
     const String& GetVertexShaderDefines() const { return vertexShaderDefines_; }
+    /// Return additional geometry shader defines.
+    const String& GetGeometryShaderDefines() const { return vertexShaderDefines_; }
     /// Return additional pixel shader defines.
     const String& GetPixelShaderDefines() const { return pixelShaderDefines_; }
 
@@ -291,6 +295,8 @@ private:
     HashMap<StringHash, SharedPtr<ShaderParameterAnimationInfo> > shaderParameterAnimationInfos_;
     /// Vertex shader defines.
     String vertexShaderDefines_;
+    /// Geometry shader defines.
+    String geometryShaderDefines_;
     /// Pixel shader defines.
     String pixelShaderDefines_;
     /// Normal culling mode.

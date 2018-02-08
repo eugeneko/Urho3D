@@ -999,7 +999,7 @@ void Graphics::SetIndexBuffer(IndexBuffer* buffer)
     }
 }
 
-void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps)
+void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps, ShaderVariation* gs)
 {
     // Switch to the clip plane variations if necessary
     if (useClipPlane_)
@@ -1036,6 +1036,26 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps)
         impl_->deviceContext_->VSSetShader((ID3D11VertexShader*)(vs ? vs->GetGPUObject() : nullptr), nullptr, 0);
         vertexShader_ = vs;
         impl_->vertexDeclarationDirty_ = true;
+    }
+
+    if (gs != geometryShader_)
+    {
+        if (gs && !gs->GetGPUObject())
+        {
+            if (gs->GetCompilerOutput().Empty())
+            {
+                URHO3D_PROFILE(CompileGeometryShader);
+
+                bool success = gs->Create();
+                if (!success)
+                {
+                    URHO3D_LOGERROR("Failed to compile geometry shader " + gs->GetFullName() + ":\n" + gs->GetCompilerOutput());
+                    gs = nullptr;
+                }
+            }
+        }
+        impl_->deviceContext_->GSSetShader((ID3D11GeometryShader*)(gs ? gs->GetGPUObject() : nullptr), nullptr, 0);
+        geometryShader_ = gs;
     }
 
     if (ps != pixelShader_)
