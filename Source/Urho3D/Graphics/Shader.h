@@ -69,10 +69,14 @@ private:
 
     /// Source code adapted for vertex shader.
     String vsSourceCode_;
+    /// Source code adapted for geometry shader.
+    String gsSourceCode_;
     /// Source code adapted for pixel shader.
     String psSourceCode_;
     /// Vertex shader variations.
     HashMap<StringHash, SharedPtr<ShaderVariation> > vsVariations_;
+    /// Geometry shader variations.
+    HashMap<StringHash, SharedPtr<ShaderVariation> > gsVariations_;
     /// Pixel shader variations.
     HashMap<StringHash, SharedPtr<ShaderVariation> > psVariations_;
     /// Source code timestamp.

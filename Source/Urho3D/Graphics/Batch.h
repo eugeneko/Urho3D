@@ -106,6 +106,8 @@ struct Batch
     Pass* pass_;
     /// Vertex shader.
     ShaderVariation* vertexShader_;
+    /// Geometry shader.
+    ShaderVariation* geometryShader_;
     /// Pixel shader.
     ShaderVariation* pixelShader_;
     /// %Geometry type.
@@ -269,10 +271,14 @@ public:
     bool hasExtraDefines_;
     /// Vertex shader extra defines.
     String vsExtraDefines_;
+    /// Geometry shader extra defines.
+    String gsExtraDefines_;
     /// Pixel shader extra defines.
     String psExtraDefines_;
     /// Hash for vertex shader extra defines.
     StringHash vsExtraDefinesHash_;
+    /// Hash for vertex shader extra defines.
+    StringHash gsExtraDefinesHash_;
     /// Hash for pixel shader extra defines.
     StringHash psExtraDefinesHash_;
 };

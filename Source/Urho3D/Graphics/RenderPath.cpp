@@ -164,6 +164,7 @@ void RenderPathCommand::Load(const XMLElement& element)
     case CMD_LIGHTVOLUMES:
     case CMD_QUAD:
         vertexShaderName_ = element.GetAttribute("vs");
+        geometryShaderName_ = element.GetAttribute("gs");
         pixelShaderName_ = element.GetAttribute("ps");
 
         if (type_ == CMD_QUAD && element.HasAttribute("blend"))
@@ -207,6 +208,7 @@ void RenderPathCommand::Load(const XMLElement& element)
 
     // Shader compile flags & parameters
     vertexShaderDefines_ = element.GetAttribute("vsdefines");
+    geometryShaderDefines_ = element.GetAttribute("gsdefines");
     pixelShaderDefines_ = element.GetAttribute("psdefines");
     XMLElement parameterElem = element.GetChild("parameter");
     while (parameterElem)

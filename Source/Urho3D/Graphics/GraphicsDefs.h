@@ -45,7 +45,9 @@ enum PrimitiveType
     POINT_LIST,
     TRIANGLE_STRIP,
     LINE_STRIP,
-    TRIANGLE_FAN
+    TRIANGLE_FAN,
+    LINE_STRIP_ADJ,
+    TRIANGLE_LIST_ADJ
 };
 
 /// %Geometry type for vertex shader geometry variations.
@@ -298,6 +300,7 @@ enum ShaderType
 {
     VS = 0,
     PS,
+    GS
 };
 
 /// Shader parameter groups for determining need to update. On APIs that support constant buffers, these correspond to different constant buffers.

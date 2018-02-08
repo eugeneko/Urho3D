@@ -63,14 +63,20 @@ public:
     void SetIsDesktop(bool enable);
     /// Set vertex shader name.
     void SetVertexShader(const String& name);
+    /// Set geometry shader name.
+    void SetGeometryShader(const String& name);
     /// Set pixel shader name.
     void SetPixelShader(const String& name);
     /// Set vertex shader defines. Separate multiple defines with spaces.
     void SetVertexShaderDefines(const String& defines);
+    /// Set geometry shader defines. Separate multiple defines with spaces.
+    void SetGeometryShaderDefines(const String& defines);
     /// Set pixel shader defines. Separate multiple defines with spaces.
     void SetPixelShaderDefines(const String& defines);
     /// Set vertex shader define excludes. Use to mark defines that the shader code will not recognize, to prevent compiling redundant shader variations.
     void SetVertexShaderDefineExcludes(const String& excludes);
+    /// Set geometry shader define excludes. Use to mark defines that the shader code will not recognize, to prevent compiling redundant shader variations.
+    void SetGeometryShaderDefineExcludes(const String& excludes);
     /// Set pixel shader define excludes. Use to mark defines that the shader code will not recognize, to prevent compiling redundant shader variations.
     void SetPixelShaderDefineExcludes(const String& excludes);
     /// Reset shader pointers.
@@ -111,17 +117,26 @@ public:
     /// Return vertex shader name.
     const String& GetVertexShader() const { return vertexShaderName_; }
 
+    /// Return geometry shader name.
+    const String& GetGeometryShader() const { return geometryShaderName_; }
+
     /// Return pixel shader name.
     const String& GetPixelShader() const { return pixelShaderName_; }
 
     /// Return vertex shader defines.
     const String& GetVertexShaderDefines() const { return vertexShaderDefines_; }
 
+    /// Return geometry shader defines.
+    const String& GetGeometryShaderDefines() const { return geometryShaderDefines_; }
+
     /// Return pixel shader defines.
     const String& GetPixelShaderDefines() const { return pixelShaderDefines_; }
 
     /// Return vertex shader define excludes.
     const String& GetVertexShaderDefineExcludes() const { return vertexShaderDefineExcludes_; }
+
+    /// Return geometry shader define excludes.
+    const String& GetGeometryShaderDefineExcludes() const { return geometryShaderDefineExcludes_; }
 
     /// Return pixel shader define excludes.
     const String& GetPixelShaderDefineExcludes() const { return pixelShaderDefineExcludes_; }
@@ -130,14 +145,21 @@ public:
     Vector<SharedPtr<ShaderVariation> >& GetVertexShaders() { return vertexShaders_; }
 
     /// Return pixel shaders.
+    Vector<SharedPtr<ShaderVariation> >& GetGeometryShaders() { return geometryShaders_; }
+
+    /// Return pixel shaders.
     Vector<SharedPtr<ShaderVariation> >& GetPixelShaders() { return pixelShaders_; }
 
     /// Return vertex shaders with extra defines from the renderpath.
     Vector<SharedPtr<ShaderVariation> >& GetVertexShaders(const StringHash& extraDefinesHash);
+    /// Return vertex shaders with extra defines from the renderpath.
+    Vector<SharedPtr<ShaderVariation> >& GetGeometryShaders(const StringHash& extraDefinesHash);
     /// Return pixel shaders with extra defines from the renderpath.
     Vector<SharedPtr<ShaderVariation> >& GetPixelShaders(const StringHash& extraDefinesHash);
     /// Return the effective vertex shader defines, accounting for excludes. Called internally by Renderer.
     String GetEffectiveVertexShaderDefines() const;
+    /// Return the effective vertex shader defines, accounting for excludes. Called internally by Renderer.
+    String GetEffectiveGeometryShaderDefines() const;
     /// Return the effective pixel shader defines, accounting for excludes. Called internally by Renderer.
     String GetEffectivePixelShaderDefines() const;
 
@@ -162,22 +184,32 @@ private:
     bool isDesktop_;
     /// Vertex shader name.
     String vertexShaderName_;
+    /// Geometry shader name.
+    String geometryShaderName_;
     /// Pixel shader name.
     String pixelShaderName_;
     /// Vertex shader defines.
     String vertexShaderDefines_;
+    /// Geometry shader defines.
+    String geometryShaderDefines_;
     /// Pixel shader defines.
     String pixelShaderDefines_;
     /// Vertex shader define excludes.
     String vertexShaderDefineExcludes_;
+    /// Geometry shader define excludes.
+    String geometryShaderDefineExcludes_;
     /// Pixel shader define excludes.
     String pixelShaderDefineExcludes_;
     /// Vertex shaders.
     Vector<SharedPtr<ShaderVariation> > vertexShaders_;
+    /// Geometry shaders.
+    Vector<SharedPtr<ShaderVariation> > geometryShaders_;
     /// Pixel shaders.
     Vector<SharedPtr<ShaderVariation> > pixelShaders_;
     /// Vertex shaders with extra defines from the renderpath.
     HashMap<StringHash, Vector<SharedPtr<ShaderVariation> > > extraVertexShaders_;
+    /// Geometry shaders with extra defines from the renderpath.
+    HashMap<StringHash, Vector<SharedPtr<ShaderVariation> > > extraGeometryShaders_;
     /// Pixel shaders with extra defines from the renderpath.
     HashMap<StringHash, Vector<SharedPtr<ShaderVariation> > > extraPixelShaders_;
     /// Pass name.
@@ -249,7 +281,7 @@ public:
     PODVector<Pass*> GetPasses() const;
 
     /// Return a clone with added shader compilation defines. Called internally by Material.
-    SharedPtr<Technique> CloneWithDefines(const String& vsDefines, const String& psDefines);
+    SharedPtr<Technique> CloneWithDefines(const String& vsDefines, const String& psDefines, const String& gsDefines = String());
 
     /// Return a pass type index by name. Allocate new if not used yet.
     static unsigned GetPassIndex(const String& passName);

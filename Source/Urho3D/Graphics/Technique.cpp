@@ -138,6 +138,12 @@ void Pass::SetVertexShader(const String& name)
     ReleaseShaders();
 }
 
+void Pass::SetGeometryShader(const String& name)
+{
+    geometryShaderName_ = name;
+    ReleaseShaders();
+}
+
 void Pass::SetPixelShader(const String& name)
 {
     pixelShaderName_ = name;
@@ -147,6 +153,12 @@ void Pass::SetPixelShader(const String& name)
 void Pass::SetVertexShaderDefines(const String& defines)
 {
     vertexShaderDefines_ = defines;
+    ReleaseShaders();
+}
+
+void Pass::SetGeometryShaderDefines(const String& defines)
+{
+    geometryShaderDefines_ = defines;
     ReleaseShaders();
 }
 
@@ -162,6 +174,12 @@ void Pass::SetVertexShaderDefineExcludes(const String& excludes)
     ReleaseShaders();
 }
 
+void Pass::SetGeometryShaderDefineExcludes(const String& excludes)
+{
+    geometryShaderDefineExcludes_ = excludes;
+    ReleaseShaders();
+}
+
 void Pass::SetPixelShaderDefineExcludes(const String& excludes)
 {
     pixelShaderDefineExcludes_ = excludes;
@@ -171,8 +189,10 @@ void Pass::SetPixelShaderDefineExcludes(const String& excludes)
 void Pass::ReleaseShaders()
 {
     vertexShaders_.Clear();
+    geometryShaders_.Clear();
     pixelShaders_.Clear();
     extraVertexShaders_.Clear();
+    extraGeometryShaders_.Clear();
     extraPixelShaders_.Clear();
 }
 
@@ -193,6 +213,19 @@ String Pass::GetEffectiveVertexShaderDefines() const
         vsDefines.Remove(vsExcludes[i]);
 
     return String::Joined(vsDefines, " ");
+}
+
+String Pass::GetEffectiveGeometryShaderDefines() const
+{
+    if (geometryShaderDefineExcludes_.Empty())
+        return geometryShaderDefines_;
+
+    Vector<String> gsDefines = geometryShaderDefines_.Split(' ');
+    Vector<String> gsExcludes = geometryShaderDefineExcludes_.Split(' ');
+    for (unsigned i = 0; i < gsExcludes.Size(); ++i)
+        gsDefines.Remove(gsExcludes[i]);
+
+    return String::Joined(gsDefines, " ");
 }
 
 String Pass::GetEffectivePixelShaderDefines() const
@@ -216,6 +249,14 @@ Vector<SharedPtr<ShaderVariation> >& Pass::GetVertexShaders(const StringHash& ex
         return vertexShaders_;
     else
         return extraVertexShaders_[extraDefinesHash];
+}
+
+Vector<SharedPtr<ShaderVariation> >& Pass::GetGeometryShaders(const StringHash& extraDefinesHash)
+{
+    if (!extraDefinesHash.Value())
+        return geometryShaders_;
+    else
+        return extraGeometryShaders_[extraDefinesHash];
 }
 
 Vector<SharedPtr<ShaderVariation> >& Pass::GetPixelShaders(const StringHash& extraDefinesHash)
@@ -271,12 +312,16 @@ bool Technique::BeginLoad(Deserializer& source)
         isDesktop_ = rootElem.GetBool("desktop");
 
     String globalVS = rootElem.GetAttribute("vs");
+    String globalGS = rootElem.GetAttribute("gs");
     String globalPS = rootElem.GetAttribute("ps");
     String globalVSDefines = rootElem.GetAttribute("vsdefines");
+    String globalGSDefines = rootElem.GetAttribute("gsdefines");
     String globalPSDefines = rootElem.GetAttribute("psdefines");
     // End with space so that the pass-specific defines can be appended
     if (!globalVSDefines.Empty())
         globalVSDefines += ' ';
+    if (!globalGSDefines.Empty())
+        globalGSDefines += ' ';
     if (!globalPSDefines.Empty())
         globalPSDefines += ' ';
 
@@ -312,7 +357,19 @@ bool Technique::BeginLoad(Deserializer& source)
                 newPass->SetPixelShaderDefines(globalPSDefines + passElem.GetAttribute("psdefines"));
             }
 
+            if (passElem.HasAttribute("gs"))
+            {
+                newPass->SetGeometryShader(passElem.GetAttribute("gs"));
+                newPass->SetGeometryShaderDefines(passElem.GetAttribute("gsdefines"));
+            }
+            else
+            {
+                newPass->SetGeometryShader(globalGS);
+                newPass->SetGeometryShaderDefines(globalGSDefines + passElem.GetAttribute("gsdefines"));
+            }
+
             newPass->SetVertexShaderDefineExcludes(passElem.GetAttribute("vsexcludes"));
+            newPass->SetGeometryShaderDefineExcludes(passElem.GetAttribute("gsexcludes"));
             newPass->SetPixelShaderDefineExcludes(passElem.GetAttribute("psexcludes"));
 
             if (passElem.HasAttribute("lighting"))
@@ -394,10 +451,13 @@ SharedPtr<Technique> Technique::Clone(const String& cloneName) const
         newPass->SetAlphaToCoverage(srcPass->GetAlphaToCoverage());
         newPass->SetIsDesktop(srcPass->IsDesktop());
         newPass->SetVertexShader(srcPass->GetVertexShader());
+        newPass->SetGeometryShader(srcPass->GetGeometryShader());
         newPass->SetPixelShader(srcPass->GetPixelShader());
         newPass->SetVertexShaderDefines(srcPass->GetVertexShaderDefines());
+        newPass->SetGeometryShaderDefines(srcPass->GetGeometryShaderDefines());
         newPass->SetPixelShaderDefines(srcPass->GetPixelShaderDefines());
         newPass->SetVertexShaderDefineExcludes(srcPass->GetVertexShaderDefineExcludes());
+        newPass->SetGeometryShaderDefineExcludes(srcPass->GetGeometryShaderDefineExcludes());
         newPass->SetPixelShaderDefineExcludes(srcPass->GetPixelShaderDefineExcludes());
     }
 
@@ -493,7 +553,7 @@ PODVector<Pass*> Technique::GetPasses() const
     return ret;
 }
 
-SharedPtr<Technique> Technique::CloneWithDefines(const String& vsDefines, const String& psDefines)
+SharedPtr<Technique> Technique::CloneWithDefines(const String& vsDefines, const String& psDefines, const String& gsDefines)
 {
     // Return self if no actual defines
     if (vsDefines.Empty() && psDefines.Empty())
@@ -518,6 +578,8 @@ SharedPtr<Technique> Technique::CloneWithDefines(const String& vsDefines, const 
 
         if (!vsDefines.Empty())
             pass->SetVertexShaderDefines(pass->GetVertexShaderDefines() + " " + vsDefines);
+        if (!gsDefines.Empty())
+            pass->SetGeometryShaderDefines(pass->GetGeometryShaderDefines() + " " + gsDefines);
         if (!psDefines.Empty())
             pass->SetPixelShaderDefines(pass->GetPixelShaderDefines() + " " + psDefines);
     }

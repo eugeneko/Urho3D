@@ -2886,13 +2886,16 @@ void View::CheckMaterialForAuxView(Material* material)
 void View::SetQueueShaderDefines(BatchQueue& queue, const RenderPathCommand& command)
 {
     String vsDefines = command.vertexShaderDefines_.Trimmed();
+    String gsDefines = command.geometryShaderDefines_.Trimmed();
     String psDefines = command.pixelShaderDefines_.Trimmed();
-    if (vsDefines.Length() || psDefines.Length())
+    if (vsDefines.Length() || psDefines.Length() || gsDefines.Length())
     {
         queue.hasExtraDefines_ = true;
         queue.vsExtraDefines_ = vsDefines;
+        queue.psExtraDefines_ = gsDefines;
         queue.psExtraDefines_ = psDefines;
         queue.vsExtraDefinesHash_ = StringHash(vsDefines);
+        queue.gsExtraDefinesHash_ = StringHash(gsDefines);
         queue.psExtraDefinesHash_ = StringHash(psDefines);
     }
     else
