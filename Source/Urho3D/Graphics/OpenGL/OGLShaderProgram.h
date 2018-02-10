@@ -39,7 +39,7 @@ class URHO3D_API ShaderProgram : public RefCounted, public GPUObject
 {
 public:
     /// Construct.
-    ShaderProgram(Graphics* graphics, ShaderVariation* vertexShader, ShaderVariation* pixelShader);
+    ShaderProgram(Graphics* graphics, ShaderVariation* vertexShader, ShaderVariation* pixelShader, ShaderVariation* geometryShader = nullptr);
     /// Destruct.
     ~ShaderProgram() override;
 
@@ -53,6 +53,8 @@ public:
 
     /// Return the vertex shader.
     ShaderVariation* GetVertexShader() const;
+    /// Return the pixel shader.
+    ShaderVariation* GetGeometryShader() const;
     /// Return the pixel shader.
     ShaderVariation* GetPixelShader() const;
     /// Return whether uses a shader parameter.
@@ -89,6 +91,8 @@ public:
 private:
     /// Vertex shader.
     WeakPtr<ShaderVariation> vertexShader_;
+    /// Geometry shader.
+    WeakPtr<ShaderVariation> geometryShader_;
     /// Pixel shader.
     WeakPtr<ShaderVariation> pixelShader_;
     /// Shader parameters.

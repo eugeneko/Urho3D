@@ -94,7 +94,12 @@ bool ShaderVariation::Create()
         return false;
     }
 
-    object_.name_ = glCreateShader(type_ == VS ? GL_VERTEX_SHADER : GL_FRAGMENT_SHADER);
+#ifndef GL_ES_VERSION_2_0
+    object_.name_ = glCreateShader(type_ == VS ? GL_VERTEX_SHADER : (type_ == GS ? GL_GEOMETRY_SHADER : GL_FRAGMENT_SHADER));
+#else
+    object_.name_ = glCreateShader(type_ == VS ? GL_VERTEX_SHADER : GL_FRAGMENT_SHADER));
+#endif
+
     if (!object_.name_)
     {
         compilerOutput_ = "Could not create shader object";
@@ -129,7 +134,11 @@ bool ShaderVariation::Create()
         shaderCode += "#version 150\n";
 
     // Distinguish between VS and PS compile in case the shader code wants to include/omit different things
+#ifndef GL_ES_VERSION_2_0
+    shaderCode += type_ == VS ? "#define COMPILEVS\n" : (type_ == GS ? "#define COMPILEGS\n" : "#define COMPILEPS\n");
+#else
     shaderCode += type_ == VS ? "#define COMPILEVS\n" : "#define COMPILEPS\n";
+#endif
 
     // Add define for the maximum number of supported bones
     shaderCode += "#define MAXBONES " + String(Graphics::GetMaxBones()) + "\n";

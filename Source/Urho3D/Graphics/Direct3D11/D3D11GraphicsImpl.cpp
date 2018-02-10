@@ -60,6 +60,7 @@ GraphicsImpl::GraphicsImpl() :
     for (unsigned i = 0; i < MAX_SHADER_PARAMETER_GROUPS; ++i)
     {
         constantBuffers_[VS][i] = nullptr;
+        constantBuffers_[GS][i] = nullptr;
         constantBuffers_[PS][i] = nullptr;
     }
 }

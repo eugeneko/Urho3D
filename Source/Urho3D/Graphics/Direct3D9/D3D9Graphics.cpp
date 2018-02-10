@@ -1142,7 +1142,7 @@ void Graphics::SetIndexBuffer(IndexBuffer* buffer)
     }
 }
 
-void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps)
+void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps, ShaderVariation* gs)
 {
     if (vs == vertexShader_ && ps == pixelShader_)
         return;
@@ -1228,7 +1228,7 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps)
 
     // Store shader combination if shader dumping in progress
     if (shaderPrecache_)
-        shaderPrecache_->StoreShaders(vertexShader_, pixelShader_);
+        shaderPrecache_->StoreShaders(vertexShader_, pixelShader_, nullptr);
 }
 
 void Graphics::SetShaderParameter(StringHash param, const float* data, unsigned count)

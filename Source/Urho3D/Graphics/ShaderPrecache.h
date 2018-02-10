@@ -32,6 +32,22 @@ namespace Urho3D
 class Graphics;
 class ShaderVariation;
 
+struct ShaderCombination
+{
+    ShaderVariation* vertexShader_;
+    ShaderVariation* geometryShader_;
+    ShaderVariation* pixelShader_;
+
+    /// Return hash value for HashSet & HashMap.
+    unsigned ToHash() const { return (((MakeHash(vertexShader_) * 31) + MakeHash(pixelShader_)) * 31 + MakeHash(geometryShader_)) * 31; }
+
+    inline bool operator==(const ShaderCombination& rhs) const
+    {
+        return vertexShader_ == rhs.vertexShader_ && pixelShader_ == rhs.pixelShader_ && geometryShader_ == rhs.geometryShader_;
+    }
+};
+
+
 /// Utility class for collecting used shader combinations during runtime for precaching.
 class URHO3D_API ShaderPrecache : public Object
 {
@@ -44,7 +60,7 @@ public:
     ~ShaderPrecache() override;
 
     /// Collect a shader combination. Called by Graphics when shaders have been set.
-    void StoreShaders(ShaderVariation* vs, ShaderVariation* ps);
+    void StoreShaders(ShaderVariation* vs, ShaderVariation* ps, ShaderVariation* gs);
 
     /// Load shaders from an XML file.
     static void LoadShaders(Graphics* graphics, Deserializer& source);
@@ -55,7 +71,7 @@ private:
     /// XML file.
     XMLFile xmlFile_;
     /// Already encountered shader combinations, pointer version for fast queries.
-    HashSet<Pair<ShaderVariation*, ShaderVariation*> > usedPtrCombinations_;
+    HashSet<ShaderCombination> usedPtrCombinations_;
     /// Already encountered shader combinations.
     HashSet<String> usedCombinations_;
 };

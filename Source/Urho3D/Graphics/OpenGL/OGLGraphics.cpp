@@ -1062,7 +1062,7 @@ void Graphics::SetIndexBuffer(IndexBuffer* buffer)
     indexBuffer_ = buffer;
 }
 
-void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps)
+void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps, ShaderVariation* gs)
 {
     if (vs == vertexShader_ && ps == pixelShader_)
         return;
@@ -1087,6 +1087,34 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps)
             vs = nullptr;
     }
 
+#ifndef GL_ES_VERSION_2_0
+    if (gs && !gs->GetGPUObjectName())
+    {
+        if (gs->GetCompilerOutput().Empty())
+        {
+            URHO3D_PROFILE(CompileGeometryShader);
+
+            bool success = gs->Create();
+            if (success)
+                URHO3D_LOGDEBUG("Compiled geometry shader " + gs->GetFullName());
+            else
+            {
+                URHO3D_LOGERROR("Failed to compile geometry shader " + gs->GetFullName() + ":\n" + gs->GetCompilerOutput());
+                gs = nullptr;
+            }
+        }
+        else
+            gs = nullptr;
+    }
+#else
+    if (gs != nullptr)
+    {
+        URHO3D_LOGERROR("Attempted to use geometry shader on OpenGL ES 2.0: " + gs->GetFullName());
+        gs = nullptr;
+    }
+#endif
+
+    
     if (ps && !ps->GetGPUObjectName())
     {
         if (ps->GetCompilerOutput().Empty())
@@ -1110,15 +1138,17 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps)
     {
         glUseProgram(0);
         vertexShader_ = nullptr;
+        geometryShader_ = nullptr; // using a geometry shader still requires the vertex shader stage, the condition above holds
         pixelShader_ = nullptr;
         impl_->shaderProgram_ = nullptr;
     }
     else
     {
         vertexShader_ = vs;
+        geometryShader_ = gs;
         pixelShader_ = ps;
 
-        Pair<ShaderVariation*, ShaderVariation*> combination(vs, ps);
+        ShaderCombination combination { vs, gs, ps };
         ShaderProgramMap::Iterator i = impl_->shaderPrograms_.Find(combination);
 
         if (i != impl_->shaderPrograms_.End())
@@ -1185,7 +1215,7 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps)
 
     // Store shader combination if shader dumping in progress
     if (shaderPrecache_)
-        shaderPrecache_->StoreShaders(vertexShader_, pixelShader_);
+        shaderPrecache_->StoreShaders(vertexShader_, pixelShader_, geometryShader_);
 
     if (impl_->shaderProgram_)
     {
@@ -2364,13 +2394,13 @@ void Graphics::CleanupShaderPrograms(ShaderVariation* variation)
 {
     for (ShaderProgramMap::Iterator i = impl_->shaderPrograms_.Begin(); i != impl_->shaderPrograms_.End();)
     {
-        if (i->second_->GetVertexShader() == variation || i->second_->GetPixelShader() == variation)
+        if (i->second_->GetVertexShader() == variation || i->second_->GetPixelShader() == variation || i->second_->GetGeometryShader() == variation)
             i = impl_->shaderPrograms_.Erase(i);
         else
             ++i;
     }
 
-    if (vertexShader_ == variation || pixelShader_ == variation)
+    if (vertexShader_ == variation || pixelShader_ == variation || geometryShader_ == variation)
         impl_->shaderProgram_ = nullptr;
 }
 
@@ -3220,6 +3250,7 @@ void Graphics::ResetCachedState()
     viewport_ = IntRect(0, 0, 0, 0);
     indexBuffer_ = nullptr;
     vertexShader_ = nullptr;
+    geometryShader_ = nullptr;
     pixelShader_ = nullptr;
     blendMode_ = BLEND_REPLACE;
     alphaToCoverage_ = false;

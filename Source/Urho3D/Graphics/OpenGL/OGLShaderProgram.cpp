@@ -58,9 +58,10 @@ static unsigned NumberPostfix(const String& str)
 unsigned ShaderProgram::globalFrameNumber = 0;
 const void* ShaderProgram::globalParameterSources[MAX_SHADER_PARAMETER_GROUPS];
 
-ShaderProgram::ShaderProgram(Graphics* graphics, ShaderVariation* vertexShader, ShaderVariation* pixelShader) :
+ShaderProgram::ShaderProgram(Graphics* graphics, ShaderVariation* vertexShader, ShaderVariation* pixelShader, ShaderVariation* geometryShader) :
     GPUObject(graphics),
     vertexShader_(vertexShader),
+    geometryShader_(geometryShader),
     pixelShader_(pixelShader),
     usedVertexAttributes_(0),
     frameNumber_(0)
@@ -121,6 +122,10 @@ bool ShaderProgram::Link()
     if (!vertexShader_ || !pixelShader_ || !vertexShader_->GetGPUObjectName() || !pixelShader_->GetGPUObjectName())
         return false;
 
+    // Reset geometry shader if it's an invalid object
+    if (geometryShader_ && !geometryShader_->GetGPUObjectName())
+        geometryShader_ = nullptr;
+
     object_.name_ = glCreateProgram();
     if (!object_.name_)
     {
@@ -129,6 +134,10 @@ bool ShaderProgram::Link()
     }
 
     glAttachShader(object_.name_, vertexShader_->GetGPUObjectName());
+#ifndef GL_ES_VERSION_2_0
+    if (geometryShader_)
+        glAttachShader(object_.name_, geometryShader_->GetGPUObjectName());
+#endif
     glAttachShader(object_.name_, pixelShader_->GetGPUObjectName());
     glLinkProgram(object_.name_);
 
@@ -181,8 +190,13 @@ bool ShaderProgram::Link()
 
         if (semantic == MAX_VERTEX_ELEMENT_SEMANTICS)
         {
-            URHO3D_LOGWARNING("Found vertex attribute " + name + " with no known semantic in shader program " +
-                vertexShader_->GetFullName() + " " + pixelShader_->GetFullName());
+            // Use a brief log when a geometry shader isn't present
+            if (geometryShader_)
+                URHO3D_LOGWARNING("Found vertex attribute " + name + " with no known semantic in shader program " +
+                    vertexShader_->GetFullName() + " " + pixelShader_->GetFullName() + " with GS: " + geometryShader_->GetFullName());
+            else
+                URHO3D_LOGWARNING("Found vertex attribute " + name + " with no known semantic in shader program " +
+                    vertexShader_->GetFullName() + " " + pixelShader_->GetFullName());
             continue;
         }
 
@@ -225,7 +239,11 @@ bool ShaderProgram::Link()
 
             if (group >= MAX_SHADER_PARAMETER_GROUPS)
             {
-                URHO3D_LOGWARNING("Skipping unrecognized uniform block " + name + " in shader program " + vertexShader_->GetFullName() +
+                if (geometryShader_)
+                    URHO3D_LOGWARNING("Skipping unrecognized uniform block " + name + " in shader program " + vertexShader_->GetFullName() +
+                        " " + pixelShader_->GetFullName() + " with GS: " + geometryShader_->GetFullName());
+                else
+                    URHO3D_LOGWARNING("Skipping unrecognized uniform block " + name + " in shader program " + vertexShader_->GetFullName() +
                            " " + pixelShader_->GetFullName());
                 continue;
             }
@@ -324,6 +342,11 @@ bool ShaderProgram::Link()
 ShaderVariation* ShaderProgram::GetVertexShader() const
 {
     return vertexShader_;
+}
+
+ShaderVariation* ShaderProgram::GetGeometryShader() const
+{
+    return geometryShader_;
 }
 
 ShaderVariation* ShaderProgram::GetPixelShader() const

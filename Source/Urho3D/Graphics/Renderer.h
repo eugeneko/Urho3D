@@ -434,7 +434,7 @@ private:
     /// Reload shaders.
     void LoadShaders();
     /// Reload shaders for a material pass. The related batch queue is provided in case it has extra shader compilation defines.
-    void LoadPassShaders(Pass* pass, Vector<SharedPtr<ShaderVariation> >& vertexShaders, Vector<SharedPtr<ShaderVariation> >& pixelShaders, const BatchQueue& queue);
+    void LoadPassShaders(Pass* pass, Vector<SharedPtr<ShaderVariation> >& vertexShaders, Vector<SharedPtr<ShaderVariation> >& pixelShaders, Vector<SharedPtr<ShaderVariation> >& geometryShaders, const BatchQueue& queue);
     /// Release shaders used in materials.
     void ReleaseMaterialShaders();
     /// Reload textures.
