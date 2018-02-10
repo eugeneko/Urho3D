@@ -181,6 +181,16 @@ static void GetD3DPrimitiveType(unsigned elementCount, PrimitiveType type, unsig
         primitiveCount = 0;
         d3dPrimitiveType = D3D_PRIMITIVE_TOPOLOGY_UNDEFINED;
         break;
+
+    case LINE_LIST_ADJ:
+        primitiveCount = elementCount / 4;
+        d3dPrimitiveType = D3D_PRIMITIVE_TOPOLOGY_LINELIST_ADJ;
+        break;
+
+    case TRIANGLE_LIST_ADJ:
+        primitiveCount = elementCount / 6;
+        d3dPrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST_ADJ;
+        break;
     }
 }
 

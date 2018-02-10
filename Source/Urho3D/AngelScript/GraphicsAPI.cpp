@@ -748,6 +748,8 @@ static void RegisterBuffers(asIScriptEngine* engine)
     engine->RegisterEnumValue("PrimitiveType", "TRIANGLE_STRIP", TRIANGLE_STRIP);
     engine->RegisterEnumValue("PrimitiveType", "LINE_STRIP", LINE_STRIP);
     engine->RegisterEnumValue("PrimitiveType", "TRIANGLE_FAN", TRIANGLE_FAN);
+    engine->RegisterEnumValue("PrimitiveType", "LINE_LIST_ADJ", LINE_LIST_ADJ);
+    engine->RegisterEnumValue("PrimitiveType", "TRIANGLE_LIST_ADJ", TRIANGLE_LIST_ADJ);
 
     engine->RegisterEnum("VertexElementType");
     engine->RegisterEnumValue("VertexElementType", "TYPE_INT", TYPE_INT);

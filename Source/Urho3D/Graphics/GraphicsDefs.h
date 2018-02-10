@@ -46,7 +46,7 @@ enum PrimitiveType
     TRIANGLE_STRIP,
     LINE_STRIP,
     TRIANGLE_FAN,
-    LINE_STRIP_ADJ,
+    LINE_LIST_ADJ,
     TRIANGLE_LIST_ADJ
 };
 

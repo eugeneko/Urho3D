@@ -214,6 +214,18 @@ static void GetGLPrimitiveType(unsigned elementCount, PrimitiveType type, unsign
         primitiveCount = elementCount - 2;
         glPrimitiveType = GL_TRIANGLE_FAN;
         break;
+
+#ifndef GL_ES_VERSION_2_0
+    case LINE_LIST_ADJ:
+        primitiveCount = elementCount / 4;
+        glPrimitiveType = GL_LINES_ADJACENCY;
+        break;
+
+    case TRIANGLE_LIST_ADJ:
+        primitiveCount = elementCount / 6;
+        glPrimitiveType = GL_TRIANGLES_ADJACENCY;
+        break;
+#endif
     }
 }
 
