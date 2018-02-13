@@ -1182,7 +1182,7 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps, ShaderVariat
             // Link a new combination
             URHO3D_PROFILE(LinkShaders);
 
-            SharedPtr<ShaderProgram> newProgram(new ShaderProgram(this, vs, ps));
+            SharedPtr<ShaderProgram> newProgram(new ShaderProgram(this, vs, ps, gs));
             if (newProgram->Link())
             {
                 URHO3D_LOGDEBUG("Linked vertex shader " + vs->GetFullName() + " and pixel shader " + ps->GetFullName());
