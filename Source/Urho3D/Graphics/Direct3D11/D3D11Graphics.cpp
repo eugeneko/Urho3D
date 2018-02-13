@@ -1100,12 +1100,11 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps, ShaderVariat
             impl_->shaderProgram_ = i->second_.Get();
         else
         {
-            ShaderProgram* newProgram = impl_->shaderPrograms_[key] = new ShaderProgram(this, vertexShader_, pixelShader_);
+            ShaderProgram* newProgram = impl_->shaderPrograms_[key] = new ShaderProgram(this, vertexShader_, pixelShader_, geometryShader_);
             impl_->shaderProgram_ = newProgram;
         }
 
         bool vsBuffersChanged = false;
-        bool gsBuffersChanged = false;
         bool psBuffersChanged = false;
 
         for (unsigned i = 0; i < MAX_SHADER_PARAMETER_GROUPS; ++i)
@@ -1117,14 +1116,6 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps, ShaderVariat
                 impl_->constantBuffers_[VS][i] = vsBuffer;
                 shaderParameterSources_[i] = (const void*)M_MAX_UNSIGNED;
                 vsBuffersChanged = true;
-            }
-
-            ID3D11Buffer* gsBuffer = impl_->shaderProgram_->gsConstantBuffers_[i] ? (ID3D11Buffer*)impl_->shaderProgram_->gsConstantBuffers_[i]->GetGPUObject() : nullptr;
-            if (gsBuffer != impl_->constantBuffers_[GS][i])
-            {
-                impl_->constantBuffers_[GS][i] = gsBuffer;
-                shaderParameterSources_[i] = (const void*)M_MAX_UNSIGNED;
-                gsBuffersChanged = true;
             }
 
             ID3D11Buffer* psBuffer = impl_->shaderProgram_->psConstantBuffers_[i] ? (ID3D11Buffer*)impl_->shaderProgram_->psConstantBuffers_[i]->
@@ -1139,8 +1130,9 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps, ShaderVariat
 
         if (vsBuffersChanged)
             impl_->deviceContext_->VSSetConstantBuffers(0, MAX_SHADER_PARAMETER_GROUPS, &impl_->constantBuffers_[VS][0]);
-        if (gsBuffersChanged)
-            impl_->deviceContext_->GSSetConstantBuffers(0, MAX_SHADER_PARAMETER_GROUPS, &impl_->constantBuffers_[GS][0]);
+        // Geometry shaders share the constant buffers with the VS
+        if (vsBuffersChanged)
+            impl_->deviceContext_->GSSetConstantBuffers(0, MAX_SHADER_PARAMETER_GROUPS, &impl_->constantBuffers_[VS][0]);
         if (psBuffersChanged)
             impl_->deviceContext_->PSSetConstantBuffers(0, MAX_SHADER_PARAMETER_GROUPS, &impl_->constantBuffers_[PS][0]);
     }
@@ -2391,7 +2383,6 @@ void Graphics::ResetCachedState()
     for (unsigned i = 0; i < MAX_SHADER_PARAMETER_GROUPS; ++i)
     {
         impl_->constantBuffers_[VS][i] = nullptr;
-        impl_->constantBuffers_[GS][i] = nullptr;
         impl_->constantBuffers_[PS][i] = nullptr;
     }
 

@@ -97,8 +97,8 @@ private:
     ID3D11SamplerState* samplers_[MAX_TEXTURE_UNITS];
     /// Bound vertex buffers.
     ID3D11Buffer* vertexBuffers_[MAX_VERTEX_STREAMS];
-    /// Bound constant buffers.
-    ID3D11Buffer* constantBuffers_[3][MAX_SHADER_PARAMETER_GROUPS];
+    /// Bound constant buffers. Vertex and Geometry shaders use the same buffers.
+    ID3D11Buffer* constantBuffers_[2][MAX_SHADER_PARAMETER_GROUPS];
     /// Vertex sizes per buffer.
     unsigned vertexSizes_[MAX_VERTEX_STREAMS];
     /// Vertex stream offsets per buffer.
