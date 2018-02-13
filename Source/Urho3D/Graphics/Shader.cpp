@@ -98,10 +98,13 @@ bool Shader::BeginLoad(Deserializer& source)
     gsSourceCode_ = shaderCode;
     psSourceCode_ = shaderCode;
     CommentOutFunction(vsSourceCode_, "void PS(");
-    CommentOutFunction(gsSourceCode_, "void GS(");
+    CommentOutFunction(vsSourceCode_, "void GS(");
+    CommentOutFunction(gsSourceCode_, "void VS(");
+    CommentOutFunction(gsSourceCode_, "void PS(");
     CommentOutFunction(psSourceCode_, "void VS(");
+    CommentOutFunction(psSourceCode_, "void GS(");
 
-    // OpenGL: rename either VS() or PS() to main()
+    // OpenGL: rename either VS() or PS() or GS() to main()
 #ifdef URHO3D_OPENGL
     vsSourceCode_.Replace("void VS(", "void main(");
     gsSourceCode_.Replace("void GS(", "void main(");

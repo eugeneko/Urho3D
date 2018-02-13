@@ -54,7 +54,7 @@ public:
     ShaderVariation* GetVariation(ShaderType type, const char* defines);
 
     /// Return either vertex or pixel shader source code.
-    const String& GetSourceCode(ShaderType type) const { return type == VS ? vsSourceCode_ : psSourceCode_; }
+    const String& GetSourceCode(ShaderType type) const { return type == VS ? vsSourceCode_ : (type == GS ? gsSourceCode_ : psSourceCode_); }
 
     /// Return the latest timestamp of the shader code and its includes.
     unsigned GetTimeStamp() const { return timeStamp_; }
