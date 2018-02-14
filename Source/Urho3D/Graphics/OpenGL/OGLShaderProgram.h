@@ -55,12 +55,14 @@ public:
     ShaderVariation* GetVertexShader() const;
     /// Return the pixel shader.
     ShaderVariation* GetPixelShader() const;
+#ifndef GL_ES_VERSION_2_0
     /// Return the geometry shader.
     ShaderVariation* GetGeometryShader() const;
     /// Return the TCS shader.
     ShaderVariation* GetTCSShader() const;
     /// Return the TES shader.
     ShaderVariation* GetTESShader() const;
+#endif
     /// Return whether uses a shader parameter.
     bool HasParameter(StringHash param) const;
 
@@ -100,12 +102,14 @@ private:
     WeakPtr<ShaderVariation> vertexShader_;
     /// Pixel shader.
     WeakPtr<ShaderVariation> pixelShader_;
+#ifndef GL_ES_VERSION_2_0
     /// Geometry shader.
     WeakPtr<ShaderVariation> geometryShader_;
     /// TCS shader.
     WeakPtr<ShaderVariation> tcsShader_;
     /// TES shader.
     WeakPtr<ShaderVariation> tesShader_;
+#endif
     /// Shader parameters.
     HashMap<StringHash, ShaderParameter> shaderParameters_;
     /// Texture unit use.

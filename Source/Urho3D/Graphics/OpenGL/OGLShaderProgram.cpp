@@ -63,11 +63,13 @@ ShaderProgram::ShaderProgram(Graphics* graphics, ShaderVariation* vertexShader, 
     vertexShader_(vertexShader),
     pixelShader_(pixelShader),
     usedVertexAttributes_(0),
-    frameNumber_(0),
-    geometryShader_(geometryShader),
-    tcsShader_(tcsShader),
-    tesShader_(tesShader)
+    frameNumber_(0)
 {
+#ifndef GL_ES_VERSION_2_0
+    geometryShader_ = geometryShader;
+    tcsShader_ = tcsShader;
+    tesShader_ = tesShader;
+#endif
     for (bool& useTextureUnit : useTextureUnits_)
         useTextureUnit = false;
     for (auto& parameterSource : parameterSources_)
@@ -125,11 +127,13 @@ bool ShaderProgram::Link()
         return false;
 
     // Reset geometry shader if it's an invalid object
+#ifndef GL_ES_VERSION_2_0
     if (geometryShader_ && !geometryShader_->GetGPUObjectName())
         geometryShader_ = nullptr;
     // Reset tessellation shaders if either is invalid
     if ((tcsShader_ && !tcsShader_->GetGPUObjectName()) || (tesShader_ && !tesShader_->GetGPUObjectName()))
         tcsShader_ = tesShader_ = nullptr;
+#endif
 
     object_.name_ = glCreateProgram();
     if (!object_.name_)
@@ -348,6 +352,7 @@ ShaderVariation* ShaderProgram::GetPixelShader() const
     return pixelShader_;
 }
 
+#ifndef GL_ES_VERSION_2_0
 ShaderVariation* ShaderProgram::GetGeometryShader() const
 {
     return geometryShader_;
@@ -362,6 +367,7 @@ ShaderVariation* ShaderProgram::GetTESShader() const
 {
     return tesShader_;
 }
+#endif
 
 bool ShaderProgram::HasParameter(StringHash param) const
 {
@@ -452,6 +458,7 @@ void ShaderProgram::ClearGlobalParameterSource(ShaderParameterGroup group)
 
 String ShaderProgram::GetShaderName() const
 {
+#ifndef GL_ES_VERSION_2_0
     if (tcsShader_ && tesShader_ && geometryShader_)
         return "VS: " + vertexShader_->GetFullName() + ", TCS: " + tcsShader_->GetFullName() + ", TES: " + tesShader_->GetFullName() + +", GS: " + geometryShader_->GetFullName() + ", PS: " + pixelShader_->GetFullName();
     else if (tcsShader_ && tesShader_)
@@ -459,6 +466,7 @@ String ShaderProgram::GetShaderName() const
     else if (geometryShader_)
         return "VS: " + vertexShader_->GetFullName() + ", GS: " + geometryShader_->GetFullName() + ", PS: " + pixelShader_->GetFullName();
     else
+#endif
         return vertexShader_->GetFullName() + " " + pixelShader_->GetFullName();
 }
 

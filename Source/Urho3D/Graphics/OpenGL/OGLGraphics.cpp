@@ -2477,11 +2477,17 @@ void Graphics::CleanupShaderPrograms(ShaderVariation* variation)
 {
     for (ShaderProgramMap::Iterator i = impl_->shaderPrograms_.Begin(); i != impl_->shaderPrograms_.End();)
     {
-        if (i->second_->GetVertexShader() == variation || i->second_->GetPixelShader() == variation || 
-            i->second_->GetGeometryShader() == variation || i->second_->GetTCSShader() == variation || i->second_->GetTESShader() == variation)
+#ifndef GL_ES_VERSION_2_0
+        if (i->second_->GetVertexShader() == variation || i->second_->GetPixelShader() == variation || i->second_->GetGeometryShader() == variation || i->second_->GetTCSShader() == variation || i->second_->GetTESShader() == variation)
             i = impl_->shaderPrograms_.Erase(i);
         else
             ++i;
+#else
+        if (i->second_->GetVertexShader() == variation || i->second_->GetPixelShader() == variation)
+            i = impl_->shaderPrograms_.Erase(i);
+        else
+            ++i;
+#endif
     }
 
     if (vertexShader_ == variation || pixelShader_ == variation || geometryShader_ == variation)
@@ -2622,17 +2628,26 @@ void Graphics::Restore()
             return;
         }
 
-        if (!forceGL2_ && GLEW_VERSION_3_3)
-            geometryShaderSupport = true;
-        if (!forceGL2_ && GLEW_VERSION_4_0)
-            tessellationSupport = true;
-        if (!forceGL2_ && GLEW_VERSION_4_3)
-            computeSupport = true;
-
         if (!forceGL2_ && GLEW_VERSION_3_2)
         {
             gl3Support = true;
             apiName_ = "GL3";
+
+            if (GLEW_VERSION_3_3)
+            {
+                geometryShaderSupport = true;
+                apiName_ = "GL3.3";
+            }
+            if (GLEW_VERSION_4_0)
+            {
+                tessellationSupport = true;
+                apiName_ = "GL4";
+            }
+            if (GLEW_VERSION_4_3)
+            {
+                computeSupport = true;
+                apiName_ = "GL4.3";
+            }
 
             // Create and bind a vertex array object that will stay in use throughout
             unsigned vertexArrayObject;
