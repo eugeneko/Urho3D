@@ -1079,11 +1079,20 @@ void Graphics::SetIndexBuffer(IndexBuffer* buffer)
 
 void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps, ShaderVariation* gs, ShaderVariation* tcs, ShaderVariation* tes)
 {
-    if (vs == vertexShader_ && ps == pixelShader_)
+    if (vs == vertexShader_ && ps == pixelShader_ && gs == geometryShader_ && tcs == tcsShader_ && tes == tesShader_)
         return;
 
-    if (!GetTessellationSupport() && (tcs || tes))
+    if ((tcs || tes) && !GetTessellationSupport())
+    {
         URHO3D_LOGERROR("Tessellation not supported by this GL context");
+        tcs = nullptr;
+        tes = nullptr;
+    }
+    if (gs && !GetGeometryShaderSupport())
+    {
+        URHO3D_LOGERROR("Geometry shaders not supported by this GL context");
+        gs = nullptr;
+    }
 
     // Compile the shaders now if not yet compiled. If already attempted, do not retry
     if (vs && !vs->GetGPUObjectName())
@@ -1106,32 +1115,69 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps, ShaderVariat
     }
 
 #ifndef GL_ES_VERSION_2_0
-    if (gs && !gs->GetGPUObjectName())
+    if (GetTessellationSupport())
     {
-        if (gs->GetCompilerOutput().Empty())
+        if (tcs && !tcs->GetGPUObjectName())
         {
-            URHO3D_PROFILE(CompileGeometryShader);
-
-            bool success = gs->Create();
-            if (success)
-                URHO3D_LOGDEBUG("Compiled geometry shader " + gs->GetFullName());
-            else
+            if (tcs->GetCompilerOutput().Empty())
             {
-                URHO3D_LOGERROR("Failed to compile geometry shader " + gs->GetFullName() + ":\n" + gs->GetCompilerOutput());
-                gs = nullptr;
+                URHO3D_PROFILE(CompileTessCtrlShader);
+
+                bool success = tcs->Create();
+                if (success)
+                    URHO3D_LOGDEBUG("Compiled tess ctrl shader " + tcs->GetFullName());
+                else
+                {
+                    URHO3D_LOGERROR("Failed to compile tess ctrl shader " + tcs->GetFullName() + ":\n" + tcs->GetCompilerOutput());
+                    tcs = nullptr;
+                }
             }
+            else
+                tcs = nullptr;
         }
-        else
-            gs = nullptr;
+
+        if (tes && !tes->GetGPUObjectName())
+        {
+            if (tes->GetCompilerOutput().Empty())
+            {
+                URHO3D_PROFILE(CompileTessEvalShader);
+
+                bool success = tes->Create();
+                if (success)
+                    URHO3D_LOGDEBUG("Compiled tess eval shader " + tes->GetFullName());
+                else
+                {
+                    URHO3D_LOGERROR("Failed to compile tess eval shader " + tes->GetFullName() + ":\n" + tes->GetCompilerOutput());
+                    tes = nullptr;
+                }
+            }
+            else
+                tes = nullptr;
+        }
     }
-#else
-    if (gs != nullptr)
+
+    if (GetGeometryShaderSupport())
     {
-        URHO3D_LOGERROR("Attempted to use geometry shader on OpenGL ES 2.0: " + gs->GetFullName());
-        gs = nullptr;
+        if (gs && !gs->GetGPUObjectName())
+        {
+            if (gs->GetCompilerOutput().Empty())
+            {
+                URHO3D_PROFILE(CompileGeometryShader);
+
+                bool success = gs->Create();
+                if (success)
+                    URHO3D_LOGDEBUG("Compiled geometry shader " + gs->GetFullName());
+                else
+                {
+                    URHO3D_LOGERROR("Failed to compile geometry shader " + gs->GetFullName() + ":\n" + gs->GetCompilerOutput());
+                    gs = nullptr;
+                }
+            }
+            else
+                gs = nullptr;
+        }
     }
 #endif
-
     
     if (ps && !ps->GetGPUObjectName())
     {
@@ -1170,7 +1216,7 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps, ShaderVariat
         tcsShader_ = tcs;
         tesShader_ = tes;
 
-        ShaderCombination combination { vs, gs, ps };
+        ShaderCombination combination { vs, ps, gs, tcs, tes };
         ShaderProgramMap::Iterator i = impl_->shaderPrograms_.Find(combination);
 
         if (i != impl_->shaderPrograms_.End())
