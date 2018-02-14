@@ -1079,7 +1079,7 @@ void Graphics::SetIndexBuffer(IndexBuffer* buffer)
 
 void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps, ShaderVariation* gs, ShaderVariation* tcs, ShaderVariation* tes)
 {
-    if (vs == vertexShader_ && ps == pixelShader_ && gs == geometryShader_ && tcs == tcsShader_ && tes == tesShader_)
+    if (vs == vertexShader_ && ps == pixelShader_ && gs == geometryShader_ && tcs == tessCtrlShader_ && tes == tessEvalShader_)
         return;
 
     if ((tcs || tes) && !GetTessellationSupport())
@@ -1204,8 +1204,8 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps, ShaderVariat
         vertexShader_ = nullptr;
         pixelShader_ = nullptr;
         geometryShader_ = nullptr; // using a geometry shader still requires the vertex shader stage, the condition above holds
-        tcsShader_ = nullptr;
-        tesShader_ = nullptr;
+        tessCtrlShader_ = nullptr;
+        tessEvalShader_ = nullptr;
         impl_->shaderProgram_ = nullptr;
     }
     else
@@ -1213,8 +1213,8 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps, ShaderVariat
         vertexShader_ = vs;
         geometryShader_ = gs;
         pixelShader_ = ps;
-        tcsShader_ = tcs;
-        tesShader_ = tes;
+        tessCtrlShader_ = tcs;
+        tessEvalShader_ = tes;
 
         ShaderCombination combination { vs, ps, gs, tcs, tes };
         ShaderProgramMap::Iterator i = impl_->shaderPrograms_.Find(combination);
@@ -1283,7 +1283,7 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps, ShaderVariat
 
     // Store shader combination if shader dumping in progress
     if (shaderPrecache_)
-        shaderPrecache_->StoreShaders(vertexShader_, pixelShader_, geometryShader_, tcsShader_, tesShader_);
+        shaderPrecache_->StoreShaders(vertexShader_, pixelShader_, geometryShader_, tessCtrlShader_, tessEvalShader_);
 
     if (impl_->shaderProgram_)
     {
@@ -3358,8 +3358,8 @@ void Graphics::ResetCachedState()
     vertexShader_ = nullptr;
     pixelShader_ = nullptr;
     geometryShader_ = nullptr;
-    tcsShader_ = nullptr;
-    tesShader_ = nullptr;
+    tessCtrlShader_ = nullptr;
+    tessEvalShader_ = nullptr;
     blendMode_ = BLEND_REPLACE;
     alphaToCoverage_ = false;
     colorWrite_ = true;

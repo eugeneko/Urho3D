@@ -95,7 +95,7 @@ void ShaderPrecache::StoreShaders(ShaderVariation* vs, ShaderVariation* ps, Shad
     String newCombination = vsName + " " + vsDefines + " " + psName + " " + psDefines;
 
 
-#ifndef GL_ES_VERSION_2_0
+#if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
     if (gs)
         newCombination += gs->GetName() + " " + gs->GetDefines();
     if (tcs)
@@ -114,7 +114,7 @@ void ShaderPrecache::StoreShaders(ShaderVariation* vs, ShaderVariation* ps, Shad
     shaderElem.SetAttribute("ps", psName);
     shaderElem.SetAttribute("psdefines", psDefines);
 
-#ifndef GL_ES_VERSION_2_0
+#if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
     if (gs)
     {
         shaderElem.SetAttribute("gs", gs->GetName());
@@ -144,7 +144,7 @@ void ShaderPrecache::LoadShaders(Graphics* graphics, Deserializer& source)
     while (shader)
     {
         String vsDefines = shader.GetAttribute("vsdefines");
-#ifndef GL_ES_VERSION_2_0
+#if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
         String gsDefines = shader.GetAttribute("gsdefines");
         String tcsDefines = shader.GetAttribute("tcsdefines");
         String tesDefines = shader.GetAttribute("tesdefines");
@@ -164,7 +164,7 @@ void ShaderPrecache::LoadShaders(Graphics* graphics, Deserializer& source)
         }
 #endif
 
-#ifndef GL_ES_VERSION_2_0
+#if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
         ShaderVariation* vs = graphics->GetShader(VS, shader.GetAttribute("vs"), vsDefines);
         ShaderVariation* tcs = graphics->GetShader(TCS, shader.GetAttribute("tcs"), tcsDefines);
         ShaderVariation* tes = graphics->GetShader(TES, shader.GetAttribute("tes"), tesDefines);

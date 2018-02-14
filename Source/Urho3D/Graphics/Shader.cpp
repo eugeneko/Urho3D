@@ -109,23 +109,23 @@ bool Shader::BeginLoad(Deserializer& source)
 
 #if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
     geometryShader_.sourceCode_ = shaderCode;
-    tcsShader_.sourceCode_ = shaderCode;
-    tesShader_.sourceCode_ = shaderCode;
+    tessCtrlShader_.sourceCode_ = shaderCode;
+    tessEvalShader_.sourceCode_ = shaderCode;
 
     CommentOutFunction(geometryShader_.sourceCode_, "void VS(");
     CommentOutFunction(geometryShader_.sourceCode_, "void PS(");
     CommentOutFunction(geometryShader_.sourceCode_, "void HS(");
     CommentOutFunction(geometryShader_.sourceCode_, "void DS(");
     
-    CommentOutFunction(tcsShader_.sourceCode_, "void VS(");
-    CommentOutFunction(tcsShader_.sourceCode_, "void PS(");
-    CommentOutFunction(tcsShader_.sourceCode_, "void GS(");
-    CommentOutFunction(tcsShader_.sourceCode_, "void DS(");
+    CommentOutFunction(tessCtrlShader_.sourceCode_, "void VS(");
+    CommentOutFunction(tessCtrlShader_.sourceCode_, "void PS(");
+    CommentOutFunction(tessCtrlShader_.sourceCode_, "void GS(");
+    CommentOutFunction(tessCtrlShader_.sourceCode_, "void DS(");
 
-    CommentOutFunction(tesShader_.sourceCode_, "void VS(");
-    CommentOutFunction(tesShader_.sourceCode_, "void PS(");
-    CommentOutFunction(tesShader_.sourceCode_, "void GS(");
-    CommentOutFunction(tesShader_.sourceCode_, "void HS(");
+    CommentOutFunction(tessEvalShader_.sourceCode_, "void VS(");
+    CommentOutFunction(tessEvalShader_.sourceCode_, "void PS(");
+    CommentOutFunction(tessEvalShader_.sourceCode_, "void GS(");
+    CommentOutFunction(tessEvalShader_.sourceCode_, "void HS(");
 #endif
 
 
@@ -135,8 +135,8 @@ bool Shader::BeginLoad(Deserializer& source)
     pixelShader_.sourceCode_.Replace("void PS(", "void main(");
 #ifndef GL_ES_VERSION_2_0
     geometryShader_.sourceCode_.Replace("void GS(", "void main(");
-    tcsShader_.sourceCode_.Replace("void HS(", "void main(");
-    tesShader_.sourceCode_.Replace("void DS(", "void main(");
+    tessCtrlShader_.sourceCode_.Replace("void HS(", "void main(");
+    tessEvalShader_.sourceCode_.Replace("void DS(", "void main(");
 #endif
 #endif
 
@@ -155,9 +155,9 @@ bool Shader::EndLoad()
 #if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
     for (HashMap<StringHash, SharedPtr<ShaderVariation> >::Iterator i = geometryShader_.variations_.Begin(); i != geometryShader_.variations_.End(); ++i)
         i->second_->Release();
-    for (HashMap<StringHash, SharedPtr<ShaderVariation> >::Iterator i = tcsShader_.variations_.Begin(); i != tcsShader_.variations_.End(); ++i)
+    for (HashMap<StringHash, SharedPtr<ShaderVariation> >::Iterator i = tessCtrlShader_.variations_.Begin(); i != tessCtrlShader_.variations_.End(); ++i)
         i->second_->Release();
-    for (HashMap<StringHash, SharedPtr<ShaderVariation> >::Iterator i = tesShader_.variations_.Begin(); i != tesShader_.variations_.End(); ++i)
+    for (HashMap<StringHash, SharedPtr<ShaderVariation> >::Iterator i = tessEvalShader_.variations_.Begin(); i != tessEvalShader_.variations_.End(); ++i)
         i->second_->Release();
 #endif
 
@@ -181,9 +181,9 @@ const String& Shader::GetSourceCode(ShaderType type) const
     case GS:
         return geometryShader_.sourceCode_;
     case TCS:
-        return tcsShader_.sourceCode_;
+        return tessCtrlShader_.sourceCode_;
     case TES:
-        return tesShader_.sourceCode_;
+        return tessEvalShader_.sourceCode_;
 #endif
     }
     return vertexShader_.sourceCode_;
@@ -233,9 +233,9 @@ HashMap<StringHash, SharedPtr<ShaderVariation> >& Shader::GetVariations(ShaderTy
     case GS:
         return geometryShader_.variations_;
     case TCS:
-        return tcsShader_.variations_;
+        return tessCtrlShader_.variations_;
     case TES:
-        return tesShader_.variations_;
+        return tessEvalShader_.variations_;
 #endif
     }
     return vertexShader_.variations_;
@@ -301,7 +301,7 @@ void Shader::RefreshMemoryUse()
     unsigned sourcesSize = vertexShader_.sourceCode_.Length() + pixelShader_.sourceCode_.Length();
 #if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
     sourcesSize += geometryShader_.sourceCode_.Length();
-    sourcesSize += tcsShader_.sourceCode_.Length() + tesShader_.sourceCode_.Length();
+    sourcesSize += tessCtrlShader_.sourceCode_.Length() + tessEvalShader_.sourceCode_.Length();
 #endif
     SetMemoryUse(
         (unsigned)(sizeof(Shader) + sourcesSize + numVariations_ * sizeof(ShaderVariation)));

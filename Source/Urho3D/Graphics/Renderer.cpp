@@ -1204,8 +1204,8 @@ void Renderer::SetBatchShaders(Batch& batch, Technique* tech, bool allowShadows,
     Vector<SharedPtr<ShaderVariation> >& pixelShaders = queue.hasExtraDefines_ ? pass->GetPixelShaders(queue.psExtraDefines_.hash_) : pass->GetPixelShaders();
 #if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
     Vector<SharedPtr<ShaderVariation> >& geometryShaders = queue.hasExtraDefines_ ? pass->GetGeometryShaders(queue.gsExtraDefines_.hash_) : pass->GetGeometryShaders();
-    Vector<SharedPtr<ShaderVariation> >& tcsShaders = queue.hasExtraDefines_ ? pass->GetGeometryShaders(queue.tcsExtraDefines_.hash_) : pass->GetTCSShaders();
-    Vector<SharedPtr<ShaderVariation> >& tesShaders = queue.hasExtraDefines_ ? pass->GetGeometryShaders(queue.tesExtraDefines_.hash_) : pass->GetTESShaders();
+    Vector<SharedPtr<ShaderVariation> >& tcsShaders = queue.hasExtraDefines_ ? pass->GetTessCtrlShaders(queue.tcsExtraDefines_.hash_) : pass->GetTessCtrlShaders();
+    Vector<SharedPtr<ShaderVariation> >& tesShaders = queue.hasExtraDefines_ ? pass->GetTessEvalShaders(queue.tesExtraDefines_.hash_) : pass->GetTessEvalShaders();
 #else
     // Provide stubs for LoadPassShaders.
     Vector<SharedPtr<ShaderVariation> > geometryShaders;
@@ -1240,8 +1240,8 @@ void Renderer::SetBatchShaders(Batch& batch, Technique* tech, bool allowShadows,
                 batch.shaders_.pixelShader_ = nullptr;
 #if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
                 batch.shaders_.geometryShader_ = nullptr;
-                batch.shaders_.tcsShader_ = nullptr;
-                batch.shaders_.tesShader_ = nullptr;
+                batch.shaders_.tessCtrlShader_ = nullptr;
+                batch.shaders_.tessEvalShader_ = nullptr;
 #endif
                 return;
             }
@@ -1291,8 +1291,8 @@ void Renderer::SetBatchShaders(Batch& batch, Technique* tech, bool allowShadows,
             batch.shaders_.pixelShader_ = pixelShaders[psi];
 #if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
             batch.shaders_.geometryShader_ = geometryShaders.Empty() ? nullptr : geometryShaders[batch.geometryType_];
-            batch.shaders_.tcsShader_ = tcsShaders.Empty() ? nullptr : tcsShaders[batch.geometryType_];
-            batch.shaders_.tesShader_ = tesShaders.Empty() ? nullptr : tesShaders[batch.geometryType_];
+            batch.shaders_.tessCtrlShader_ = tcsShaders.Empty() ? nullptr : tcsShaders[batch.geometryType_];
+            batch.shaders_.tessEvalShader_ = tesShaders.Empty() ? nullptr : tesShaders[batch.geometryType_];
 #endif
         }
         else
@@ -1308,8 +1308,8 @@ void Renderer::SetBatchShaders(Batch& batch, Technique* tech, bool allowShadows,
                 batch.shaders_.vertexShader_ = vertexShaders[vsi];
 #if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
                 batch.shaders_.geometryShader_ = geometryShaders.Empty() ? nullptr : geometryShaders[batch.geometryType_];
-                batch.shaders_.tcsShader_ = tcsShaders.Empty() ? nullptr : tcsShaders[batch.geometryType_];
-                batch.shaders_.tesShader_ = tesShaders.Empty() ? nullptr : tesShaders[batch.geometryType_];
+                batch.shaders_.tessCtrlShader_ = tcsShaders.Empty() ? nullptr : tcsShaders[batch.geometryType_];
+                batch.shaders_.tessEvalShader_ = tesShaders.Empty() ? nullptr : tesShaders[batch.geometryType_];
 #endif
             }
             else
@@ -1318,8 +1318,8 @@ void Renderer::SetBatchShaders(Batch& batch, Technique* tech, bool allowShadows,
                 batch.shaders_.vertexShader_ = vertexShaders[vsi];
 #if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
                 batch.shaders_.geometryShader_ = geometryShaders.Empty() ? nullptr : geometryShaders[batch.geometryType_];
-                batch.shaders_.tcsShader_ = tcsShaders.Empty() ? nullptr : tcsShaders[batch.geometryType_];
-                batch.shaders_.tesShader_ = tesShaders.Empty() ? nullptr : tesShaders[batch.geometryType_];
+                batch.shaders_.tessCtrlShader_ = tcsShaders.Empty() ? nullptr : tcsShaders[batch.geometryType_];
+                batch.shaders_.tessEvalShader_ = tesShaders.Empty() ? nullptr : tesShaders[batch.geometryType_];
 #endif
             }
 
@@ -1396,8 +1396,8 @@ void Renderer::SetLightVolumeBatchShaders(Batch& batch, Camera* camera, const St
     // light volumes do not use a GS, TCS, or TES
 #if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
     batch.shaders_.geometryShader_ = nullptr;
-    batch.shaders_.tcsShader_ = nullptr;
-    batch.shaders_.tesShader_ = nullptr;
+    batch.shaders_.tessCtrlShader_ = nullptr;
+    batch.shaders_.tessEvalShader_ = nullptr;
 #endif
 }
 
@@ -1724,8 +1724,8 @@ void Renderer::LoadPassShaders(Pass* pass, Vector<SharedPtr<ShaderVariation> >& 
     String psDefines = pass->GetEffectivePixelShaderDefines();
 #if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
     String gsDefines = pass->GetEffectiveGeometryShaderDefines();
-    String tcsDefines = pass->GetEffectiveTCSShaderDefines();
-    String tesDefines = pass->GetEffectiveTESShaderDefines();
+    String tcsDefines = pass->GetEffectiveTessCtrlShaderDefines();
+    String tesDefines = pass->GetEffectiveTessEvalShaderDefines();
 #endif
 
     // Make sure to end defines with space to allow appending engine's defines
@@ -1850,12 +1850,12 @@ void Renderer::LoadPassShaders(Pass* pass, Vector<SharedPtr<ShaderVariation> >& 
                 geometryShaders[j] = graphics_->GetShader(GS, pass->GetGeometryShader(), gsDefines + geometryVSVariations[j]);
             }
         }
-        if (!pass->GetTCSShader().Empty() && !pass->GetTESShader().Empty())
+        if (!pass->GetTessCtrlShader().Empty() && !pass->GetTessEvalShader().Empty())
         {
             for (unsigned j = 0; j < MAX_GEOMETRYTYPES; ++j)
             {
-                tcsShaders[j] = graphics_->GetShader(TCS, pass->GetTCSShader(), tcsDefines + geometryVSVariations[j]);
-                tesShaders[j] = graphics_->GetShader(TES, pass->GetTESShader(), tesDefines + geometryVSVariations[j]);
+                tcsShaders[j] = graphics_->GetShader(TCS, pass->GetTessCtrlShader(), tcsDefines + geometryVSVariations[j]);
+                tesShaders[j] = graphics_->GetShader(TES, pass->GetTessEvalShader(), tesDefines + geometryVSVariations[j]);
             }
         }
 #endif

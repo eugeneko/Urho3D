@@ -37,22 +37,22 @@ struct ShaderCombination
     ShaderVariation* vertexShader_;
     ShaderVariation* pixelShader_;
     ShaderVariation* geometryShader_;
-    ShaderVariation* tcsShader_;
-    ShaderVariation* tesShader_;
+    ShaderVariation* tessCtrlShader_;
+    ShaderVariation* tessEvalShader_;
 
     /// Return hash value for HashSet & HashMap.
     unsigned ToHash() const 
     { 
         unsigned hash = MakeHash(vertexShader_) * 31;
         hash += MakeHash(pixelShader_);
-        if (geometryShader_ || tcsShader_ || tesShader_)
+        if (geometryShader_ || tessCtrlShader_ || tessEvalShader_)
         {
             hash *= 31;
             hash += MakeHash(geometryShader_);
             hash *= 31;
-            hash += MakeHash(tcsShader_);
+            hash += MakeHash(tessCtrlShader_);
             hash *= 31;
-            hash += MakeHash(tesShader_);
+            hash += MakeHash(tessEvalShader_);
         }
         return hash;
     }
@@ -62,8 +62,8 @@ struct ShaderCombination
         return vertexShader_ == rhs.vertexShader_ && 
             pixelShader_ == rhs.pixelShader_ && 
             geometryShader_ == rhs.geometryShader_ &&
-            tcsShader_ == rhs.tcsShader_ &&
-            tesShader_ == rhs.tesShader_;
+            tessCtrlShader_ == rhs.tessCtrlShader_ &&
+            tessEvalShader_ == rhs.tessEvalShader_;
     }
 };
 

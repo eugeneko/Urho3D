@@ -57,9 +57,9 @@ struct BatchShaders
     /// Geometry shader.
     ShaderVariation* geometryShader_;
     /// Hull/TCS shader.
-    ShaderVariation* tcsShader_;
+    ShaderVariation* tessCtrlShader_;
     /// Domain/TES shader.
-    ShaderVariation* tesShader_;
+    ShaderVariation* tessEvalShader_;
 #endif
 };
 

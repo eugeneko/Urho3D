@@ -403,10 +403,10 @@ public:
     ShaderVariation* GetGeometryShader() const { return geometryShader_; }
 
     /// Return current Hull/TCS shader.
-    ShaderVariation* GetTCSShader() const { return tcsShader_; }
+    ShaderVariation* GetTessCtrlShader() const { return tessCtrlShader_; }
 
     /// Return current Domain/TES shader.
-    ShaderVariation* GetTESShader() const { return tesShader_; }
+    ShaderVariation* GetTessEvalShader() const { return tessEvalShader_; }
 
     /// Return shader program. This is an API-specific class and should not be used by applications.
     ShaderProgram* GetShaderProgram() const;
@@ -735,9 +735,9 @@ private:
     /// Pixel shader in use.
     ShaderVariation* pixelShader_;
     /// Hull/TCS shader in use.
-    ShaderVariation* tcsShader_;
+    ShaderVariation* tessCtrlShader_;
     /// Domain/TES shader in use.
-    ShaderVariation* tesShader_;
+    ShaderVariation* tessEvalShader_;
     /// Textures in use.
     Texture* textures_[MAX_TEXTURE_UNITS];
     /// Texture unit mappings.

@@ -2889,8 +2889,8 @@ void View::SetQueueShaderDefines(BatchQueue& queue, const RenderPathCommand& com
     String psDefines = command.pixelShaderDefines_.Trimmed();
 
     String gsDefines = command.geometryShaderDefines_.Trimmed();
-    String tcsDefines = command.tcsShaderDefines_.Trimmed();
-    String tesDefines = command.tesShaderDefines_.Trimmed();
+    String tcsDefines = command.tessCtrlShaderDefines_.Trimmed();
+    String tesDefines = command.tessEvalShaderDefines_.Trimmed();
 
     if (vsDefines.Length() || psDefines.Length() || gsDefines.Length())
     {
@@ -2900,7 +2900,7 @@ void View::SetQueueShaderDefines(BatchQueue& queue, const RenderPathCommand& com
         queue.vsExtraDefines_.hash_ = StringHash(vsDefines);
         queue.psExtraDefines_.hash_ = StringHash(psDefines);
         
-#if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_DIRECT3D9)
+#if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
         queue.gsExtraDefines_.defines_ = gsDefines;
         queue.tcsExtraDefines_.defines_ = tcsDefines;
         queue.tesExtraDefines_.defines_ = tesDefines;

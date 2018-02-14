@@ -208,12 +208,12 @@ void ShaderVariation::Release()
         }
         else if (type_ == TCS)
         {
-            if (graphics_->GetTCSShader() == this)
+            if (graphics_->GetTessCtrlShader() == this)
                 graphics_->SetShaders(nullptr, nullptr, nullptr, nullptr, nullptr);
         }
         else if (type_ == TES)
         {
-            if (graphics_->GetTESShader() == this)
+            if (graphics_->GetTessEvalShader() == this)
                 graphics_->SetShaders(nullptr, nullptr, nullptr, nullptr, nullptr);
         }
 

@@ -1043,7 +1043,7 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps, ShaderVariat
         tes = nullptr;
     }
 
-    if (vs == vertexShader_ && ps == pixelShader_ && gs == geometryShader_ && tcs == tcsShader_ && tes == tesShader_)
+    if (vs == vertexShader_ && ps == pixelShader_ && gs == geometryShader_ && tcs == tessCtrlShader_ && tes == tessEvalShader_)
         return;
 
     if (vs != vertexShader_)
@@ -1071,7 +1071,7 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps, ShaderVariat
         impl_->vertexDeclarationDirty_ = true;
     }
 
-    if (tcs != tcsShader_)
+    if (tcs != tessCtrlShader_)
     {
         if (tcs && !tcs->GetGPUObject())
         {
@@ -1091,10 +1091,10 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps, ShaderVariat
         }
 
         impl_->deviceContext_->HSSetShader((ID3D11HullShader*)(tcs ? tcs->GetGPUObject() : nullptr), nullptr, 0);
-        tcsShader_ = tcs;
+        tessCtrlShader_ = tcs;
     }
 
-    if (tes != tesShader_)
+    if (tes != tessEvalShader_)
     {
         if (tes && !tes->GetGPUObject())
         {
@@ -1114,7 +1114,7 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps, ShaderVariat
         }
 
         impl_->deviceContext_->DSSetShader((ID3D11DomainShader*)(tes ? tes->GetGPUObject() : nullptr), nullptr, 0);
-        tesShader_ = tes;
+        tessEvalShader_ = tes;
     }
 
     if (gs != geometryShader_)
@@ -1169,7 +1169,7 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps, ShaderVariat
             impl_->shaderProgram_ = i->second_.Get();
         else
         {
-            ShaderProgram* newProgram = impl_->shaderPrograms_[key] = new ShaderProgram(this, vertexShader_, pixelShader_, geometryShader_, tcsShader_, tesShader_);
+            ShaderProgram* newProgram = impl_->shaderPrograms_[key] = new ShaderProgram(this, vertexShader_, pixelShader_, geometryShader_, tessCtrlShader_, tessEvalShader_);
             impl_->shaderProgram_ = newProgram;
         }
 
@@ -1205,7 +1205,7 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps, ShaderVariat
         {
             if (geometryShader_)
                 impl_->deviceContext_->GSSetConstantBuffers(0, MAX_SHADER_PARAMETER_GROUPS, &impl_->constantBuffers_[VS][0]);
-            if (tcsShader_ && tcsShader_)
+            if (tessCtrlShader_ && tessEvalShader_)
             {
                 impl_->deviceContext_->HSSetConstantBuffers(0, MAX_SHADER_PARAMETER_GROUPS, &impl_->constantBuffers_[VS][0]);
                 impl_->deviceContext_->DSSetConstantBuffers(0, MAX_SHADER_PARAMETER_GROUPS, &impl_->constantBuffers_[VS][0]);
@@ -1219,7 +1219,7 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps, ShaderVariat
 
     // Store shader combination if shader dumping in progress
     if (shaderPrecache_)
-        shaderPrecache_->StoreShaders(vertexShader_, pixelShader_, geometryShader_, tcsShader_, tesShader_);
+        shaderPrecache_->StoreShaders(vertexShader_, pixelShader_, geometryShader_, tessCtrlShader_, tessEvalShader_);
 
     // Update clip plane parameter if necessary
     if (useClipPlane_)
@@ -2494,8 +2494,8 @@ void Graphics::ResetCachedState()
     vertexShader_ = nullptr;
     pixelShader_ = nullptr;
     geometryShader_ = nullptr;
-    tcsShader_ = nullptr;
-    tesShader_ = nullptr;
+    tessCtrlShader_ = nullptr;
+    tessEvalShader_ = nullptr;
     blendMode_ = BLEND_REPLACE;
     alphaToCoverage_ = false;
     colorWrite_ = true;

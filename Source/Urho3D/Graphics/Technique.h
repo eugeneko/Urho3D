@@ -163,41 +163,41 @@ public:
     String GetEffectiveGeometryShaderDefines() const { return GetEffectiveShaderDefines(GS); }
     
     /// Set TCS shader name.
-    void SetTCSShader(const String& name) { SetShader(TCS, name); }
+    void SetTessCtrlShader(const String& name) { SetShader(TCS, name); }
     /// Set TES shader name.
-    void SetTESShader(const String& name) { SetShader(TES, name); }
+    void SetTessEvalShader(const String& name) { SetShader(TES, name); }
     /// Set TCS shader defines. Separate multiple defines with spaces.
-    void SetTCSShaderDefines(const String& defines) { SetShaderDefines(TCS, defines); }
+    void SetTessCtrlShaderDefines(const String& defines) { SetShaderDefines(TCS, defines); }
     /// Set TES shader defines. Separate multiple defines with spaces.
-    void SetTESShaderDefines(const String& defines) { SetShaderDefines(TES, defines); }
+    void SetTessEvalShaderDefines(const String& defines) { SetShaderDefines(TES, defines); }
     /// Set TCS shader define excludes. Use to mark defines that the shader code will not recognize, to prevent compiling redundant shader variations.
-    void SetTCSShaderDefineExcludes(const String& excludes) { SetShaderExcludeDefines(TCS, excludes); }
+    void SetTessCtrlShaderDefineExcludes(const String& excludes) { SetShaderExcludeDefines(TCS, excludes); }
     /// Set TES shader define excludes. Use to mark defines that the shader code will not recognize, to prevent compiling redundant shader variations.
-    void SetTESShaderDefineExcludes(const String& excludes) { SetShaderExcludeDefines(TES, excludes); }
+    void SetTessEvalShaderDefineExcludes(const String& excludes) { SetShaderExcludeDefines(TES, excludes); }
     /// Return TCS shader name.
-    const String& GetTCSShader() const { return tcsShaderData_.shaderName_; }
+    const String& GetTessCtrlShader() const { return tessCtrlShaderData_.shaderName_; }
     /// Return TES shader name.
-    const String& GetTESShader() const { return tesShaderData_.shaderName_; }
+    const String& GetTessEvalShader() const { return tessEvalShaderData_.shaderName_; }
     /// Return geometry shader defines.
-    const String& GetTCSShaderDefines() const { return tcsShaderData_.defines_; }
+    const String& GetTessCtrlShaderDefines() const { return tessCtrlShaderData_.defines_; }
     /// Return geometry shader defines.
-    const String& GetTESShaderDefines() const { return tesShaderData_.defines_; }
+    const String& GetTessEvalShaderDefines() const { return tessEvalShaderData_.defines_; }
     /// Return TCS shader define excludes.
-    const String& GetTCSShaderDefineExcludes() const { return tcsShaderData_.defineExcludes_; }
+    const String& GetTessCtrlShaderDefineExcludes() const { return tessCtrlShaderData_.defineExcludes_; }
     /// Return TES shader define excludes.
-    const String& GetTESShaderDefineExcludes() const { return tesShaderData_.defineExcludes_; }
+    const String& GetTessEvalShaderDefineExcludes() const { return tessEvalShaderData_.defineExcludes_; }
     /// Return TCS shaders.
-    Vector<SharedPtr<ShaderVariation> >& GetTCSShaders() { return tcsShaderData_.shaders_; }
+    Vector<SharedPtr<ShaderVariation> >& GetTessCtrlShaders() { return tessCtrlShaderData_.shaders_; }
     /// Return TES shaders.
-    Vector<SharedPtr<ShaderVariation> >& GetTESShaders() { return tesShaderData_.shaders_; }
+    Vector<SharedPtr<ShaderVariation> >& GetTessEvalShaders() { return tessEvalShaderData_.shaders_; }
     /// Return TCS shaders with extra defines from the renderpath.
-    Vector<SharedPtr<ShaderVariation> >& GetTCSShaders(const StringHash& extraDefinesHash) { return GetShaders(TCS, extraDefinesHash); }
+    Vector<SharedPtr<ShaderVariation> >& GetTessCtrlShaders(const StringHash& extraDefinesHash) { return GetShaders(TCS, extraDefinesHash); }
     /// Return TES shaders with extra defines from the renderpath.
-    Vector<SharedPtr<ShaderVariation> >& GetTESShaders(const StringHash& extraDefinesHash) { return GetShaders(TES, extraDefinesHash); }
+    Vector<SharedPtr<ShaderVariation> >& GetTessEvalShaders(const StringHash& extraDefinesHash) { return GetShaders(TES, extraDefinesHash); }
     /// Return the effective TES shader defines, accounting for excludes. Called internally by Renderer.
-    String GetEffectiveTCSShaderDefines() const { return GetEffectiveShaderDefines(TCS); }
+    String GetEffectiveTessCtrlShaderDefines() const { return GetEffectiveShaderDefines(TCS); }
     /// Return the effective TCS shader defines, accounting for excludes. Called internally by Renderer.
-    String GetEffectiveTESShaderDefines() const { return GetEffectiveShaderDefines(TES); }
+    String GetEffectiveTessEvalShaderDefines() const { return GetEffectiveShaderDefines(TES); }
 #endif
 
 private:
@@ -260,9 +260,9 @@ private:
     /// Geometry shader data.
     ShaderData geometryShaderData_;
     /// TCS shader data.
-    ShaderData tcsShaderData_;
+    ShaderData tessCtrlShaderData_;
     /// TES shader data.
-    ShaderData tesShaderData_;
+    ShaderData tessEvalShaderData_;
 #endif
 
     /// Pass name.

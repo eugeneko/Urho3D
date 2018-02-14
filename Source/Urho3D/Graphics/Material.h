@@ -143,10 +143,10 @@ public:
 #if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
     /// Set additional geometry shader defines. Separate multiple defines with spaces. Setting defines at the material level causes technique(s) to be cloned as necessary.
     void SetGeometryShaderDefines(const String& defines);
-    /// Set additional geometry shader defines. Separate multiple defines with spaces. Setting defines at the material level causes technique(s) to be cloned as necessary.
-    void SetTESShaderDefines(const String& defines);
-    /// Set additional geometry shader defines. Separate multiple defines with spaces. Setting defines at the material level causes technique(s) to be cloned as necessary.
-    void SetTCSShaderDefines(const String& defines);
+    /// Set additional TCS/Hull shader defines. Separate multiple defines with spaces. Setting defines at the material level causes technique(s) to be cloned as necessary.
+    void SetTessCtrlShaderDefines(const String& defines);
+    /// Set additional TCS/Domain shader defines. Separate multiple defines with spaces. Setting defines at the material level causes technique(s) to be cloned as necessary.
+    void SetTessEvalShaderDefines(const String& defines);
 #endif
     /// Set shader parameter.
     void SetShaderParameter(const String& name, const Variant& value);
@@ -216,10 +216,10 @@ public:
 #if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
     /// Return additional geometry shader defines.
     const String& GetGeometryShaderDefines() const { return geometryShaderDefines_; }
-    /// Return additional geometry shader defines.
-    const String& GetTESShaderDefines() const { return tcsShaderDefines_; }
-    /// Return additional geometry shader defines.
-    const String& GetTCSShaderDefines() const { return tesShaderDefines_; }
+    /// Return additional TCS/Hull shader defines.
+    const String& GetTessCtrlShaderDefines() const { return tessCtrlShaderDefines_; }
+    /// Return additional TES/Domain shader defines.
+    const String& GetTessEvalShaderDefines() const { return tessEvalShaderDefines_; }
 #endif
 
     /// Return shader parameter.
@@ -312,10 +312,10 @@ private:
 #if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
     /// Geometry shader defines.
     String geometryShaderDefines_;
-    /// Geometry shader defines.
-    String tesShaderDefines_;
-    /// Geometry shader defines.
-    String tcsShaderDefines_;
+    /// TCS/Hull shader defines.
+    String tessCtrlShaderDefines_;
+    /// TES/Domain shader defines.
+    String tessEvalShaderDefines_;
 #endif
     /// Normal culling mode.
     CullMode cullMode_;

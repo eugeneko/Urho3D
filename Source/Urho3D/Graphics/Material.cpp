@@ -421,8 +421,8 @@ bool Material::Load(const XMLElement& source)
         pixelShaderDefines_ = shaderElem.GetAttribute("psdefines");
 #if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
         geometryShaderDefines_ = shaderElem.GetAttribute("gsdefines");
-        tcsShaderDefines_ = shaderElem.GetAttribute("tcsdefines");
-        tesShaderDefines_ = shaderElem.GetAttribute("tesdefines");
+        tessCtrlShaderDefines_ = shaderElem.GetAttribute("tcsdefines");
+        tessEvalShaderDefines_ = shaderElem.GetAttribute("tesdefines");
 #endif
     }
 
@@ -577,8 +577,8 @@ bool Material::Load(const JSONValue& source)
         pixelShaderDefines_ = shaderVal.Get("psdefines").GetString();
 #if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
         geometryShaderDefines_ = shaderVal.Get("gsdefines").GetString();
-        tcsShaderDefines_ = shaderVal.Get("tcsdefines").GetString();
-        tesShaderDefines_ = shaderVal.Get("tesdefines").GetString();
+        tessCtrlShaderDefines_ = shaderVal.Get("tcsdefines").GetString();
+        tessEvalShaderDefines_ = shaderVal.Get("tesdefines").GetString();
 #endif
     }
 
@@ -760,7 +760,7 @@ bool Material::Save(XMLElement& dest) const
     // Write shader compile defines
     if (!vertexShaderDefines_.Empty() || !pixelShaderDefines_.Empty()
 #if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
-        || !geometryShaderDefines_.Empty() || !tcsShaderDefines_.Empty() || !tesShaderDefines_.Empty()
+        || !geometryShaderDefines_.Empty() || !tessCtrlShaderDefines_.Empty() || !tessEvalShaderDefines_.Empty()
 #endif
         )
     {
@@ -772,10 +772,10 @@ bool Material::Save(XMLElement& dest) const
 #if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
         if (!geometryShaderDefines_.Empty())
             shaderElem.SetString("gsdefines", geometryShaderDefines_);
-        if (!tcsShaderDefines_.Empty())
-            shaderElem.SetString("tcsdefines", tcsShaderDefines_);
-        if (!tesShaderDefines_.Empty())
-            shaderElem.SetString("tesdefines", tesShaderDefines_);
+        if (!tessCtrlShaderDefines_.Empty())
+            shaderElem.SetString("tcsdefines", tessCtrlShaderDefines_);
+        if (!tessEvalShaderDefines_.Empty())
+            shaderElem.SetString("tesdefines", tessEvalShaderDefines_);
 #endif
     }
 
@@ -875,7 +875,7 @@ bool Material::Save(JSONValue& dest) const
     // Write shader compile defines
     if (!vertexShaderDefines_.Empty() || !pixelShaderDefines_.Empty() 
 #if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
-        || !geometryShaderDefines_.Empty() || !tcsShaderDefines_.Empty() || !tesShaderDefines_.Empty()
+        || !geometryShaderDefines_.Empty() || !tessCtrlShaderDefines_.Empty() || !tessEvalShaderDefines_.Empty()
 #endif
         )
     {
@@ -888,10 +888,10 @@ bool Material::Save(JSONValue& dest) const
 #if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
         if (!geometryShaderDefines_.Empty())
             shaderVal.Set("gsdefines", geometryShaderDefines_);
-        if (!tcsShaderDefines_.Empty())
-            shaderVal.Set("tcsdefines", tcsShaderDefines_);
-        if (!tesShaderDefines_.Empty())
-            shaderVal.Set("tesdefines", tesShaderDefines_);
+        if (!tessCtrlShaderDefines_.Empty())
+            shaderVal.Set("tcsdefines", tessCtrlShaderDefines_);
+        if (!tessEvalShaderDefines_.Empty())
+            shaderVal.Set("tesdefines", tessEvalShaderDefines_);
 #endif
         dest.Set("shader", shaderVal);
     }
@@ -1003,20 +1003,20 @@ void Material::SetGeometryShaderDefines(const String& defines)
     }
 }
 
-void Material::SetTCSShaderDefines(const String& defines)
+void Material::SetTessCtrlShaderDefines(const String& defines)
 {
-    if (defines != tcsShaderDefines_)
+    if (defines != tessCtrlShaderDefines_)
     {
-        tcsShaderDefines_ = defines;
+        tessCtrlShaderDefines_ = defines;
         ApplyShaderDefines();
     }
 }
 
-void Material::SetTESShaderDefines(const String& defines)
+void Material::SetTessEvalShaderDefines(const String& defines)
 {
-    if (defines != tesShaderDefines_)
+    if (defines != tessEvalShaderDefines_)
     {
-        tesShaderDefines_ = defines;
+        tessEvalShaderDefines_ = defines;
         ApplyShaderDefines();
     }
 }
@@ -1225,8 +1225,8 @@ SharedPtr<Material> Material::Clone(const String& cloneName) const
     
 #if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
     ret->geometryShaderDefines_ = geometryShaderDefines_;
-    ret->tcsShaderDefines_ = tcsShaderDefines_;
-    ret->tesShaderDefines_ = tesShaderDefines_;
+    ret->tessCtrlShaderDefines_ = tessCtrlShaderDefines_;
+    ret->tessEvalShaderDefines_ = tessEvalShaderDefines_;
 #endif
 
     ret->pixelShaderDefines_ = pixelShaderDefines_;
@@ -1332,8 +1332,8 @@ void Material::ResetToDefaults()
     pixelShaderDefines_.Clear();
 #if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
     geometryShaderDefines_.Clear();
-    tcsShaderDefines_.Clear();
-    tesShaderDefines_.Clear();
+    tessCtrlShaderDefines_.Clear();
+    tessEvalShaderDefines_.Clear();
 #endif
 
     SetNumTechniques(1);
@@ -1460,10 +1460,10 @@ void Material::ApplyShaderDefines(unsigned index)
         return;
 
 #if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
-    if (vertexShaderDefines_.Empty() && pixelShaderDefines_.Empty() && geometryShaderDefines_.Empty() && tcsShaderDefines_.Empty() && tesShaderDefines_.Empty())
+    if (vertexShaderDefines_.Empty() && pixelShaderDefines_.Empty() && geometryShaderDefines_.Empty() && tessCtrlShaderDefines_.Empty() && tessEvalShaderDefines_.Empty())
         techniques_[index].technique_ = techniques_[index].original_;
     else
-        techniques_[index].technique_ = techniques_[index].original_->CloneWithDefines(vertexShaderDefines_, pixelShaderDefines_, geometryShaderDefines_, tcsShaderDefines_, tesShaderDefines_);
+        techniques_[index].technique_ = techniques_[index].original_->CloneWithDefines(vertexShaderDefines_, pixelShaderDefines_, geometryShaderDefines_, tessCtrlShaderDefines_, tessEvalShaderDefines_);
 #else
     if (vertexShaderDefines_.Empty() && pixelShaderDefines_.Empty())
         techniques_[index].technique_ = techniques_[index].original_;
