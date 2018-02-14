@@ -54,12 +54,14 @@ public:
     ShaderVariation* GetVariation(ShaderType type, const char* defines);
 
     /// Return either vertex or pixel shader source code.
-    const String& GetSourceCode(ShaderType type) const { return type == VS ? vsSourceCode_ : (type == GS ? gsSourceCode_ : psSourceCode_); }
+    const String& GetSourceCode(ShaderType type) const;
 
     /// Return the latest timestamp of the shader code and its includes.
     unsigned GetTimeStamp() const { return timeStamp_; }
 
 private:
+    /// Return the table of shader variations for a specific shader stage.
+    HashMap<StringHash, SharedPtr<ShaderVariation> >& GetVariations(ShaderType type);
     /// Process source code and include files. Return true if successful.
     bool ProcessSource(String& code, Deserializer& source);
     /// Sort the defines and strip extra spaces to prevent creation of unnecessary duplicate shader variations.
@@ -67,18 +69,25 @@ private:
     /// Recalculate the memory used by the shader.
     void RefreshMemoryUse();
 
-    /// Source code adapted for vertex shader.
-    String vsSourceCode_;
-    /// Source code adapted for geometry shader.
-    String gsSourceCode_;
-    /// Source code adapted for pixel shader.
-    String psSourceCode_;
-    /// Vertex shader variations.
-    HashMap<StringHash, SharedPtr<ShaderVariation> > vsVariations_;
-    /// Geometry shader variations.
-    HashMap<StringHash, SharedPtr<ShaderVariation> > gsVariations_;
-    /// Pixel shader variations.
-    HashMap<StringHash, SharedPtr<ShaderVariation> > psVariations_;
+    /// Encapsulates information for a specific shader stage.
+    struct ShaderData
+    {
+        /// Source code adapted for the shader.
+        String sourceCode_;
+        /// Shader variations.
+        HashMap<StringHash, SharedPtr<ShaderVariation> > variations_;
+    };
+
+    /// Vertex shader source and variations.
+    ShaderData vertexShader_;
+    /// Pixel shader source and variations.
+    ShaderData pixelShader_;
+    /// Geometry shader source and variations.
+    ShaderData geometryShader_;
+    /// TCS shader source and variations.
+    ShaderData tcsShader_;
+    /// TES shader source and variations.
+    ShaderData tesShader_;
     /// Source code timestamp.
     unsigned timeStamp_;
     /// Number of unique variations so far.

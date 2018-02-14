@@ -75,13 +75,13 @@ ShaderPrecache::~ShaderPrecache()
     xmlFile_.Save(dest);
 }
 
-void ShaderPrecache::StoreShaders(ShaderVariation* vs, ShaderVariation* ps, ShaderVariation* gs)
+void ShaderPrecache::StoreShaders(ShaderVariation* vs, ShaderVariation* ps, ShaderVariation* gs, ShaderVariation* tcs, ShaderVariation* tes)
 {
     if (!vs || !ps)
         return;
 
     // Check for duplicate using pointers first (fast)
-    ShaderCombination shaderCombo = { vs, gs, ps };
+    ShaderCombination shaderCombo = { vs, ps, gs, tcs, tes };
     if (usedPtrCombinations_.Contains(shaderCombo))
         return;
     usedPtrCombinations_.Insert(shaderCombo);
@@ -96,6 +96,10 @@ void ShaderPrecache::StoreShaders(ShaderVariation* vs, ShaderVariation* ps, Shad
 
     if (gs)
         newCombination += gs->GetName() + " " + gs->GetDefines();
+    if (tcs)
+        newCombination += tcs->GetName() + " " + tcs->GetDefines();
+    if (tes)
+        newCombination += tes->GetName() + " " + tes->GetDefines();
 
     if (usedCombinations_.Contains(newCombination))
         return;
@@ -110,6 +114,16 @@ void ShaderPrecache::StoreShaders(ShaderVariation* vs, ShaderVariation* ps, Shad
     {
         shaderElem.SetAttribute("gs", gs->GetName());
         shaderElem.SetAttribute("gsdefines", gs->GetDefines());
+    }
+    if (tcs)
+    {
+        shaderElem.SetAttribute("tcs", tcs->GetName());
+        shaderElem.SetAttribute("tcsdefines", tcs->GetDefines());
+    }
+    if (tes)
+    {
+        shaderElem.SetAttribute("tes", tcs->GetName());
+        shaderElem.SetAttribute("tesdefines", tcs->GetDefines());
     }
 }
 
@@ -126,6 +140,8 @@ void ShaderPrecache::LoadShaders(Graphics* graphics, Deserializer& source)
         String vsDefines = shader.GetAttribute("vsdefines");
 #ifndef GL_ES_VERSION_2_0
         String gsDefines = shader.GetAttribute("gsdefines");
+        String tcsDefines = shader.GetAttribute("tcsdefines");
+        String tesDefines = shader.GetAttribute("tesdefines");
 #endif
         String psDefines = shader.GetAttribute("psdefines");
 
@@ -144,10 +160,12 @@ void ShaderPrecache::LoadShaders(Graphics* graphics, Deserializer& source)
 
 #ifndef GL_ES_VERSION_2_0
         ShaderVariation* vs = graphics->GetShader(VS, shader.GetAttribute("vs"), vsDefines);
+        ShaderVariation* tcs = graphics->GetShader(TCS, shader.GetAttribute("tcs"), tcsDefines);
+        ShaderVariation* tes = graphics->GetShader(TES, shader.GetAttribute("tes"), tesDefines);
         ShaderVariation* gs = graphics->GetShader(GS, shader.GetAttribute("gs"), gsDefines);
         ShaderVariation* ps = graphics->GetShader(PS, shader.GetAttribute("ps"), psDefines);
         // Set the shaders active to actually compile them
-        graphics->SetShaders(vs, ps, gs);
+        graphics->SetShaders(vs, ps, gs, tcs, tes);
 #else
         ShaderVariation* vs = graphics->GetShader(VS, shader.GetAttribute("vs"), vsDefines);
         ShaderVariation* ps = graphics->GetShader(PS, shader.GetAttribute("ps"), psDefines);

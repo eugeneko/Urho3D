@@ -46,6 +46,23 @@ class View;
 class Zone;
 struct LightBatchQueue;
 
+/// Container of shaders used in a batch.
+struct BatchShaders
+{
+    /// Vertex shader.
+    ShaderVariation* vertexShader_;
+    /// Pixel shader.
+    ShaderVariation* pixelShader_;
+#if !defined(URHO3D_OPENGL_ES) && !defined(URHO3D_DIRECT3D9)
+    /// Geometry shader.
+    ShaderVariation* geometryShader_;
+    /// Hull/TCS shader.
+    ShaderVariation* tcsShader_;
+    /// Domain/TES shader.
+    ShaderVariation* tesShader_;
+#endif
+};
+
 /// Queued 3D geometry draw call.
 struct Batch
 {
@@ -104,12 +121,8 @@ struct Batch
     LightBatchQueue* lightQueue_;
     /// Material pass.
     Pass* pass_;
-    /// Vertex shader.
-    ShaderVariation* vertexShader_;
-    /// Geometry shader.
-    ShaderVariation* geometryShader_;
-    /// Pixel shader.
-    ShaderVariation* pixelShader_;
+    /// Set of shaders used for the batch.
+    BatchShaders shaders_;
     /// %Geometry type.
     GeometryType geometryType_;
 };
@@ -269,18 +282,26 @@ public:
     unsigned maxSortedInstances_;
     /// Whether the pass command contains extra shader defines.
     bool hasExtraDefines_;
+
+    /// Shader definitions container.
+    struct ExtraShaderDefines
+    {
+        /// Text of the preprocessor definitions.
+        String defines_;
+        /// Hash of the preprocessor definitions.
+        StringHash hash_;
+    };
+
     /// Vertex shader extra defines.
-    String vsExtraDefines_;
+    ExtraShaderDefines vsExtraDefines_;
     /// Geometry shader extra defines.
-    String gsExtraDefines_;
+    ExtraShaderDefines gsExtraDefines_;
     /// Pixel shader extra defines.
-    String psExtraDefines_;
-    /// Hash for vertex shader extra defines.
-    StringHash vsExtraDefinesHash_;
-    /// Hash for vertex shader extra defines.
-    StringHash gsExtraDefinesHash_;
-    /// Hash for pixel shader extra defines.
-    StringHash psExtraDefinesHash_;
+    ExtraShaderDefines psExtraDefines_;
+    /// TCS shader extra defines.
+    ExtraShaderDefines tcsExtraDefines_;
+    /// TES shader extra defines.
+    ExtraShaderDefines tesExtraDefines_;
 };
 
 /// Queue for shadow map draw calls

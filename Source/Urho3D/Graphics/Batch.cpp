@@ -162,7 +162,11 @@ void CalculateSpotMatrix(Matrix4& dest, Light* light)
 void Batch::CalculateSortKey()
 {
     auto shaderID = (unsigned)(
-        ((*((unsigned*)&vertexShader_) / sizeof(ShaderVariation)) + (*((unsigned*)&pixelShader_) / sizeof(ShaderVariation)) + (*((unsigned*)&geometryShader_) / sizeof(ShaderVariation))) &
+        ((*((unsigned*)&shaders_.vertexShader_) / sizeof(ShaderVariation)) + 
+        (*((unsigned*)&shaders_.pixelShader_) / sizeof(ShaderVariation)) + 
+        (*((unsigned*)&shaders_.geometryShader_) / sizeof(ShaderVariation)) +
+        (*((unsigned*)&shaders_.tcsShader_) / sizeof(ShaderVariation)) +
+        (*((unsigned*)&shaders_.tesShader_) / sizeof(ShaderVariation))) &
         0x7fff);
     if (!isBase_)
         shaderID |= 0x8000;
@@ -177,7 +181,7 @@ void Batch::CalculateSortKey()
 
 void Batch::Prepare(View* view, Camera* camera, bool setModelTransform, bool allowDepthWrite) const
 {
-    if (!vertexShader_ || !pixelShader_)
+    if (!shaders_.vertexShader_ || !shaders_.pixelShader_)
         return;
 
     Graphics* graphics = view->GetGraphics();
@@ -187,7 +191,7 @@ void Batch::Prepare(View* view, Camera* camera, bool setModelTransform, bool all
     Texture2D* shadowMap = lightQueue_ ? lightQueue_->shadowMap_ : nullptr;
 
     // Set shaders first. The available shader parameters and their register/uniform positions depend on the currently set shaders
-    graphics->SetShaders(vertexShader_, pixelShader_, geometryShader_);
+    graphics->SetShaders(shaders_.vertexShader_, shaders_.pixelShader_, shaders_.geometryShader_, shaders_.tcsShader_, shaders_.tesShader_);
 
     // Set pass / material-specific renderstates
     if (pass_ && material_)

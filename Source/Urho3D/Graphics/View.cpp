@@ -1855,7 +1855,7 @@ void View::RenderQuad(RenderPathCommand& command)
         command.pixelShaderName_ = String::EMPTY;
 
     // Set shaders & shader parameters and textures
-    graphics_->SetShaders(vs, ps);
+    graphics_->SetShaders(vs, ps, nullptr, nullptr, nullptr);
 
     SetGlobalShaderParameters();
     SetCameraShaderParameters(camera_);
@@ -2133,7 +2133,7 @@ void View::BlitFramebuffer(Texture* source, RenderSurface* destination, bool dep
     graphics_->SetViewport(destRect);
 
     static const char* shaderName = "CopyFramebuffer";
-    graphics_->SetShaders(graphics_->GetShader(VS, shaderName), graphics_->GetShader(PS, shaderName));
+    graphics_->SetShaders(graphics_->GetShader(VS, shaderName), graphics_->GetShader(PS, shaderName), nullptr, nullptr, nullptr);
 
     SetGBufferShaderParameters(srcSize, srcRect);
 
@@ -2886,17 +2886,26 @@ void View::CheckMaterialForAuxView(Material* material)
 void View::SetQueueShaderDefines(BatchQueue& queue, const RenderPathCommand& command)
 {
     String vsDefines = command.vertexShaderDefines_.Trimmed();
-    String gsDefines = command.geometryShaderDefines_.Trimmed();
     String psDefines = command.pixelShaderDefines_.Trimmed();
+
+    String gsDefines = command.geometryShaderDefines_.Trimmed();
+    String tcsDefines = command.tcsShaderDefines_.Trimmed();
+    String tesDefines = command.tesShaderDefines_.Trimmed();
+
     if (vsDefines.Length() || psDefines.Length() || gsDefines.Length())
     {
         queue.hasExtraDefines_ = true;
-        queue.vsExtraDefines_ = vsDefines;
-        queue.psExtraDefines_ = gsDefines;
-        queue.psExtraDefines_ = psDefines;
-        queue.vsExtraDefinesHash_ = StringHash(vsDefines);
-        queue.gsExtraDefinesHash_ = StringHash(gsDefines);
-        queue.psExtraDefinesHash_ = StringHash(psDefines);
+        queue.vsExtraDefines_.defines_ = vsDefines;
+        queue.psExtraDefines_.defines_ = psDefines;
+        queue.vsExtraDefines_.hash_ = StringHash(vsDefines);
+        queue.psExtraDefines_.hash_ = StringHash(psDefines);
+        
+        queue.psExtraDefines_.defines_ = gsDefines;
+        queue.tcsExtraDefines_.defines_ = tcsDefines;
+        queue.tesExtraDefines_.defines_ = tesDefines;
+        queue.gsExtraDefines_.hash_ = StringHash(gsDefines);
+        queue.tcsExtraDefines_.hash_ = StringHash(tcsDefines);
+        queue.tesExtraDefines_.hash_ = StringHash(tesDefines);
     }
     else
         queue.hasExtraDefines_ = false;

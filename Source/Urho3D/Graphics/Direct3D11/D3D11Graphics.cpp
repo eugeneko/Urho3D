@@ -205,6 +205,9 @@ static HWND GetWindowHandle(SDL_Window* window)
 
 const Vector2 Graphics::pixelUVOffset(0.0f, 0.0f);
 bool Graphics::gl3Support = false;
+bool Graphics::tessellationSupport = false;
+bool Graphics::computeSupport = false;
+bool Graphics::geometryShaderSupport = false;
 
 Graphics::Graphics(Context* context) :
     Object(context),
@@ -679,7 +682,7 @@ void Graphics::Clear(unsigned flags, const Color& color, float depth, unsigned s
         SetFillMode(FILL_SOLID);
         SetScissorTest(false);
         SetStencilTest((flags & CLEAR_STENCIL) != 0, CMP_ALWAYS, OP_REF, OP_KEEP, OP_KEEP, stencil);
-        SetShaders(GetShader(VS, "ClearFramebuffer"), GetShader(PS, "ClearFramebuffer"));
+        SetShaders(GetShader(VS, "ClearFramebuffer"), GetShader(PS, "ClearFramebuffer"), nullptr, nullptr, nullptr);
         SetShaderParameter(VSP_MODEL, model);
         SetShaderParameter(VSP_VIEWPROJ, projection);
         SetShaderParameter(PSP_MATDIFFCOLOR, color);
@@ -1009,7 +1012,7 @@ void Graphics::SetIndexBuffer(IndexBuffer* buffer)
     }
 }
 
-void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps, ShaderVariation* gs)
+void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps, ShaderVariation* gs, ShaderVariation* tcs, ShaderVariation* tes)
 {
     // Switch to the clip plane variations if necessary
     if (useClipPlane_)
@@ -1046,6 +1049,52 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps, ShaderVariat
         impl_->deviceContext_->VSSetShader((ID3D11VertexShader*)(vs ? vs->GetGPUObject() : nullptr), nullptr, 0);
         vertexShader_ = vs;
         impl_->vertexDeclarationDirty_ = true;
+    }
+
+    if (tcs != tcsShader_)
+    {
+        if (tcs && !tcs->GetGPUObject())
+        {
+            if (tcs->GetCompilerOutput().Empty())
+            {
+                URHO3D_PROFILE(CompileTessellationControlShader);
+
+                bool success = tcs->Create();
+                if (!success)
+                {
+                    URHO3D_LOGERROR("Failed to compile TCS shader " + tcs->GetFullName() + ":\n" + tcs->GetCompilerOutput());
+                    tcs = nullptr;
+                }
+            }
+            else
+                tcs = nullptr;
+        }
+
+        impl_->deviceContext_->HSSetShader((ID3D11HullShader*)(tcs ? tcs->GetGPUObject() : nullptr), nullptr, 0);
+        tcsShader_ = tcs;
+    }
+
+    if (tes != tesShader_)
+    {
+        if (tes && !tes->GetGPUObject())
+        {
+            if (tes->GetCompilerOutput().Empty())
+            {
+                URHO3D_PROFILE(CompileTessellationControlShader);
+
+                bool success = tes->Create();
+                if (!success)
+                {
+                    URHO3D_LOGERROR("Failed to compile TES shader " + tes->GetFullName() + ":\n" + tes->GetCompilerOutput());
+                    tes = nullptr;
+                }
+            }
+            else
+                tes = nullptr;
+        }
+
+        impl_->deviceContext_->DSSetShader((ID3D11DomainShader*)(tes ? tes->GetGPUObject() : nullptr), nullptr, 0);
+        tesShader_ = tes;
     }
 
     if (gs != geometryShader_)
@@ -1130,9 +1179,17 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps, ShaderVariat
 
         if (vsBuffersChanged)
             impl_->deviceContext_->VSSetConstantBuffers(0, MAX_SHADER_PARAMETER_GROUPS, &impl_->constantBuffers_[VS][0]);
-        // Geometry shaders share the constant buffers with the VS
+        // Geometry/Hull/Domain shaders share the constant buffers with the VS
         if (vsBuffersChanged)
-            impl_->deviceContext_->GSSetConstantBuffers(0, MAX_SHADER_PARAMETER_GROUPS, &impl_->constantBuffers_[VS][0]);
+        {
+            if (geometryShader_)
+                impl_->deviceContext_->GSSetConstantBuffers(0, MAX_SHADER_PARAMETER_GROUPS, &impl_->constantBuffers_[VS][0]);
+            if (tcsShader_ && tcsShader_)
+            {
+                impl_->deviceContext_->HSSetConstantBuffers(0, MAX_SHADER_PARAMETER_GROUPS, &impl_->constantBuffers_[VS][0]);
+                impl_->deviceContext_->DSSetConstantBuffers(0, MAX_SHADER_PARAMETER_GROUPS, &impl_->constantBuffers_[VS][0]);
+            }
+        }
         if (psBuffersChanged)
             impl_->deviceContext_->PSSetConstantBuffers(0, MAX_SHADER_PARAMETER_GROUPS, &impl_->constantBuffers_[PS][0]);
     }
@@ -1141,7 +1198,7 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps, ShaderVariat
 
     // Store shader combination if shader dumping in progress
     if (shaderPrecache_)
-        shaderPrecache_->StoreShaders(vertexShader_, pixelShader_, geometryShader_);
+        shaderPrecache_->StoreShaders(vertexShader_, pixelShader_, geometryShader_, tcsShader_, tesShader_);
 
     // Update clip plane parameter if necessary
     if (useClipPlane_)
@@ -2100,6 +2157,21 @@ bool Graphics::GetGL3Support()
     return gl3Support;
 }
 
+bool Graphics::GetTessellationSupport()
+{
+    return tessellationSupport;
+}
+
+bool Graphics::GetGeometryShaderSupport()
+{
+    return geometryShaderSupport;
+}
+
+bool Graphics::GetComputeSupport()
+{
+    return computeSupport;
+}
+
 bool Graphics::OpenWindow(int width, int height, bool resizable, bool borderless)
 {
     if (!externalWindow_)
@@ -2355,6 +2427,11 @@ void Graphics::CheckFeatureSupport()
     dummyColorFormat_ = DXGI_FORMAT_UNKNOWN;
     sRGBSupport_ = true;
     sRGBWriteSupport_ = true;
+
+    const bool isDX11Capable = impl_->device_->GetFeatureLevel() >= D3D_FEATURE_LEVEL_11_0;
+    tessellationSupport = isDX11Capable;
+    computeSupport = isDX11Capable;
+    geometryShaderSupport = isDX11Capable || (impl_->device_->GetFeatureLevel() >= D3D_FEATURE_LEVEL_10_0);
 }
 
 void Graphics::ResetCachedState()
@@ -2395,6 +2472,9 @@ void Graphics::ResetCachedState()
     primitiveType_ = 0;
     vertexShader_ = nullptr;
     pixelShader_ = nullptr;
+    geometryShader_ = nullptr;
+    tcsShader_ = nullptr;
+    tesShader_ = nullptr;
     blendMode_ = BLEND_REPLACE;
     alphaToCoverage_ = false;
     colorWrite_ = true;

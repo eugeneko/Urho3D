@@ -231,6 +231,9 @@ static void GetGLPrimitiveType(unsigned elementCount, PrimitiveType type, unsign
 
 const Vector2 Graphics::pixelUVOffset(0.0f, 0.0f);
 bool Graphics::gl3Support = false;
+bool Graphics::tessellationSupport = false;
+bool Graphics::geometryShaderSupport = false;
+bool Graphics::computeSupport = false;
 
 Graphics::Graphics(Context* context) :
     Object(context),
@@ -1074,10 +1077,13 @@ void Graphics::SetIndexBuffer(IndexBuffer* buffer)
     indexBuffer_ = buffer;
 }
 
-void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps, ShaderVariation* gs)
+void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps, ShaderVariation* gs, ShaderVariation* tcs, ShaderVariation* tes)
 {
     if (vs == vertexShader_ && ps == pixelShader_)
         return;
+
+    if (!GetTessellationSupport() && (tcs || tes))
+        URHO3D_LOGERROR("Tessellation not supported by this GL context");
 
     // Compile the shaders now if not yet compiled. If already attempted, do not retry
     if (vs && !vs->GetGPUObjectName())
@@ -1150,8 +1156,10 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps, ShaderVariat
     {
         glUseProgram(0);
         vertexShader_ = nullptr;
-        geometryShader_ = nullptr; // using a geometry shader still requires the vertex shader stage, the condition above holds
         pixelShader_ = nullptr;
+        geometryShader_ = nullptr; // using a geometry shader still requires the vertex shader stage, the condition above holds
+        tcsShader_ = nullptr;
+        tesShader_ = nullptr;
         impl_->shaderProgram_ = nullptr;
     }
     else
@@ -1159,6 +1167,8 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps, ShaderVariat
         vertexShader_ = vs;
         geometryShader_ = gs;
         pixelShader_ = ps;
+        tcsShader_ = tcs;
+        tesShader_ = tes;
 
         ShaderCombination combination { vs, gs, ps };
         ShaderProgramMap::Iterator i = impl_->shaderPrograms_.Find(combination);
@@ -1182,7 +1192,7 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps, ShaderVariat
             // Link a new combination
             URHO3D_PROFILE(LinkShaders);
 
-            SharedPtr<ShaderProgram> newProgram(new ShaderProgram(this, vs, ps, gs));
+            SharedPtr<ShaderProgram> newProgram(new ShaderProgram(this, vs, ps, gs, tcs, tes));
             if (newProgram->Link())
             {
                 URHO3D_LOGDEBUG("Linked vertex shader " + vs->GetFullName() + " and pixel shader " + ps->GetFullName());
@@ -1227,7 +1237,7 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps, ShaderVariat
 
     // Store shader combination if shader dumping in progress
     if (shaderPrecache_)
-        shaderPrecache_->StoreShaders(vertexShader_, pixelShader_, geometryShader_);
+        shaderPrecache_->StoreShaders(vertexShader_, pixelShader_, geometryShader_, tcsShader_, tesShader_);
 
     if (impl_->shaderProgram_)
     {
@@ -2210,6 +2220,21 @@ bool Graphics::GetGL3Support()
     return gl3Support;
 }
 
+bool Graphics::GetTessellationSupport()
+{
+    return tessellationSupport;
+}
+
+bool Graphics::GetGeometryShaderSupport()
+{
+    return geometryShaderSupport;
+}
+
+bool Graphics::GetComputeSupport()
+{
+    return computeSupport;
+}
+
 ShaderVariation* Graphics::GetShader(ShaderType type, const String& name, const String& defines) const
 {
     return GetShader(type, name.CString(), defines.CString());
@@ -2406,7 +2431,8 @@ void Graphics::CleanupShaderPrograms(ShaderVariation* variation)
 {
     for (ShaderProgramMap::Iterator i = impl_->shaderPrograms_.Begin(); i != impl_->shaderPrograms_.End();)
     {
-        if (i->second_->GetVertexShader() == variation || i->second_->GetPixelShader() == variation || i->second_->GetGeometryShader() == variation)
+        if (i->second_->GetVertexShader() == variation || i->second_->GetPixelShader() == variation || 
+            i->second_->GetGeometryShader() == variation || i->second_->GetTCSShader() == variation || i->second_->GetTESShader() == variation)
             i = impl_->shaderPrograms_.Erase(i);
         else
             ++i;
@@ -2549,6 +2575,13 @@ void Graphics::Restore()
             URHO3D_LOGERRORF("Could not initialize OpenGL extensions, root cause: '%s'", glewGetErrorString(err));
             return;
         }
+
+        if (!forceGL2_ && GLEW_VERSION_3_3)
+            geometryShaderSupport = true;
+        if (!forceGL2_ && GLEW_VERSION_4_0)
+            tessellationSupport = true;
+        if (!forceGL2_ && GLEW_VERSION_4_3)
+            computeSupport = true;
 
         if (!forceGL2_ && GLEW_VERSION_3_2)
         {
@@ -3262,8 +3295,10 @@ void Graphics::ResetCachedState()
     viewport_ = IntRect(0, 0, 0, 0);
     indexBuffer_ = nullptr;
     vertexShader_ = nullptr;
-    geometryShader_ = nullptr;
     pixelShader_ = nullptr;
+    geometryShader_ = nullptr;
+    tcsShader_ = nullptr;
+    tesShader_ = nullptr;
     blendMode_ = BLEND_REPLACE;
     alphaToCoverage_ = false;
     colorWrite_ = true;

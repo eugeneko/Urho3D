@@ -66,12 +66,12 @@ void ShaderVariation::Release()
             if (type_ == VS)
             {
                 if (graphics_->GetVertexShader() == this)
-                    graphics_->SetShaders(nullptr, nullptr);
+                    graphics_->SetShaders(nullptr, nullptr, nullptr, nullptr, nullptr);
             }
             else
             {
                 if (graphics_->GetPixelShader() == this)
-                    graphics_->SetShaders(nullptr, nullptr);
+                    graphics_->SetShaders(nullptr, nullptr, nullptr, nullptr, nullptr);
             }
 
             glDeleteShader(object_.name_);
@@ -95,7 +95,24 @@ bool ShaderVariation::Create()
     }
 
 #ifndef GL_ES_VERSION_2_0
-    object_.name_ = glCreateShader(type_ == VS ? GL_VERTEX_SHADER : (type_ == GS ? GL_GEOMETRY_SHADER : GL_FRAGMENT_SHADER));
+    switch (type_)
+    {
+    case VS:
+        object_.name_ = glCreateShader(GL_VERTEX_SHADER);
+        break;
+    case PS:
+        object_.name_ = glCreateShader(GL_FRAGMENT_SHADER);
+        break;
+    case GS:
+        object_.name_ = glCreateShader(GL_GEOMETRY_SHADER);
+        break;
+    case TCS:
+        object_.name_ = glCreateShader(GL_TESS_CONTROL_SHADER);
+        break;
+    case TES:
+        object_.name_ = glCreateShader(GL_TESS_EVALUATION_SHADER);
+        break;
+    }
 #else
     object_.name_ = glCreateShader(type_ == VS ? GL_VERTEX_SHADER : GL_FRAGMENT_SHADER));
 #endif
@@ -135,7 +152,24 @@ bool ShaderVariation::Create()
 
     // Distinguish between VS and PS compile in case the shader code wants to include/omit different things
 #ifndef GL_ES_VERSION_2_0
-    shaderCode += type_ == VS ? "#define COMPILEVS\n" : (type_ == GS ? "#define COMPILEGS\n" : "#define COMPILEPS\n");
+    switch (type_)
+    {
+    case VS:
+        shaderCode += "#define COMPILEVS\n";
+        break;
+    case PS:
+        shaderCode += "#define COMPILEPS\n";
+        break;
+    case GS:
+        shaderCode += "#define COMPILEGS\n";
+        break;
+    case TCS:
+        shaderCode += "#define COMPILEHS\n";
+        break;
+    case TES:
+        shaderCode += "#define COMPILEDS\n";
+        break;
+    }
 #else
     shaderCode += type_ == VS ? "#define COMPILEVS\n" : "#define COMPILEPS\n";
 #endif

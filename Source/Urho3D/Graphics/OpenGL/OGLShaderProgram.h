@@ -39,7 +39,7 @@ class URHO3D_API ShaderProgram : public RefCounted, public GPUObject
 {
 public:
     /// Construct.
-    ShaderProgram(Graphics* graphics, ShaderVariation* vertexShader, ShaderVariation* pixelShader, ShaderVariation* geometryShader = nullptr);
+    ShaderProgram(Graphics* graphics, ShaderVariation* vertexShader, ShaderVariation* pixelShader, ShaderVariation* geometryShader, ShaderVariation* tcsShader, ShaderVariation* tesShader);
     /// Destruct.
     ~ShaderProgram() override;
 
@@ -54,9 +54,13 @@ public:
     /// Return the vertex shader.
     ShaderVariation* GetVertexShader() const;
     /// Return the pixel shader.
-    ShaderVariation* GetGeometryShader() const;
-    /// Return the pixel shader.
     ShaderVariation* GetPixelShader() const;
+    /// Return the geometry shader.
+    ShaderVariation* GetGeometryShader() const;
+    /// Return the TCS shader.
+    ShaderVariation* GetTCSShader() const;
+    /// Return the TES shader.
+    ShaderVariation* GetTESShader() const;
     /// Return whether uses a shader parameter.
     bool HasParameter(StringHash param) const;
 
@@ -89,12 +93,19 @@ public:
     static void ClearGlobalParameterSource(ShaderParameterGroup group);
 
 private:
+    /// Returns an aggregated shader name for logging.
+    String GetShaderName() const;
+
     /// Vertex shader.
     WeakPtr<ShaderVariation> vertexShader_;
-    /// Geometry shader.
-    WeakPtr<ShaderVariation> geometryShader_;
     /// Pixel shader.
     WeakPtr<ShaderVariation> pixelShader_;
+    /// Geometry shader.
+    WeakPtr<ShaderVariation> geometryShader_;
+    /// TCS shader.
+    WeakPtr<ShaderVariation> tcsShader_;
+    /// TES shader.
+    WeakPtr<ShaderVariation> tesShader_;
     /// Shader parameters.
     HashMap<StringHash, ShaderParameter> shaderParameters_;
     /// Texture unit use.

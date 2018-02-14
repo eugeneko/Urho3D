@@ -145,12 +145,12 @@ void ShaderVariation::Release()
         if (type_ == VS)
         {
             if (graphics_->GetVertexShader() == this)
-                graphics_->SetShaders(nullptr, nullptr);
+                graphics_->SetShaders(nullptr, nullptr, nullptr, nullptr, nullptr);
         }
         else
         {
             if (graphics_->GetPixelShader() == this)
-                graphics_->SetShaders(nullptr, nullptr);
+                graphics_->SetShaders(nullptr, nullptr, nullptr, nullptr, nullptr);
         }
     }
 

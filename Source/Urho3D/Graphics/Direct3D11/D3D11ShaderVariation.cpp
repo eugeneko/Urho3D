@@ -72,7 +72,24 @@ bool ShaderVariation::Create()
     // Check for up-to-date bytecode on disk
     String path, name, extension;
     SplitPath(owner_->GetName(), path, name, extension);
-    extension = type_ == VS ? ".vs4" : (type_ == PS ? ".ps4" : ".gs4");
+    switch (type_)
+    {
+    case VS:
+        extension = ".vs4";
+        break;
+    case PS:
+        extension = ".ps4";
+        break;
+    case GS:
+        extension = ".gs4";
+        break;
+    case TCS:
+        extension = ".tcs4";
+        break;
+    case TES:
+        extension = ".tes4";
+        break;
+    }
 
     String binaryShaderName = graphics_->GetShaderCacheDir() + name + "_" + StringHash(defines_).ToString() + extension;
 
@@ -116,7 +133,7 @@ bool ShaderVariation::Create()
         else
             compilerOutput_ = "Could not create pixel shader, empty bytecode";
     }
-    else // Geometry shader
+    else if (type_ == GS)
     {
         if (device && byteCode_.Size())
         {
@@ -129,6 +146,34 @@ bool ShaderVariation::Create()
         }
         else
             compilerOutput_ = "Could not create geometry shader, empty bytecode";
+    }
+    else if (type_ == TCS)
+    {
+        if (device && byteCode_.Size())
+        {
+            HRESULT hr = device->CreateHullShader(&byteCode_[0], byteCode_.Size(), nullptr, (ID3D11HullShader**)&object_.ptr_);
+            if (FAILED(hr))
+            {
+                URHO3D_SAFE_RELEASE(object_.ptr_);
+                compilerOutput_ = "Could not create hull shader (HRESULT " + ToStringHex((unsigned)hr) + ")";
+            }
+        }
+        else
+            compilerOutput_ = "Could not create hull shader, empty bytecode";
+    }
+    else if (type_ == TES)
+    {
+        if (device && byteCode_.Size())
+        {
+            HRESULT hr = device->CreateDomainShader(&byteCode_[0], byteCode_.Size(), nullptr, (ID3D11DomainShader**)&object_.ptr_);
+            if (FAILED(hr))
+            {
+                URHO3D_SAFE_RELEASE(object_.ptr_);
+                compilerOutput_ = "Could not create domain shader (HRESULT " + ToStringHex((unsigned)hr) + ")";
+            }
+        }
+        else
+            compilerOutput_ = "Could not create domain shader, empty bytecode";
     }
 
     return object_.ptr_ != nullptr;
@@ -146,17 +191,27 @@ void ShaderVariation::Release()
         if (type_ == VS)
         {
             if (graphics_->GetVertexShader() == this)
-                graphics_->SetShaders(nullptr, nullptr);
+                graphics_->SetShaders(nullptr, nullptr, nullptr, nullptr, nullptr);
         }
         else if (type_ == PS)
         {
             if (graphics_->GetPixelShader() == this)
-                graphics_->SetShaders(nullptr, nullptr);
+                graphics_->SetShaders(nullptr, nullptr, nullptr, nullptr, nullptr);
         }
-        else
+        else if (type_ == GS)
         {
             if (graphics_->GetGeometryShader() == this)
-                graphics_->SetShaders(nullptr, nullptr, nullptr);
+                graphics_->SetShaders(nullptr, nullptr, nullptr, nullptr, nullptr);
+        }
+        else if (type_ == TCS)
+        {
+            if (graphics_->GetTCSShader() == this)
+                graphics_->SetShaders(nullptr, nullptr, nullptr, nullptr, nullptr);
+        }
+        else if (type_ == TES)
+        {
+            if (graphics_->GetTESShader() == this)
+                graphics_->SetShaders(nullptr, nullptr, nullptr, nullptr, nullptr);
         }
 
         URHO3D_SAFE_RELEASE(object_.ptr_);
@@ -240,8 +295,12 @@ bool ShaderVariation::LoadByteCode(const String& binaryShaderName)
             URHO3D_LOGDEBUG("Loaded cached vertex shader " + GetFullName());
         else if (type_ == PS)
             URHO3D_LOGDEBUG("Loaded cached pixel shader " + GetFullName());
-        else
+        else if (type_ == GS)
             URHO3D_LOGDEBUG("Loaded cached geometry shader " + GetFullName());
+        else if (type_ == TCS)
+            URHO3D_LOGDEBUG("Loaded cached hull shader " + GetFullName());
+        else if (type_ == TES)
+            URHO3D_LOGDEBUG("Loaded cached domain shader " + GetFullName());
 
         CalculateConstantBufferSizes();
         return true;
@@ -278,11 +337,23 @@ bool ShaderVariation::Compile()
         profile = "ps_4_0";
         flags |= D3DCOMPILE_PREFER_FLOW_CONTROL;
     }
-    else // geometry shader
+    else if (type_ == GS)
     {
         entryPoint = "GS";
         defines.Push("COMPILEGS");
         profile = "gs_4_0";
+    }
+    else if (type_ == TCS)
+    {
+        entryPoint = "HS";
+        defines.Push("COMPILEHS");
+        profile = "hs_5_0";
+    }
+    else if (type_ == TES) 
+    {
+        entryPoint = "DS";
+        defines.Push("COMPILEDS");
+        profile = "ds_5_0";
     }
 
     defines.Push("MAXBONES=" + String(Graphics::GetMaxBones()));
@@ -338,8 +409,12 @@ bool ShaderVariation::Compile()
             URHO3D_LOGDEBUG("Compiled vertex shader " + GetFullName());
         else if (type_ == PS)
             URHO3D_LOGDEBUG("Compiled pixel shader " + GetFullName());
-        else
+        else if (type_ == GS)
             URHO3D_LOGDEBUG("Compiled geometry shader " + GetFullName());
+        else if (type_ == TCS)
+            URHO3D_LOGDEBUG("Compiled hull shader " + GetFullName());
+        else if (type_ == TES)
+            URHO3D_LOGDEBUG("Compiled domain shader " + GetFullName());
 
         unsigned char* bufData = (unsigned char*)shaderCode->GetBufferPointer();
         unsigned bufSize = (unsigned)shaderCode->GetBufferSize();

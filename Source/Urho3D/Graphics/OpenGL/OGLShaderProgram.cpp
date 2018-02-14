@@ -58,13 +58,15 @@ static unsigned NumberPostfix(const String& str)
 unsigned ShaderProgram::globalFrameNumber = 0;
 const void* ShaderProgram::globalParameterSources[MAX_SHADER_PARAMETER_GROUPS];
 
-ShaderProgram::ShaderProgram(Graphics* graphics, ShaderVariation* vertexShader, ShaderVariation* pixelShader, ShaderVariation* geometryShader) :
+ShaderProgram::ShaderProgram(Graphics* graphics, ShaderVariation* vertexShader, ShaderVariation* pixelShader, ShaderVariation* geometryShader, ShaderVariation* tcsShader, ShaderVariation* tesShader) :
     GPUObject(graphics),
     vertexShader_(vertexShader),
-    geometryShader_(geometryShader),
     pixelShader_(pixelShader),
     usedVertexAttributes_(0),
-    frameNumber_(0)
+    frameNumber_(0),
+    geometryShader_(geometryShader),
+    tcsShader_(tcsShader),
+    tesShader_(tesShader)
 {
     for (bool& useTextureUnit : useTextureUnits_)
         useTextureUnit = false;
@@ -82,7 +84,7 @@ void ShaderProgram::OnDeviceLost()
     GPUObject::OnDeviceLost();
 
     if (graphics_ && graphics_->GetShaderProgram() == this)
-        graphics_->SetShaders(nullptr, nullptr);
+        graphics_->SetShaders(nullptr, nullptr, nullptr, nullptr, nullptr);
 
     linkerOutput_.Clear();
 }
@@ -97,7 +99,7 @@ void ShaderProgram::Release()
         if (!graphics_->IsDeviceLost())
         {
             if (graphics_->GetShaderProgram() == this)
-                graphics_->SetShaders(nullptr, nullptr);
+                graphics_->SetShaders(nullptr, nullptr, nullptr, nullptr, nullptr);
 
             glDeleteProgram(object_.name_);
         }
@@ -125,6 +127,9 @@ bool ShaderProgram::Link()
     // Reset geometry shader if it's an invalid object
     if (geometryShader_ && !geometryShader_->GetGPUObjectName())
         geometryShader_ = nullptr;
+    // Reset tessellation shaders if either is invalid
+    if ((tcsShader_ && !tcsShader_->GetGPUObjectName()) || (tesShader_ && !tesShader_->GetGPUObjectName()))
+        tcsShader_ = tesShader_ = nullptr;
 
     object_.name_ = glCreateProgram();
     if (!object_.name_)
@@ -137,6 +142,11 @@ bool ShaderProgram::Link()
 #ifndef GL_ES_VERSION_2_0
     if (geometryShader_)
         glAttachShader(object_.name_, geometryShader_->GetGPUObjectName());
+    if (tcsShader_ && tesShader_)
+    {
+        glAttachShader(object_.name_, tcsShader_->GetGPUObjectName());
+        glAttachShader(object_.name_, tesShader_->GetGPUObjectName());
+    }
 #endif
     glAttachShader(object_.name_, pixelShader_->GetGPUObjectName());
     glLinkProgram(object_.name_);
@@ -190,13 +200,7 @@ bool ShaderProgram::Link()
 
         if (semantic == MAX_VERTEX_ELEMENT_SEMANTICS)
         {
-            // Use a brief log when a geometry shader isn't present
-            if (geometryShader_)
-                URHO3D_LOGWARNING("Found vertex attribute " + name + " with no known semantic in shader program " +
-                    vertexShader_->GetFullName() + " " + pixelShader_->GetFullName() + " with GS: " + geometryShader_->GetFullName());
-            else
-                URHO3D_LOGWARNING("Found vertex attribute " + name + " with no known semantic in shader program " +
-                    vertexShader_->GetFullName() + " " + pixelShader_->GetFullName());
+            URHO3D_LOGWARNING("Found vertex attribute " + name + " with no known semantic in shader program " + GetShaderName());
             continue;
         }
 
@@ -239,12 +243,7 @@ bool ShaderProgram::Link()
 
             if (group >= MAX_SHADER_PARAMETER_GROUPS)
             {
-                if (geometryShader_)
-                    URHO3D_LOGWARNING("Skipping unrecognized uniform block " + name + " in shader program " + vertexShader_->GetFullName() +
-                        " " + pixelShader_->GetFullName() + " with GS: " + geometryShader_->GetFullName());
-                else
-                    URHO3D_LOGWARNING("Skipping unrecognized uniform block " + name + " in shader program " + vertexShader_->GetFullName() +
-                           " " + pixelShader_->GetFullName());
+                URHO3D_LOGWARNING("Skipping unrecognized uniform block " + name + " in shader program " + GetShaderName());
                 continue;
             }
 
@@ -344,14 +343,24 @@ ShaderVariation* ShaderProgram::GetVertexShader() const
     return vertexShader_;
 }
 
+ShaderVariation* ShaderProgram::GetPixelShader() const
+{
+    return pixelShader_;
+}
+
 ShaderVariation* ShaderProgram::GetGeometryShader() const
 {
     return geometryShader_;
 }
 
-ShaderVariation* ShaderProgram::GetPixelShader() const
+ShaderVariation* ShaderProgram::GetTCSShader() const
 {
-    return pixelShader_;
+    return tcsShader_;
+}
+
+ShaderVariation* ShaderProgram::GetTESShader() const
+{
+    return tesShader_;
 }
 
 bool ShaderProgram::HasParameter(StringHash param) const
@@ -439,6 +448,18 @@ void ShaderProgram::ClearParameterSources()
 void ShaderProgram::ClearGlobalParameterSource(ShaderParameterGroup group)
 {
     globalParameterSources[group] = (const void*)M_MAX_UNSIGNED;
+}
+
+String ShaderProgram::GetShaderName() const
+{
+    if (tcsShader_ && tesShader_ && geometryShader_)
+        return "VS: " + vertexShader_->GetFullName() + ", TCS: " + tcsShader_->GetFullName() + ", TES: " + tesShader_->GetFullName() + +", GS: " + geometryShader_->GetFullName() + ", PS: " + pixelShader_->GetFullName();
+    else if (tcsShader_ && tesShader_)
+        return "VS: " + vertexShader_->GetFullName() + ", TCS: " + tcsShader_->GetFullName() + ", TES: " + tesShader_->GetFullName() + ", PS: " + pixelShader_->GetFullName();
+    else if (geometryShader_)
+        return "VS: " + vertexShader_->GetFullName() + ", GS: " + geometryShader_->GetFullName() + ", PS: " + pixelShader_->GetFullName();
+    else
+        return vertexShader_->GetFullName() + " " + pixelShader_->GetFullName();
 }
 
 }

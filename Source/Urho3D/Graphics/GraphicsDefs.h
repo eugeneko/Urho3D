@@ -295,12 +295,14 @@ enum RenderSurfaceUpdateMode
     SURFACE_UPDATEALWAYS
 };
 
-/// Shader types.
+/// Shader types, using OpenGL naming convention for tessellation stages.
 enum ShaderType
 {
     VS = 0,
     PS,
-    GS
+    GS,
+    TCS,
+    TES
 };
 
 /// Shader parameter groups for determining need to update. On APIs that support constant buffers, these correspond to different constant buffers.

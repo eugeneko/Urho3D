@@ -94,21 +94,45 @@ bool Shader::BeginLoad(Deserializer& source)
         return false;
 
     // Comment out the unneeded shader function
-    vsSourceCode_ = shaderCode;
-    gsSourceCode_ = shaderCode;
-    psSourceCode_ = shaderCode;
-    CommentOutFunction(vsSourceCode_, "void PS(");
-    CommentOutFunction(vsSourceCode_, "void GS(");
-    CommentOutFunction(gsSourceCode_, "void VS(");
-    CommentOutFunction(gsSourceCode_, "void PS(");
-    CommentOutFunction(psSourceCode_, "void VS(");
-    CommentOutFunction(psSourceCode_, "void GS(");
+    vertexShader_.sourceCode_ = shaderCode;
+    pixelShader_.sourceCode_ = shaderCode;
+    geometryShader_.sourceCode_ = shaderCode;
+    tcsShader_.sourceCode_ = shaderCode;
+    tesShader_.sourceCode_ = shaderCode;
+
+    CommentOutFunction(vertexShader_.sourceCode_, "void PS(");
+    CommentOutFunction(vertexShader_.sourceCode_, "void GS(");
+    CommentOutFunction(vertexShader_.sourceCode_, "void HS(");
+    CommentOutFunction(vertexShader_.sourceCode_, "void DS(");
+    
+    CommentOutFunction(pixelShader_.sourceCode_, "void VS(");
+    CommentOutFunction(pixelShader_.sourceCode_, "void GS(");
+    CommentOutFunction(pixelShader_.sourceCode_, "void HS(");
+    CommentOutFunction(pixelShader_.sourceCode_, "void DS(");
+
+    CommentOutFunction(geometryShader_.sourceCode_, "void VS(");
+    CommentOutFunction(geometryShader_.sourceCode_, "void PS(");
+    CommentOutFunction(geometryShader_.sourceCode_, "void HS(");
+    CommentOutFunction(geometryShader_.sourceCode_, "void DS(");
+    
+    CommentOutFunction(tcsShader_.sourceCode_, "void VS(");
+    CommentOutFunction(tcsShader_.sourceCode_, "void PS(");
+    CommentOutFunction(tcsShader_.sourceCode_, "void GS(");
+    CommentOutFunction(tcsShader_.sourceCode_, "void DS(");
+
+    CommentOutFunction(tesShader_.sourceCode_, "void VS(");
+    CommentOutFunction(tesShader_.sourceCode_, "void PS(");
+    CommentOutFunction(tesShader_.sourceCode_, "void GS(");
+    CommentOutFunction(tesShader_.sourceCode_, "void HS(");
+
 
     // OpenGL: rename either VS() or PS() or GS() to main()
 #ifdef URHO3D_OPENGL
-    vsSourceCode_.Replace("void VS(", "void main(");
-    gsSourceCode_.Replace("void GS(", "void main(");
-    psSourceCode_.Replace("void PS(", "void main(");
+    vertexShader_.sourceCode_.Replace("void VS(", "void main(");
+    pixelShader_.sourceCode_.Replace("void PS(", "void main(");
+    geometryShader_.sourceCode_.Replace("void GS(", "void main(");
+    tcsShader_.sourceCode_.Replace("void HS(", "void main(");
+    tesShader_.sourceCode_.Replace("void DS(", "void main(");
 #endif
 
     RefreshMemoryUse();
@@ -118,11 +142,16 @@ bool Shader::BeginLoad(Deserializer& source)
 bool Shader::EndLoad()
 {
     // If variations had already been created, release them and require recompile
-    for (HashMap<StringHash, SharedPtr<ShaderVariation> >::Iterator i = vsVariations_.Begin(); i != vsVariations_.End(); ++i)
+    for (HashMap<StringHash, SharedPtr<ShaderVariation> >::Iterator i = vertexShader_.variations_.Begin(); i != vertexShader_.variations_.End(); ++i)
         i->second_->Release();
-    for (HashMap<StringHash, SharedPtr<ShaderVariation> >::Iterator i = gsVariations_.Begin(); i != gsVariations_.End(); ++i)
+    for (HashMap<StringHash, SharedPtr<ShaderVariation> >::Iterator i = pixelShader_.variations_.Begin(); i != pixelShader_.variations_.End(); ++i)
         i->second_->Release();
-    for (HashMap<StringHash, SharedPtr<ShaderVariation> >::Iterator i = psVariations_.Begin(); i != psVariations_.End(); ++i)
+    
+    for (HashMap<StringHash, SharedPtr<ShaderVariation> >::Iterator i = geometryShader_.variations_.Begin(); i != geometryShader_.variations_.End(); ++i)
+        i->second_->Release();
+    for (HashMap<StringHash, SharedPtr<ShaderVariation> >::Iterator i = tcsShader_.variations_.Begin(); i != tcsShader_.variations_.End(); ++i)
+        i->second_->Release();
+    for (HashMap<StringHash, SharedPtr<ShaderVariation> >::Iterator i = tesShader_.variations_.Begin(); i != tesShader_.variations_.End(); ++i)
         i->second_->Release();
 
     return true;
@@ -133,10 +162,28 @@ ShaderVariation* Shader::GetVariation(ShaderType type, const String& defines)
     return GetVariation(type, defines.CString());
 }
 
+const String& Shader::GetSourceCode(ShaderType type) const
+{
+    switch (type)
+    {
+    case VS:
+        return vertexShader_.sourceCode_;
+    case PS:
+        return pixelShader_.sourceCode_;
+    case GS:
+        return geometryShader_.sourceCode_;
+    case TCS:
+        return tcsShader_.sourceCode_;
+    case TES:
+        return tesShader_.sourceCode_;
+    }
+    return vertexShader_.sourceCode_;
+}
+
 ShaderVariation* Shader::GetVariation(ShaderType type, const char* defines)
 {
     StringHash definesHash(defines);
-    HashMap<StringHash, SharedPtr<ShaderVariation> >& variations(type == VS ? vsVariations_ : (type == PS ? psVariations_ : gsVariations_));
+    HashMap<StringHash, SharedPtr<ShaderVariation> >& variations = GetVariations(type);
     HashMap<StringHash, SharedPtr<ShaderVariation> >::Iterator i = variations.Find(definesHash);
     if (i == variations.End())
     {
@@ -163,6 +210,24 @@ ShaderVariation* Shader::GetVariation(ShaderType type, const char* defines)
     }
 
     return i->second_;
+}
+
+HashMap<StringHash, SharedPtr<ShaderVariation> >& Shader::GetVariations(ShaderType type)
+{
+    switch (type)
+    {
+    case VS:
+        return vertexShader_.variations_;
+    case PS:
+        return pixelShader_.variations_;
+    case GS:
+        return geometryShader_.variations_;
+    case TCS:
+        return tcsShader_.variations_;
+    case TES:
+        return tesShader_.variations_;
+    }
+    return vertexShader_.variations_;
 }
 
 bool Shader::ProcessSource(String& code, Deserializer& source)
@@ -222,8 +287,11 @@ String Shader::NormalizeDefines(const String& defines)
 
 void Shader::RefreshMemoryUse()
 {
+    unsigned sourcesSize = vertexShader_.sourceCode_.Length() + pixelShader_.sourceCode_.Length();
+    sourcesSize += geometryShader_.sourceCode_.Length();
+    sourcesSize += tcsShader_.sourceCode_.Length() + tesShader_.sourceCode_.Length();
     SetMemoryUse(
-        (unsigned)(sizeof(Shader) + vsSourceCode_.Length() + psSourceCode_.Length() + numVariations_ * sizeof(ShaderVariation)));
+        (unsigned)(sizeof(Shader) + sourcesSize + numVariations_ * sizeof(ShaderVariation)));
 }
 
 }
