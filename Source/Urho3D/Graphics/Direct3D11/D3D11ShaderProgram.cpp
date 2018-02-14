@@ -27,7 +27,7 @@
 namespace Urho3D
 {
 
-ShaderProgram::ShaderProgram(Graphics* graphics, ShaderVariation* vertexShader, ShaderVariation* pixelShader, ShaderVariation* geometryShader)
+ShaderProgram::ShaderProgram(Graphics* graphics, ShaderVariation* vertexShader, ShaderVariation* pixelShader, ShaderVariation* geometryShader, ShaderVariation* tcsShader, ShaderVariation* tesShader)
 {
     // Create needed constant buffers
     const unsigned* vsBufferSizes = vertexShader->GetConstantBufferSizes();
@@ -35,6 +35,32 @@ ShaderProgram::ShaderProgram(Graphics* graphics, ShaderVariation* vertexShader, 
     {
         if (vsBufferSizes[i])
             vsConstantBuffers_[i] = graphics->GetOrCreateConstantBuffer(VS, i, vsBufferSizes[i]);
+    }
+
+    if (tcsShader)
+    {
+        const unsigned* tcsBufferSizes = tcsShader->GetConstantBufferSizes();
+        for (unsigned i = 0; i < MAX_SHADER_PARAMETER_GROUPS; ++i)
+        {
+            if (tcsBufferSizes[i] != 0 && tcsBufferSizes[i] != vsBufferSizes[i])
+            {
+                URHO3D_LOGERRORF("Hull shader and vertex shader constant buffer mismatch: HS size '%u', VS size '%u' at index %u", tcsBufferSizes[i], vsBufferSizes[i], i);
+                URHO3D_LOGINFO("Hull and vertex shaders must use matching constant buffers");
+            }
+        }
+    }
+
+    if (tesShader)
+    {
+        const unsigned* tesBufferSizes = tesShader->GetConstantBufferSizes();
+        for (unsigned i = 0; i < MAX_SHADER_PARAMETER_GROUPS; ++i)
+        {
+            if (tesBufferSizes[i] != 0 && tesBufferSizes[i] != vsBufferSizes[i])
+            {
+                URHO3D_LOGERRORF("Domain shader and vertex shader constant buffer mismatch: DS size '%u', VS size '%u' at index %u", tesBufferSizes[i], vsBufferSizes[i], i);
+                URHO3D_LOGINFO("Domain and vertex shaders must use matching constant buffers");
+            }
+        }
     }
 
     if (geometryShader)

@@ -1023,7 +1023,27 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps, ShaderVariat
             ps = ps->GetOwner()->GetVariation(PS, ps->GetDefinesClipPlane());
     }
 
-    if (vs == vertexShader_ && ps == pixelShader_)
+    if (gs && !GetGeometryShaderSupport())
+    {
+        URHO3D_LOGERROR("Attempted to use geometry shader without D3D_FEATURE_LEVEL_10_0");
+        gs = nullptr;
+    }
+
+    if ((tcs || tes) && !GetTessellationSupport())
+    {
+        URHO3D_LOGERROR("Attempted to use tessellation without D3D_FEATURE_LEVEL_11_0");
+        tcs = nullptr;
+        tes = nullptr;
+    }
+
+    if ((tcs && !tes) || (!tcs && tes))
+    {
+        URHO3D_LOGERROR("Attempted to use incomplete tessellation shader, both stages are required");
+        tcs = nullptr;
+        tes = nullptr;
+    }
+
+    if (vs == vertexShader_ && ps == pixelShader_ && gs == geometryShader_ && tcs == tcsShader_ && tes == tesShader_)
         return;
 
     if (vs != vertexShader_)
@@ -1057,7 +1077,7 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps, ShaderVariat
         {
             if (tcs->GetCompilerOutput().Empty())
             {
-                URHO3D_PROFILE(CompileTessellationControlShader);
+                URHO3D_PROFILE(CompileTessCtrlShader);
 
                 bool success = tcs->Create();
                 if (!success)
@@ -1080,7 +1100,7 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps, ShaderVariat
         {
             if (tes->GetCompilerOutput().Empty())
             {
-                URHO3D_PROFILE(CompileTessellationControlShader);
+                URHO3D_PROFILE(CompileTessEvalShader);
 
                 bool success = tes->Create();
                 if (!success)
@@ -1149,7 +1169,7 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps, ShaderVariat
             impl_->shaderProgram_ = i->second_.Get();
         else
         {
-            ShaderProgram* newProgram = impl_->shaderPrograms_[key] = new ShaderProgram(this, vertexShader_, pixelShader_, geometryShader_);
+            ShaderProgram* newProgram = impl_->shaderPrograms_[key] = new ShaderProgram(this, vertexShader_, pixelShader_, geometryShader_, tcsShader_, tesShader_);
             impl_->shaderProgram_ = newProgram;
         }
 
@@ -1179,6 +1199,7 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps, ShaderVariat
 
         if (vsBuffersChanged)
             impl_->deviceContext_->VSSetConstantBuffers(0, MAX_SHADER_PARAMETER_GROUPS, &impl_->constantBuffers_[VS][0]);
+        
         // Geometry/Hull/Domain shaders share the constant buffers with the VS
         if (vsBuffersChanged)
         {
