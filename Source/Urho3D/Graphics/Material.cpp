@@ -419,7 +419,7 @@ bool Material::Load(const XMLElement& source)
     {
         vertexShaderDefines_ = shaderElem.GetAttribute("vsdefines");
         pixelShaderDefines_ = shaderElem.GetAttribute("psdefines");
-#if !defined(URHO3D_OPENGL_ES) && !defined(URHO3D_D3D9)
+#if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
         geometryShaderDefines_ = shaderElem.GetAttribute("gsdefines");
         tcsShaderDefines_ = shaderElem.GetAttribute("tcsdefines");
         tesShaderDefines_ = shaderElem.GetAttribute("tesdefines");
@@ -575,7 +575,7 @@ bool Material::Load(const JSONValue& source)
     {
         vertexShaderDefines_ = shaderVal.Get("vsdefines").GetString();
         pixelShaderDefines_ = shaderVal.Get("psdefines").GetString();
-#if !defined(URHO3D_OPENGL_ES) && !defined(URHO3D_D3D9)
+#if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
         geometryShaderDefines_ = shaderVal.Get("gsdefines").GetString();
         tcsShaderDefines_ = shaderVal.Get("tcsdefines").GetString();
         tesShaderDefines_ = shaderVal.Get("tesdefines").GetString();
@@ -759,7 +759,7 @@ bool Material::Save(XMLElement& dest) const
 
     // Write shader compile defines
     if (!vertexShaderDefines_.Empty() || !pixelShaderDefines_.Empty()
-#if !defined(URHO3D_OPENGL_ES) && !defined(URHO3D_D3D9)
+#if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
         || !geometryShaderDefines_.Empty() || !tcsShaderDefines_.Empty() || !tesShaderDefines_.Empty()
 #endif
         )
@@ -769,7 +769,7 @@ bool Material::Save(XMLElement& dest) const
             shaderElem.SetString("vsdefines", vertexShaderDefines_);
         if (!pixelShaderDefines_.Empty())
             shaderElem.SetString("psdefines", pixelShaderDefines_);
-#if !defined(URHO3D_OPENGL_ES) && !defined(URHO3D_D3D9)
+#if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
         if (!geometryShaderDefines_.Empty())
             shaderElem.SetString("gsdefines", geometryShaderDefines_);
         if (!tcsShaderDefines_.Empty())
@@ -874,7 +874,7 @@ bool Material::Save(JSONValue& dest) const
 
     // Write shader compile defines
     if (!vertexShaderDefines_.Empty() || !pixelShaderDefines_.Empty() 
-#if !defined(URHO3D_OPENGL_ES) && !defined(URHO3D_D3D9)
+#if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
         || !geometryShaderDefines_.Empty() || !tcsShaderDefines_.Empty() || !tesShaderDefines_.Empty()
 #endif
         )
@@ -885,7 +885,7 @@ bool Material::Save(JSONValue& dest) const
         if (!pixelShaderDefines_.Empty())
             shaderVal.Set("psdefines", pixelShaderDefines_);
 
-#if !defined(URHO3D_OPENGL_ES) && !defined(URHO3D_D3D9)
+#if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
         if (!geometryShaderDefines_.Empty())
             shaderVal.Set("gsdefines", geometryShaderDefines_);
         if (!tcsShaderDefines_.Empty())
@@ -993,7 +993,7 @@ void Material::SetPixelShaderDefines(const String& defines)
     }
 }
 
-#if !defined(URHO3D_OPENGL_ES) && !defined(URHO3D_D3D9)
+#if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
 void Material::SetGeometryShaderDefines(const String& defines)
 {
     if (defines != geometryShaderDefines_)
@@ -1223,7 +1223,7 @@ SharedPtr<Material> Material::Clone(const String& cloneName) const
     ret->techniques_ = techniques_;
     ret->vertexShaderDefines_ = vertexShaderDefines_;
     
-#if !defined(URHO3D_OPENGL_ES) && !defined(URHO3D_D3D9)
+#if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
     ret->geometryShaderDefines_ = geometryShaderDefines_;
     ret->tcsShaderDefines_ = tcsShaderDefines_;
     ret->tesShaderDefines_ = tesShaderDefines_;
@@ -1330,7 +1330,7 @@ void Material::ResetToDefaults()
 
     vertexShaderDefines_.Clear();
     pixelShaderDefines_.Clear();
-#if !defined(URHO3D_OPENGL_ES) && !defined(URHO3D_D3D9)
+#if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
     geometryShaderDefines_.Clear();
     tcsShaderDefines_.Clear();
     tesShaderDefines_.Clear();
@@ -1459,7 +1459,7 @@ void Material::ApplyShaderDefines(unsigned index)
     if (index >= techniques_.Size() || !techniques_[index].original_)
         return;
 
-#if !defined(URHO3D_OPENGL_ES) && !defined(URHO3D_D3D9)
+#if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
     if (vertexShaderDefines_.Empty() && pixelShaderDefines_.Empty() && geometryShaderDefines_.Empty() && tcsShaderDefines_.Empty() && tesShaderDefines_.Empty())
         techniques_[index].technique_ = techniques_[index].original_;
     else

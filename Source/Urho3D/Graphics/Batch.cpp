@@ -161,7 +161,7 @@ void CalculateSpotMatrix(Matrix4& dest, Light* light)
 
 void Batch::CalculateSortKey()
 {
-#if !defined(URHO3D_OPENGL_ES) && !defined(URHO3D_D3D9)
+#if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
     auto shaderID = (unsigned)(
         ((*((unsigned*)&shaders_.vertexShader_) / sizeof(ShaderVariation)) + 
         (*((unsigned*)&shaders_.pixelShader_) / sizeof(ShaderVariation)) + 
@@ -195,7 +195,7 @@ void Batch::Prepare(View* view, Camera* camera, bool setModelTransform, bool all
     Texture2D* shadowMap = lightQueue_ ? lightQueue_->shadowMap_ : nullptr;
 
     // Set shaders first. The available shader parameters and their register/uniform positions depend on the currently set shaders
-#if !defined(URHO3D_OPENGL_ES) && !defined(URHO3D_D3D9)
+#if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
     graphics->SetShaders(shaders_.vertexShader_, shaders_.pixelShader_, shaders_.geometryShader_, shaders_.tcsShader_, shaders_.tesShader_);
 #else
     graphics->SetShaders(shaders_.vertexShader_, shaders_.pixelShader_, nullptr, nullptr, nullptr);

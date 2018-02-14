@@ -114,7 +114,7 @@ bool ShaderVariation::Create()
         break;
     }
 #else
-    object_.name_ = glCreateShader(type_ == VS ? GL_VERTEX_SHADER : GL_FRAGMENT_SHADER));
+    object_.name_ = glCreateShader(type_ == VS ? GL_VERTEX_SHADER : GL_FRAGMENT_SHADER);
 #endif
 
     if (!object_.name_)

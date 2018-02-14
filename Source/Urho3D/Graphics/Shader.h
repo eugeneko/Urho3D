@@ -82,7 +82,7 @@ private:
     ShaderData vertexShader_;
     /// Pixel shader source and variations.
     ShaderData pixelShader_;
-#if !defined(URHO3D_OPENGL_ES) && !defined(URHO3D_D3D9)
+#if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
     /// Geometry shader source and variations.
     ShaderData geometryShader_;
     /// TCS shader source and variations.

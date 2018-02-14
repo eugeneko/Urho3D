@@ -140,7 +140,7 @@ public:
     void SetVertexShaderDefines(const String& defines);
     /// Set additional pixel shader defines. Separate multiple defines with spaces. Setting defines at the material level causes technique(s) to be cloned as necessary.
     void SetPixelShaderDefines(const String& defines);
-#if !defined(URHO3D_OPENGL_ES) && !defined(URHO3D_D3D9)
+#if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
     /// Set additional geometry shader defines. Separate multiple defines with spaces. Setting defines at the material level causes technique(s) to be cloned as necessary.
     void SetGeometryShaderDefines(const String& defines);
     /// Set additional geometry shader defines. Separate multiple defines with spaces. Setting defines at the material level causes technique(s) to be cloned as necessary.
@@ -213,7 +213,7 @@ public:
     const String& GetVertexShaderDefines() const { return vertexShaderDefines_; }
     /// Return additional pixel shader defines.
     const String& GetPixelShaderDefines() const { return pixelShaderDefines_; }
-#if !defined(URHO3D_OPENGL_ES) && !defined(URHO3D_D3D9)
+#if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
     /// Return additional geometry shader defines.
     const String& GetGeometryShaderDefines() const { return geometryShaderDefines_; }
     /// Return additional geometry shader defines.
@@ -309,7 +309,7 @@ private:
     String vertexShaderDefines_;
     /// Pixel shader defines.
     String pixelShaderDefines_;
-#if !defined(URHO3D_OPENGL_ES) && !defined(URHO3D_D3D9)
+#if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
     /// Geometry shader defines.
     String geometryShaderDefines_;
     /// Geometry shader defines.

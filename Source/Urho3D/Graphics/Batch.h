@@ -53,7 +53,7 @@ struct BatchShaders
     ShaderVariation* vertexShader_;
     /// Pixel shader.
     ShaderVariation* pixelShader_;
-#if !defined(URHO3D_OPENGL_ES) && !defined(URHO3D_D3D9)
+#if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
     /// Geometry shader.
     ShaderVariation* geometryShader_;
     /// Hull/TCS shader.
@@ -294,14 +294,16 @@ public:
 
     /// Vertex shader extra defines.
     ExtraShaderDefines vsExtraDefines_;
-    /// Geometry shader extra defines.
-    ExtraShaderDefines gsExtraDefines_;
     /// Pixel shader extra defines.
     ExtraShaderDefines psExtraDefines_;
+#if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
+    /// Geometry shader extra defines.
+    ExtraShaderDefines gsExtraDefines_;
     /// TCS shader extra defines.
     ExtraShaderDefines tcsExtraDefines_;
     /// TES shader extra defines.
     ExtraShaderDefines tesExtraDefines_;
+#endif
 };
 
 /// Queue for shadow map draw calls

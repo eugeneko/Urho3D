@@ -2900,12 +2900,14 @@ void View::SetQueueShaderDefines(BatchQueue& queue, const RenderPathCommand& com
         queue.vsExtraDefines_.hash_ = StringHash(vsDefines);
         queue.psExtraDefines_.hash_ = StringHash(psDefines);
         
-        queue.psExtraDefines_.defines_ = gsDefines;
+#if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_DIRECT3D9)
+        queue.gsExtraDefines_.defines_ = gsDefines;
         queue.tcsExtraDefines_.defines_ = tcsDefines;
         queue.tesExtraDefines_.defines_ = tesDefines;
         queue.gsExtraDefines_.hash_ = StringHash(gsDefines);
         queue.tcsExtraDefines_.hash_ = StringHash(tcsDefines);
         queue.tesExtraDefines_.hash_ = StringHash(tesDefines);
+#endif
     }
     else
         queue.hasExtraDefines_ = false;

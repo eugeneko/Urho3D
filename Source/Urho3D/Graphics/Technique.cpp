@@ -139,7 +139,7 @@ void Pass::ReleaseShaders()
     pixelShaderData_.shaders_.Clear();
     pixelShaderData_.extraShaders_.Clear();
 
-#if !defined(URHO3D_OPENGL_ES) && !defined(URHO3D_D3D9)
+#if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
     geometryShaderData_.shaders_.Clear();
     geometryShaderData_.extraShaders_.Clear();
     tcsShaderData_.shaders_.Clear();
@@ -204,7 +204,7 @@ Pass::ShaderData& Pass::GetShaderData(ShaderType type)
         return vertexShaderData_;
     case PS:
         return pixelShaderData_;
-#if !defined(URHO3D_OPENGL_ES) && !defined(URHO3D_D3D9)
+#if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
     case GS:
         return geometryShaderData_;
     case TCS:
@@ -224,7 +224,7 @@ const Pass::ShaderData& Pass::GetShaderData(ShaderType type) const
         return vertexShaderData_;
     case PS:
         return pixelShaderData_;
-#if !defined(URHO3D_OPENGL_ES) && !defined(URHO3D_D3D9)
+#if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
     case GS:
         return geometryShaderData_;
     case TCS:
@@ -336,7 +336,7 @@ bool Technique::BeginLoad(Deserializer& source)
                 newPass->SetPixelShaderDefines(globalPSDefines + passElem.GetAttribute("psdefines"));
             }
 
-#if !defined(URHO3D_OPENGL_ES) && !defined(URHO3D_D3D9)
+#if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
             if (passElem.HasAttribute("gs"))
             {
                 newPass->SetGeometryShader(passElem.GetAttribute("gs"));
@@ -374,7 +374,7 @@ bool Technique::BeginLoad(Deserializer& source)
             newPass->SetVertexShaderDefineExcludes(passElem.GetAttribute("vsexcludes"));
             newPass->SetPixelShaderDefineExcludes(passElem.GetAttribute("psexcludes"));
 
-#if !defined(URHO3D_OPENGL_ES) && !defined(URHO3D_D3D9)
+#if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
             newPass->SetGeometryShaderDefineExcludes(passElem.GetAttribute("gsexcludes"));
             newPass->SetTCSShaderDefineExcludes(passElem.GetAttribute("tcsexcludes"));
             newPass->SetTESShaderDefineExcludes(passElem.GetAttribute("tesexcludes"));
@@ -465,7 +465,7 @@ SharedPtr<Technique> Technique::Clone(const String& cloneName) const
         newPass->SetVertexShaderDefineExcludes(srcPass->GetVertexShaderDefineExcludes());
         newPass->SetPixelShaderDefineExcludes(srcPass->GetPixelShaderDefineExcludes());
         
-#if !defined(URHO3D_OPENGL_ES) && !defined(URHO3D_D3D9)
+#if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
         newPass->SetGeometryShader(srcPass->GetGeometryShader());
         newPass->SetGeometryShaderDefines(srcPass->GetGeometryShaderDefines());
         newPass->SetGeometryShaderDefineExcludes(srcPass->GetGeometryShaderDefineExcludes());
@@ -597,7 +597,7 @@ SharedPtr<Technique> Technique::CloneWithDefines(const String& vsDefines, const 
             pass->SetVertexShaderDefines(pass->GetVertexShaderDefines() + " " + vsDefines);
         if (!psDefines.Empty())
             pass->SetPixelShaderDefines(pass->GetPixelShaderDefines() + " " + psDefines);
-#if !defined(URHO3D_OPENGL_ES) && !defined(URHO3D_D3D9)
+#if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
         if (!gsDefines.Empty())
             pass->SetGeometryShaderDefines(pass->GetGeometryShaderDefines() + " " + gsDefines);
         if (!tcsDefines.Empty())
