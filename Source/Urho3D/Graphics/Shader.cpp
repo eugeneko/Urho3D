@@ -96,9 +96,6 @@ bool Shader::BeginLoad(Deserializer& source)
     // Comment out the unneeded shader function
     vertexShader_.sourceCode_ = shaderCode;
     pixelShader_.sourceCode_ = shaderCode;
-    geometryShader_.sourceCode_ = shaderCode;
-    tcsShader_.sourceCode_ = shaderCode;
-    tesShader_.sourceCode_ = shaderCode;
 
     CommentOutFunction(vertexShader_.sourceCode_, "void PS(");
     CommentOutFunction(vertexShader_.sourceCode_, "void GS(");
@@ -109,6 +106,11 @@ bool Shader::BeginLoad(Deserializer& source)
     CommentOutFunction(pixelShader_.sourceCode_, "void GS(");
     CommentOutFunction(pixelShader_.sourceCode_, "void HS(");
     CommentOutFunction(pixelShader_.sourceCode_, "void DS(");
+
+#if !defined(URHO3D_OPENGL_ES) && !defined(URHO3D_D3D9)
+    geometryShader_.sourceCode_ = shaderCode;
+    tcsShader_.sourceCode_ = shaderCode;
+    tesShader_.sourceCode_ = shaderCode;
 
     CommentOutFunction(geometryShader_.sourceCode_, "void VS(");
     CommentOutFunction(geometryShader_.sourceCode_, "void PS(");
@@ -124,6 +126,7 @@ bool Shader::BeginLoad(Deserializer& source)
     CommentOutFunction(tesShader_.sourceCode_, "void PS(");
     CommentOutFunction(tesShader_.sourceCode_, "void GS(");
     CommentOutFunction(tesShader_.sourceCode_, "void HS(");
+#endif
 
 
     // OpenGL: rename either VS() or PS() or GS() to main()
@@ -147,12 +150,14 @@ bool Shader::EndLoad()
     for (HashMap<StringHash, SharedPtr<ShaderVariation> >::Iterator i = pixelShader_.variations_.Begin(); i != pixelShader_.variations_.End(); ++i)
         i->second_->Release();
     
+#if !defined(URHO3D_OPENGL_ES) && !defined(URHO3D_D3D9)
     for (HashMap<StringHash, SharedPtr<ShaderVariation> >::Iterator i = geometryShader_.variations_.Begin(); i != geometryShader_.variations_.End(); ++i)
         i->second_->Release();
     for (HashMap<StringHash, SharedPtr<ShaderVariation> >::Iterator i = tcsShader_.variations_.Begin(); i != tcsShader_.variations_.End(); ++i)
         i->second_->Release();
     for (HashMap<StringHash, SharedPtr<ShaderVariation> >::Iterator i = tesShader_.variations_.Begin(); i != tesShader_.variations_.End(); ++i)
         i->second_->Release();
+#endif
 
     return true;
 }
@@ -170,12 +175,14 @@ const String& Shader::GetSourceCode(ShaderType type) const
         return vertexShader_.sourceCode_;
     case PS:
         return pixelShader_.sourceCode_;
+#if !defined(URHO3D_OPENGL_ES) && !defined(URHO3D_D3D9)
     case GS:
         return geometryShader_.sourceCode_;
     case TCS:
         return tcsShader_.sourceCode_;
     case TES:
         return tesShader_.sourceCode_;
+#endif
     }
     return vertexShader_.sourceCode_;
 }
@@ -220,12 +227,14 @@ HashMap<StringHash, SharedPtr<ShaderVariation> >& Shader::GetVariations(ShaderTy
         return vertexShader_.variations_;
     case PS:
         return pixelShader_.variations_;
+#if !defined(URHO3D_OPENGL_ES) && !defined(URHO3D_D3D9)
     case GS:
         return geometryShader_.variations_;
     case TCS:
         return tcsShader_.variations_;
     case TES:
         return tesShader_.variations_;
+#endif
     }
     return vertexShader_.variations_;
 }
@@ -288,8 +297,10 @@ String Shader::NormalizeDefines(const String& defines)
 void Shader::RefreshMemoryUse()
 {
     unsigned sourcesSize = vertexShader_.sourceCode_.Length() + pixelShader_.sourceCode_.Length();
+#if !defined(URHO3D_OPENGL_ES) && !defined(URHO3D_D3D9)
     sourcesSize += geometryShader_.sourceCode_.Length();
     sourcesSize += tcsShader_.sourceCode_.Length() + tesShader_.sourceCode_.Length();
+#endif
     SetMemoryUse(
         (unsigned)(sizeof(Shader) + sourcesSize + numVariations_ * sizeof(ShaderVariation)));
 }

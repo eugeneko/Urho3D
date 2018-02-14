@@ -138,15 +138,20 @@ public:
     void SetTechnique(unsigned index, Technique* tech, unsigned qualityLevel = 0, float lodDistance = 0.0f);
     /// Set additional vertex shader defines. Separate multiple defines with spaces. Setting defines at the material level causes technique(s) to be cloned as necessary.
     void SetVertexShaderDefines(const String& defines);
-    /// Set additional geometry shader defines. Separate multiple defines with spaces. Setting defines at the material level causes technique(s) to be cloned as necessary.
-    void SetGeometryShaderDefines(const String& defines);
     /// Set additional pixel shader defines. Separate multiple defines with spaces. Setting defines at the material level causes technique(s) to be cloned as necessary.
     void SetPixelShaderDefines(const String& defines);
+#if !defined(URHO3D_OPENGL_ES) && !defined(URHO3D_D3D9)
+    /// Set additional geometry shader defines. Separate multiple defines with spaces. Setting defines at the material level causes technique(s) to be cloned as necessary.
+    void SetGeometryShaderDefines(const String& defines);
+    /// Set additional geometry shader defines. Separate multiple defines with spaces. Setting defines at the material level causes technique(s) to be cloned as necessary.
+    void SetTESShaderDefines(const String& defines);
+    /// Set additional geometry shader defines. Separate multiple defines with spaces. Setting defines at the material level causes technique(s) to be cloned as necessary.
+    void SetTCSShaderDefines(const String& defines);
+#endif
     /// Set shader parameter.
     void SetShaderParameter(const String& name, const Variant& value);
     /// Set shader parameter animation.
-    void
-        SetShaderParameterAnimation(const String& name, ValueAnimation* animation, WrapMode wrapMode = WM_LOOP, float speed = 1.0f);
+    void SetShaderParameterAnimation(const String& name, ValueAnimation* animation, WrapMode wrapMode = WM_LOOP, float speed = 1.0f);
     /// Set shader parameter animation wrap mode.
     void SetShaderParameterAnimationWrapMode(const String& name, WrapMode wrapMode);
     /// Set shader parameter animation speed.
@@ -206,10 +211,16 @@ public:
 
     /// Return additional vertex shader defines.
     const String& GetVertexShaderDefines() const { return vertexShaderDefines_; }
-    /// Return additional geometry shader defines.
-    const String& GetGeometryShaderDefines() const { return vertexShaderDefines_; }
     /// Return additional pixel shader defines.
     const String& GetPixelShaderDefines() const { return pixelShaderDefines_; }
+#if !defined(URHO3D_OPENGL_ES) && !defined(URHO3D_D3D9)
+    /// Return additional geometry shader defines.
+    const String& GetGeometryShaderDefines() const { return geometryShaderDefines_; }
+    /// Return additional geometry shader defines.
+    const String& GetTESShaderDefines() const { return tcsShaderDefines_; }
+    /// Return additional geometry shader defines.
+    const String& GetTCSShaderDefines() const { return tesShaderDefines_; }
+#endif
 
     /// Return shader parameter.
     const Variant& GetShaderParameter(const String& name) const;
@@ -293,12 +304,19 @@ private:
     HashMap<StringHash, MaterialShaderParameter> shaderParameters_;
     /// %Shader parameters animation infos.
     HashMap<StringHash, SharedPtr<ShaderParameterAnimationInfo> > shaderParameterAnimationInfos_;
+
     /// Vertex shader defines.
     String vertexShaderDefines_;
-    /// Geometry shader defines.
-    String geometryShaderDefines_;
     /// Pixel shader defines.
     String pixelShaderDefines_;
+#if !defined(URHO3D_OPENGL_ES) && !defined(URHO3D_D3D9)
+    /// Geometry shader defines.
+    String geometryShaderDefines_;
+    /// Geometry shader defines.
+    String tesShaderDefines_;
+    /// Geometry shader defines.
+    String tcsShaderDefines_;
+#endif
     /// Normal culling mode.
     CullMode cullMode_;
     /// Culling mode for shadow rendering.

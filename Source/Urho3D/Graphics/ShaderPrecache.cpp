@@ -94,12 +94,15 @@ void ShaderPrecache::StoreShaders(ShaderVariation* vs, ShaderVariation* ps, Shad
     // Check for duplicate using strings (needed for combinations loaded from existing file)
     String newCombination = vsName + " " + vsDefines + " " + psName + " " + psDefines;
 
+
+#ifndef GL_ES_VERSION_2_0
     if (gs)
         newCombination += gs->GetName() + " " + gs->GetDefines();
     if (tcs)
         newCombination += tcs->GetName() + " " + tcs->GetDefines();
     if (tes)
         newCombination += tes->GetName() + " " + tes->GetDefines();
+#endif
 
     if (usedCombinations_.Contains(newCombination))
         return;
@@ -110,6 +113,8 @@ void ShaderPrecache::StoreShaders(ShaderVariation* vs, ShaderVariation* ps, Shad
     shaderElem.SetAttribute("vsdefines", vsDefines);
     shaderElem.SetAttribute("ps", psName);
     shaderElem.SetAttribute("psdefines", psDefines);
+
+#ifndef GL_ES_VERSION_2_0
     if (gs)
     {
         shaderElem.SetAttribute("gs", gs->GetName());
@@ -125,6 +130,7 @@ void ShaderPrecache::StoreShaders(ShaderVariation* vs, ShaderVariation* ps, Shad
         shaderElem.SetAttribute("tes", tcs->GetName());
         shaderElem.SetAttribute("tesdefines", tcs->GetDefines());
     }
+#endif
 }
 
 void ShaderPrecache::LoadShaders(Graphics* graphics, Deserializer& source)

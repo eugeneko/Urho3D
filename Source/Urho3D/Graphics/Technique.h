@@ -142,6 +142,7 @@ public:
     /// Return the effective pixel shader defines, accounting for excludes. Called internally by Renderer.
     String GetEffectivePixelShaderDefines() const { return GetEffectiveShaderDefines(PS); }
     
+#if !defined(URHO3D_OPENGL_ES) && !defined(URHO3D_D3D9)
     /// Set geometry shader name.
     void SetGeometryShader(const String& name) { SetShader(GS, name); }
     /// Set geometry shader defines. Separate multiple defines with spaces.
@@ -197,6 +198,7 @@ public:
     String GetEffectiveTCSShaderDefines() const { return GetEffectiveShaderDefines(TCS); }
     /// Return the effective TCS shader defines, accounting for excludes. Called internally by Renderer.
     String GetEffectiveTESShaderDefines() const { return GetEffectiveShaderDefines(TES); }
+#endif
 
 private:
     /// Set the name of specific shader stage.
@@ -254,12 +256,14 @@ private:
     ShaderData vertexShaderData_;
     /// Pixel shader data.
     ShaderData pixelShaderData_;
+#if !defined(URHO3D_OPENGL_ES) && !defined(URHO3D_D3D9)
     /// Geometry shader data.
     ShaderData geometryShaderData_;
     /// TCS shader data.
     ShaderData tcsShaderData_;
     /// TES shader data.
     ShaderData tesShaderData_;
+#endif
 
     /// Pass name.
     String name_;

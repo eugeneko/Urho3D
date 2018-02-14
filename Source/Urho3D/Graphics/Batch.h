@@ -53,7 +53,7 @@ struct BatchShaders
     ShaderVariation* vertexShader_;
     /// Pixel shader.
     ShaderVariation* pixelShader_;
-#if !defined(URHO3D_OPENGL_ES) && !defined(URHO3D_DIRECT3D9)
+#if !defined(URHO3D_OPENGL_ES) && !defined(URHO3D_D3D9)
     /// Geometry shader.
     ShaderVariation* geometryShader_;
     /// Hull/TCS shader.

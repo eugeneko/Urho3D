@@ -1201,10 +1201,17 @@ void Renderer::SetBatchShaders(Batch& batch, Technique* tech, bool allowShadows,
         pass->ReleaseShaders();
 
     Vector<SharedPtr<ShaderVariation> >& vertexShaders = queue.hasExtraDefines_ ? pass->GetVertexShaders(queue.vsExtraDefines_.hash_) : pass->GetVertexShaders();
+    Vector<SharedPtr<ShaderVariation> >& pixelShaders = queue.hasExtraDefines_ ? pass->GetPixelShaders(queue.psExtraDefines_.hash_) : pass->GetPixelShaders();
+#if !defined(URHO3D_OPENGL_ES) && !defined(URHO3D_D3D9)
+    Vector<SharedPtr<ShaderVariation> >& geometryShaders = queue.hasExtraDefines_ ? pass->GetGeometryShaders(queue.gsExtraDefines_.hash_) : pass->GetGeometryShaders();
     Vector<SharedPtr<ShaderVariation> >& tcsShaders = queue.hasExtraDefines_ ? pass->GetGeometryShaders(queue.tcsExtraDefines_.hash_) : pass->GetTCSShaders();
     Vector<SharedPtr<ShaderVariation> >& tesShaders = queue.hasExtraDefines_ ? pass->GetGeometryShaders(queue.tesExtraDefines_.hash_) : pass->GetTESShaders();
-    Vector<SharedPtr<ShaderVariation> >& geometryShaders = queue.hasExtraDefines_ ? pass->GetGeometryShaders(queue.gsExtraDefines_.hash_) : pass->GetGeometryShaders();
-    Vector<SharedPtr<ShaderVariation> >& pixelShaders = queue.hasExtraDefines_ ? pass->GetPixelShaders(queue.psExtraDefines_.hash_) : pass->GetPixelShaders();
+#else
+    // Provide stubs for LoadPassShaders.
+    Vector<SharedPtr<ShaderVariation> > geometryShaders;
+    Vector<SharedPtr<ShaderVariation> > tcsShaders;
+    Vector<SharedPtr<ShaderVariation> > tesShaders;
+#endif
 
     // Load shaders now if necessary
     if (!vertexShaders.Size() || !pixelShaders.Size())
@@ -1231,9 +1238,11 @@ void Renderer::SetBatchShaders(Batch& batch, Technique* tech, bool allowShadows,
                 // Do not log error, as it would result in a lot of spam
                 batch.shaders_.vertexShader_ = nullptr;
                 batch.shaders_.pixelShader_ = nullptr;
+#if !defined(URHO3D_OPENGL_ES) && !defined(URHO3D_D3D9)
                 batch.shaders_.geometryShader_ = nullptr;
                 batch.shaders_.tcsShader_ = nullptr;
                 batch.shaders_.tesShader_ = nullptr;
+#endif
                 return;
             }
 
@@ -1280,9 +1289,11 @@ void Renderer::SetBatchShaders(Batch& batch, Technique* tech, bool allowShadows,
 
             batch.shaders_.vertexShader_ = vertexShaders[vsi];
             batch.shaders_.pixelShader_ = pixelShaders[psi];
+#if !defined(URHO3D_OPENGL_ES) && !defined(URHO3D_D3D9)
             batch.shaders_.geometryShader_ = geometryShaders.Empty() ? nullptr : geometryShaders[batch.geometryType_];
             batch.shaders_.tcsShader_ = tcsShaders.Empty() ? nullptr : tcsShaders[batch.geometryType_];
             batch.shaders_.tesShader_ = tesShaders.Empty() ? nullptr : tesShaders[batch.geometryType_];
+#endif
         }
         else
         {
@@ -1295,17 +1306,21 @@ void Renderer::SetBatchShaders(Batch& batch, Technique* tech, bool allowShadows,
 
                 unsigned vsi = batch.geometryType_ * MAX_VERTEXLIGHT_VS_VARIATIONS + numVertexLights;
                 batch.shaders_.vertexShader_ = vertexShaders[vsi];
+#if !defined(URHO3D_OPENGL_ES) && !defined(URHO3D_D3D9)
                 batch.shaders_.geometryShader_ = geometryShaders.Empty() ? nullptr : geometryShaders[batch.geometryType_];
                 batch.shaders_.tcsShader_ = tcsShaders.Empty() ? nullptr : tcsShaders[batch.geometryType_];
                 batch.shaders_.tesShader_ = tesShaders.Empty() ? nullptr : tesShaders[batch.geometryType_];
+#endif
             }
             else
             {
                 unsigned vsi = batch.geometryType_;
                 batch.shaders_.vertexShader_ = vertexShaders[vsi];
+#if !defined(URHO3D_OPENGL_ES) && !defined(URHO3D_D3D9)
                 batch.shaders_.geometryShader_ = geometryShaders.Empty() ? nullptr : geometryShaders[batch.geometryType_];
                 batch.shaders_.tcsShader_ = tcsShaders.Empty() ? nullptr : tcsShaders[batch.geometryType_];
                 batch.shaders_.tesShader_ = tesShaders.Empty() ? nullptr : tesShaders[batch.geometryType_];
+#endif
             }
 
             batch.shaders_.pixelShader_ = pixelShaders[heightFog ? 1 : 0];
@@ -1379,9 +1394,11 @@ void Renderer::SetLightVolumeBatchShaders(Batch& batch, Camera* camera, const St
         batch.shaders_.pixelShader_ = graphics_->GetShader(PS, psName, deferredLightPSVariations_[psi]);
         
     // light volumes do not use a GS, TCS, or TES
+#if !defined(URHO3D_OPENGL_ES) && !defined(URHO3D_D3D9)
     batch.shaders_.geometryShader_ = nullptr;
     batch.shaders_.tcsShader_ = nullptr;
     batch.shaders_.tesShader_ = nullptr;
+#endif
 }
 
 void Renderer::SetCullMode(CullMode mode, Camera* camera)
@@ -1704,22 +1721,26 @@ void Renderer::LoadPassShaders(Pass* pass, Vector<SharedPtr<ShaderVariation> >& 
     tesShaders.Clear();
 
     String vsDefines = pass->GetEffectiveVertexShaderDefines();
-    String gsDefines = pass->GetEffectiveGeometryShaderDefines();
     String psDefines = pass->GetEffectivePixelShaderDefines();
+#if !defined(URHO3D_OPENGL_ES) && !defined(URHO3D_D3D9)
+    String gsDefines = pass->GetEffectiveGeometryShaderDefines();
     String tcsDefines = pass->GetEffectiveTCSShaderDefines();
     String tesDefines = pass->GetEffectiveTESShaderDefines();
+#endif
 
     // Make sure to end defines with space to allow appending engine's defines
     if (vsDefines.Length() && !vsDefines.EndsWith(" "))
         vsDefines += ' ';
     if (psDefines.Length() && !psDefines.EndsWith(" "))
         psDefines += ' ';
+#if !defined(URHO3D_OPENGL_ES) && !defined(URHO3D_D3D9)
     if (gsDefines.Length() && !gsDefines.EndsWith(" "))
         gsDefines += ' ';
     if (tcsDefines.Length() && !tcsDefines.EndsWith(" "))
         tcsDefines += ' ';
     if (tcsDefines.Length() && !tesDefines.EndsWith(" "))
         tesDefines += ' ';
+#endif
 
     // Append defines from batch queue (renderpath command) if needed
     if (queue.vsExtraDefines_.defines_.Length())
@@ -1732,6 +1753,8 @@ void Renderer::LoadPassShaders(Pass* pass, Vector<SharedPtr<ShaderVariation> >& 
         psDefines += queue.psExtraDefines_.defines_;
         psDefines += ' ';
     }
+
+#if !defined(URHO3D_OPENGL_ES) && !defined(URHO3D_D3D9)
     if (queue.gsExtraDefines_.defines_.Length())
     {
         gsDefines += queue.gsExtraDefines_.defines_;
@@ -1747,16 +1770,19 @@ void Renderer::LoadPassShaders(Pass* pass, Vector<SharedPtr<ShaderVariation> >& 
         tesDefines += queue.tesExtraDefines_.defines_;
         tesDefines += ' ';
     }
+#endif
 
     // Add defines for VSM in the shadow pass if necessary
     if (pass->GetName() == "shadow"
         && (shadowQuality_ == SHADOWQUALITY_VSM || shadowQuality_ == SHADOWQUALITY_BLUR_VSM))
     {
         vsDefines += "VSM_SHADOW ";
-        gsDefines += "VSM_SHADOW ";
         psDefines += "VSM_SHADOW ";
+#if !defined(URHO3D_OPENGL_ES) && !defined(URHO3D_D3D9)
+        gsDefines += "VSM_SHADOW ";
         tcsDefines += "VSM_SHADOW ";
         tesDefines += "VSM_SHADOW ";
+#endif
     }
 
     if (pass->GetLightingMode() == LIGHTING_PERPIXEL)
@@ -1813,6 +1839,7 @@ void Renderer::LoadPassShaders(Pass* pass, Vector<SharedPtr<ShaderVariation> >& 
             }
         }
 
+#if !defined(URHO3D_OPENGL_ES) && !defined(URHO3D_D3D9)
         geometryShaders.Resize(MAX_GEOMETRYTYPES);
         tcsShaders.Resize(MAX_GEOMETRYTYPES);
         tesShaders.Resize(MAX_GEOMETRYTYPES);
@@ -1831,6 +1858,7 @@ void Renderer::LoadPassShaders(Pass* pass, Vector<SharedPtr<ShaderVariation> >& 
                 tesShaders[j] = graphics_->GetShader(TES, pass->GetTESShader(), tesDefines + geometryVSVariations[j]);
             }
         }
+#endif
 
         pixelShaders.Resize(2);
         for (unsigned j = 0; j < 2; ++j)

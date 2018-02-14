@@ -139,12 +139,14 @@ void Pass::ReleaseShaders()
     pixelShaderData_.shaders_.Clear();
     pixelShaderData_.extraShaders_.Clear();
 
+#if !defined(URHO3D_OPENGL_ES) && !defined(URHO3D_D3D9)
     geometryShaderData_.shaders_.Clear();
     geometryShaderData_.extraShaders_.Clear();
     tcsShaderData_.shaders_.Clear();
     tcsShaderData_.extraShaders_.Clear();
     tesShaderData_.shaders_.Clear();
     tesShaderData_.extraShaders_.Clear();
+#endif
 }
 
 void Pass::MarkShadersLoaded(unsigned frameNumber)
@@ -202,12 +204,14 @@ Pass::ShaderData& Pass::GetShaderData(ShaderType type)
         return vertexShaderData_;
     case PS:
         return pixelShaderData_;
+#if !defined(URHO3D_OPENGL_ES) && !defined(URHO3D_D3D9)
     case GS:
         return geometryShaderData_;
     case TCS:
         return tcsShaderData_;
     case TES:
         return tesShaderData_;
+#endif
     }
     return vertexShaderData_;
 }
@@ -220,12 +224,14 @@ const Pass::ShaderData& Pass::GetShaderData(ShaderType type) const
         return vertexShaderData_;
     case PS:
         return pixelShaderData_;
+#if !defined(URHO3D_OPENGL_ES) && !defined(URHO3D_D3D9)
     case GS:
         return geometryShaderData_;
     case TCS:
         return tcsShaderData_;
     case TES:
         return tesShaderData_;
+#endif
     }
     return vertexShaderData_;
 }
@@ -330,6 +336,7 @@ bool Technique::BeginLoad(Deserializer& source)
                 newPass->SetPixelShaderDefines(globalPSDefines + passElem.GetAttribute("psdefines"));
             }
 
+#if !defined(URHO3D_OPENGL_ES) && !defined(URHO3D_D3D9)
             if (passElem.HasAttribute("gs"))
             {
                 newPass->SetGeometryShader(passElem.GetAttribute("gs"));
@@ -362,12 +369,16 @@ bool Technique::BeginLoad(Deserializer& source)
                 newPass->SetTESShader(globalTES);
                 newPass->SetTESShaderDefines(globalTESDefines + passElem.GetAttribute("tesdefines"));
             }
+#endif
 
             newPass->SetVertexShaderDefineExcludes(passElem.GetAttribute("vsexcludes"));
             newPass->SetPixelShaderDefineExcludes(passElem.GetAttribute("psexcludes"));
+
+#if !defined(URHO3D_OPENGL_ES) && !defined(URHO3D_D3D9)
             newPass->SetGeometryShaderDefineExcludes(passElem.GetAttribute("gsexcludes"));
             newPass->SetTCSShaderDefineExcludes(passElem.GetAttribute("tcsexcludes"));
             newPass->SetTESShaderDefineExcludes(passElem.GetAttribute("tesexcludes"));
+#endif
 
             if (passElem.HasAttribute("lighting"))
             {
@@ -454,6 +465,7 @@ SharedPtr<Technique> Technique::Clone(const String& cloneName) const
         newPass->SetVertexShaderDefineExcludes(srcPass->GetVertexShaderDefineExcludes());
         newPass->SetPixelShaderDefineExcludes(srcPass->GetPixelShaderDefineExcludes());
         
+#if !defined(URHO3D_OPENGL_ES) && !defined(URHO3D_D3D9)
         newPass->SetGeometryShader(srcPass->GetGeometryShader());
         newPass->SetGeometryShaderDefines(srcPass->GetGeometryShaderDefines());
         newPass->SetGeometryShaderDefineExcludes(srcPass->GetGeometryShaderDefineExcludes());
@@ -463,6 +475,7 @@ SharedPtr<Technique> Technique::Clone(const String& cloneName) const
         newPass->SetTESShader(srcPass->GetTESShader());
         newPass->SetTESShaderDefines(srcPass->GetTESShaderDefines());
         newPass->SetTESShaderDefineExcludes(srcPass->GetTESShaderDefineExcludes());
+#endif
     }
 
     return ret;
@@ -584,12 +597,14 @@ SharedPtr<Technique> Technique::CloneWithDefines(const String& vsDefines, const 
             pass->SetVertexShaderDefines(pass->GetVertexShaderDefines() + " " + vsDefines);
         if (!psDefines.Empty())
             pass->SetPixelShaderDefines(pass->GetPixelShaderDefines() + " " + psDefines);
+#if !defined(URHO3D_OPENGL_ES) && !defined(URHO3D_D3D9)
         if (!gsDefines.Empty())
             pass->SetGeometryShaderDefines(pass->GetGeometryShaderDefines() + " " + gsDefines);
         if (!tcsDefines.Empty())
             pass->SetTCSShaderDefines(pass->GetTCSShaderDefines() + " " + tcsDefines);
         if (!tesDefines.Empty())
             pass->SetTESShaderDefines(pass->GetTESShaderDefines() + " " + tesDefines);
+#endif
     }
 
     return i->second_;

@@ -72,22 +72,25 @@ bool ShaderVariation::Create()
     // Check for up-to-date bytecode on disk
     String path, name, extension;
     SplitPath(owner_->GetName(), path, name, extension);
+
+    // Using SM5 when compute is available for structured buffer support.
+    const bool usingSM5 = Graphics::GetComputeSupport();
     switch (type_)
     {
     case VS:
-        extension = ".vs4";
+        extension = usingSM5 ? ".vs5" : ".vs4";
         break;
     case PS:
-        extension = ".ps4";
+        extension = usingSM5 ? ".ps5" : ".ps4";
         break;
     case GS:
-        extension = ".gs4";
+        extension = usingSM5 ? ".gs5" : ".gs4";
         break;
     case TCS:
-        extension = ".tcs4";
+        extension = ".tcs5";
         break;
     case TES:
-        extension = ".tes4";
+        extension = ".tes5";
         break;
     }
 
@@ -324,24 +327,26 @@ bool ShaderVariation::Compile()
 
     defines.Push("D3D11");
 
+    // If compute is supported then the v5 profiles will be used, which add structured buffer support
+    const bool shouldUseV5 = Graphics::GetComputeSupport();
     if (type_ == VS)
     {
         entryPoint = "VS";
         defines.Push("COMPILEVS");
-        profile = "vs_4_0";
+        profile = shouldUseV5 ? "vs_5_0" : "vs_4_0";
     }
     else if (type_ == PS)
     {
         entryPoint = "PS";
         defines.Push("COMPILEPS");
-        profile = "ps_4_0";
+        profile = shouldUseV5 ? "ps_5_0" : "ps_4_0";
         flags |= D3DCOMPILE_PREFER_FLOW_CONTROL;
     }
     else if (type_ == GS)
     {
         entryPoint = "GS";
         defines.Push("COMPILEGS");
-        profile = "gs_4_0";
+        profile = shouldUseV5 ? "gs_5_0" : "gs_4_0";
     }
     else if (type_ == TCS)
     {

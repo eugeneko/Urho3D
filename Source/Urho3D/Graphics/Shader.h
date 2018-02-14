@@ -82,12 +82,14 @@ private:
     ShaderData vertexShader_;
     /// Pixel shader source and variations.
     ShaderData pixelShader_;
+#if !defined(URHO3D_OPENGL_ES) && !defined(URHO3D_D3D9)
     /// Geometry shader source and variations.
     ShaderData geometryShader_;
     /// TCS shader source and variations.
     ShaderData tcsShader_;
     /// TES shader source and variations.
     ShaderData tesShader_;
+#endif
     /// Source code timestamp.
     unsigned timeStamp_;
     /// Number of unique variations so far.
