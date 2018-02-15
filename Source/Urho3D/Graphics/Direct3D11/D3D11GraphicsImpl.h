@@ -24,6 +24,7 @@
 
 #include "../../Graphics/ConstantBuffer.h"
 #include "../../Graphics/GraphicsDefs.h"
+#include "../../Graphics/ShaderPrecache.h"
 #include "../../Graphics/ShaderProgram.h"
 #include "../../Graphics/VertexDeclaration.h"
 #include "../../Math/Color.h"
@@ -38,7 +39,7 @@ namespace Urho3D
 
 #define URHO3D_LOGD3DERROR(msg, hr) URHO3D_LOGERRORF("%s (HRESULT %x)", msg, (unsigned)hr)
 
-using ShaderProgramMap = HashMap<Pair<ShaderVariation*, ShaderVariation*>, SharedPtr<ShaderProgram> >;
+using ShaderProgramMap = HashMap<ShaderCombination, SharedPtr<ShaderProgram> >;
 using VertexDeclarationMap = HashMap<unsigned long long, SharedPtr<VertexDeclaration> >;
 using ConstantBufferMap = HashMap<unsigned, SharedPtr<ConstantBuffer> >;
 
