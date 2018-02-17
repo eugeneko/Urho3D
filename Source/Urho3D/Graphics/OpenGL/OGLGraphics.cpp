@@ -229,6 +229,17 @@ static void GetGLPrimitiveType(unsigned elementCount, PrimitiveType type, unsign
     }
 }
 
+#ifndef GL_ES_VERSION_2_0
+inline static void GetGLTessellationType(GLenum& glPrimitiveType, bool isTessellationActive)
+{
+    if (isTessellationActive)
+    {
+        glPatchParameteri(GL_PATCH_VERTICES, 3);
+        glPrimitiveType = GL_PATCHES;
+    }
+}
+#endif
+
 const Vector2 Graphics::pixelUVOffset(0.0f, 0.0f);
 bool Graphics::gl3Support = false;
 bool Graphics::tessellationSupport = false;
@@ -920,6 +931,11 @@ void Graphics::Draw(PrimitiveType type, unsigned vertexStart, unsigned vertexCou
     GLenum glPrimitiveType;
 
     GetGLPrimitiveType(vertexCount, type, primitiveCount, glPrimitiveType);
+
+#ifndef GL_ES_VERSION_2_0
+    GetGLTessellationType(glPrimitiveType, tessCtrlShader_ && tessEvalShader_);
+#endif
+
     glDrawArrays(glPrimitiveType, vertexStart, vertexCount);
 
     numPrimitives_ += primitiveCount;
@@ -939,6 +955,11 @@ void Graphics::Draw(PrimitiveType type, unsigned indexStart, unsigned indexCount
 
     GetGLPrimitiveType(indexCount, type, primitiveCount, glPrimitiveType);
     GLenum indexType = indexSize == sizeof(unsigned short) ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT;
+
+#ifndef GL_ES_VERSION_2_0
+    GetGLTessellationType(glPrimitiveType, tessCtrlShader_ && tessEvalShader_);
+#endif
+
     glDrawElements(glPrimitiveType, indexCount, indexType, reinterpret_cast<const GLvoid*>(indexStart * indexSize));
 
     numPrimitives_ += primitiveCount;
@@ -959,6 +980,11 @@ void Graphics::Draw(PrimitiveType type, unsigned indexStart, unsigned indexCount
 
     GetGLPrimitiveType(indexCount, type, primitiveCount, glPrimitiveType);
     GLenum indexType = indexSize == sizeof(unsigned short) ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT;
+
+#ifndef GL_ES_VERSION_2_0
+    GetGLTessellationType(glPrimitiveType, tessCtrlShader_ && tessEvalShader_);
+#endif
+
     glDrawElementsBaseVertex(glPrimitiveType, indexCount, indexType, reinterpret_cast<GLvoid*>(indexStart * indexSize), baseVertexIndex);
 
     numPrimitives_ += primitiveCount;
@@ -987,6 +1013,10 @@ void Graphics::DrawInstanced(PrimitiveType type, unsigned indexStart, unsigned i
 #else
     if (gl3Support)
     {
+#ifndef GL_ES_VERSION_2_0
+        GetGLTessellationType(glPrimitiveType, tessCtrlShader_ && tessEvalShader_);
+#endif
+
         glDrawElementsInstanced(glPrimitiveType, indexCount, indexType, reinterpret_cast<const GLvoid*>(indexStart * indexSize),
             instanceCount);
     }
@@ -1017,6 +1047,10 @@ void Graphics::DrawInstanced(PrimitiveType type, unsigned indexStart, unsigned i
 
     GetGLPrimitiveType(indexCount, type, primitiveCount, glPrimitiveType);
     GLenum indexType = indexSize == sizeof(unsigned short) ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT;
+
+#ifndef GL_ES_VERSION_2_0
+    GetGLTessellationType(glPrimitiveType, tessCtrlShader_ && tessEvalShader_);
+#endif
 
     glDrawElementsInstancedBaseVertex(glPrimitiveType, indexCount, indexType, reinterpret_cast<const GLvoid*>(indexStart * indexSize),
         instanceCount, baseVertexIndex);

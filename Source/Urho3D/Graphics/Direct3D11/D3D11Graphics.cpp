@@ -194,6 +194,12 @@ static void GetD3DPrimitiveType(unsigned elementCount, PrimitiveType type, unsig
     }
 }
 
+inline static void GetTessellationType(D3D_PRIMITIVE_TOPOLOGY& d3dPrimitiveType, bool isTessellating)
+{
+    if (isTessellating)
+        d3dPrimitiveType = D3D_PRIMITIVE_TOPOLOGY_3_CONTROL_POINT_PATCHLIST;
+}
+
 static HWND GetWindowHandle(SDL_Window* window)
 {
     SDL_SysWMinfo sysInfo;
@@ -816,8 +822,7 @@ void Graphics::Draw(PrimitiveType type, unsigned vertexStart, unsigned vertexCou
     GetD3DPrimitiveType(vertexCount, type, primitiveCount, d3dPrimitiveType);
     
     // If tessellating then remap primitive type
-    if (tessCtrlShader_ && tessEvalShader_)
-        d3dPrimitiveType = D3D_PRIMITIVE_TOPOLOGY_3_CONTROL_POINT_PATCHLIST;
+    GetTessellationType(d3dPrimitiveType, tessCtrlShader_ && tessEvalShader_);
 
     if (d3dPrimitiveType != primitiveType_)
     {
@@ -846,8 +851,7 @@ void Graphics::Draw(PrimitiveType type, unsigned indexStart, unsigned indexCount
     GetD3DPrimitiveType(indexCount, type, primitiveCount, d3dPrimitiveType);
     
     // If tessellating then remap primitive type
-    if (tessCtrlShader_ && tessEvalShader_)
-        d3dPrimitiveType = D3D_PRIMITIVE_TOPOLOGY_3_CONTROL_POINT_PATCHLIST;
+    GetTessellationType(d3dPrimitiveType, tessCtrlShader_ && tessEvalShader_);
 
     if (d3dPrimitiveType != primitiveType_)
     {
@@ -876,8 +880,7 @@ void Graphics::Draw(PrimitiveType type, unsigned indexStart, unsigned indexCount
     GetD3DPrimitiveType(indexCount, type, primitiveCount, d3dPrimitiveType);
 
     // If tessellating then remap primitive type
-    if (tessCtrlShader_ && tessEvalShader_)
-        d3dPrimitiveType = D3D_PRIMITIVE_TOPOLOGY_3_CONTROL_POINT_PATCHLIST;
+    GetTessellationType(d3dPrimitiveType, tessCtrlShader_ && tessEvalShader_);
 
     if (d3dPrimitiveType != primitiveType_)
     {
@@ -907,8 +910,7 @@ void Graphics::DrawInstanced(PrimitiveType type, unsigned indexStart, unsigned i
     GetD3DPrimitiveType(indexCount, type, primitiveCount, d3dPrimitiveType);
 
     // If tessellating then remap primitive type
-    if (tessCtrlShader_ && tessEvalShader_)
-        d3dPrimitiveType = D3D_PRIMITIVE_TOPOLOGY_3_CONTROL_POINT_PATCHLIST;
+    GetTessellationType(d3dPrimitiveType, tessCtrlShader_ && tessEvalShader_);
 
     if (d3dPrimitiveType != primitiveType_)
     {
@@ -938,8 +940,7 @@ void Graphics::DrawInstanced(PrimitiveType type, unsigned indexStart, unsigned i
     GetD3DPrimitiveType(indexCount, type, primitiveCount, d3dPrimitiveType);
 
     // If tessellating then remap primitive type
-    if (tessCtrlShader_ && tessEvalShader_)
-        d3dPrimitiveType = D3D_PRIMITIVE_TOPOLOGY_3_CONTROL_POINT_PATCHLIST;
+    GetTessellationType(d3dPrimitiveType, tessCtrlShader_ && tessEvalShader_);
 
     if (d3dPrimitiveType != primitiveType_)
     {
@@ -1071,8 +1072,6 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps, ShaderVariat
     if (vs == vertexShader_ && ps == pixelShader_ && gs == geometryShader_ && tcs == tessCtrlShader_ && tes == tessEvalShader_)
         return;
 
-    // Failure to compile a tessellation stage can crash the GPU and take the system with it!
-    bool hadCriticalFailure = false;
     if (vs != vertexShader_)
     {
         // Create the shader now if not yet created. If already attempted, do not retry
@@ -1098,6 +1097,7 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps, ShaderVariat
         impl_->vertexDeclarationDirty_ = true;
     }
 
+    bool tessellationFailure = false;
     if (tcs != tessCtrlShader_)
     {
         if (tcs && !tcs->GetGPUObject())
@@ -1115,12 +1115,11 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps, ShaderVariat
             }
             else
                 tcs = nullptr;
-
-            hadCriticalFailure |= tcs == nullptr;
         }
 
         impl_->deviceContext_->HSSetShader((ID3D11HullShader*)(tcs ? tcs->GetGPUObject() : nullptr), nullptr, 0);
         tessCtrlShader_ = tcs;
+        tessellationFailure = tcs != nullptr;
     }
 
     if (tes != tessEvalShader_)
@@ -1140,12 +1139,22 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps, ShaderVariat
             }
             else
                 tes = nullptr;
-
-            hadCriticalFailure |= tes == nullptr;
         }
 
         impl_->deviceContext_->DSSetShader((ID3D11DomainShader*)(tes ? tes->GetGPUObject() : nullptr), nullptr, 0);
         tessEvalShader_ = tes;
+        tessellationFailure = tes != nullptr;
+    }
+
+    // If tessellation fails to compile then clear any partial state and nil the locally tracked version
+    if (tessellationFailure)
+    {
+        if (tessCtrlShader_)
+            impl_->deviceContext_->HSSetShader(nullptr, nullptr, 0);
+        if (tessEvalShader_)
+            impl_->deviceContext_->DSSetShader(nullptr, nullptr, 0);
+        tcs = tes = nullptr;
+        tessCtrlShader_ = tessEvalShader_ = nullptr;
     }
 
     if (gs != geometryShader_)
@@ -1191,17 +1200,6 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps, ShaderVariat
         pixelShader_ = ps;
     }
 
-    // If a critical failure occurred then wipe all active shaders
-    if (hadCriticalFailure)
-    {
-        vertexShader_ = geometryShader_ = pixelShader_ = tessCtrlShader_ = tessEvalShader_ = nullptr;
-        impl_->deviceContext_->VSSetShader(nullptr, nullptr, 0);
-        impl_->deviceContext_->HSSetShader(nullptr, nullptr, 0);
-        impl_->deviceContext_->DSSetShader(nullptr, nullptr, 0);
-        impl_->deviceContext_->GSSetShader(nullptr, nullptr, 0);
-        impl_->deviceContext_->PSSetShader(nullptr, nullptr, 0);
-    }
-
     // Update current shader parameters & constant buffers
     if (vertexShader_ && pixelShader_)
     {
@@ -1245,13 +1243,9 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps, ShaderVariat
         // Geometry/Hull/Domain shaders share the constant buffers with the VS
         if (vsBuffersChanged)
         {
-            if (geometryShader_)
-                impl_->deviceContext_->GSSetConstantBuffers(0, MAX_SHADER_PARAMETER_GROUPS, &impl_->constantBuffers_[VS][0]);
-            if (tessCtrlShader_ && tessEvalShader_)
-            {
-                impl_->deviceContext_->HSSetConstantBuffers(0, MAX_SHADER_PARAMETER_GROUPS, &impl_->constantBuffers_[VS][0]);
-                impl_->deviceContext_->DSSetConstantBuffers(0, MAX_SHADER_PARAMETER_GROUPS, &impl_->constantBuffers_[VS][0]);
-            }
+            impl_->deviceContext_->GSSetConstantBuffers(0, MAX_SHADER_PARAMETER_GROUPS, &impl_->constantBuffers_[VS][0]);
+            impl_->deviceContext_->HSSetConstantBuffers(0, MAX_SHADER_PARAMETER_GROUPS, &impl_->constantBuffers_[VS][0]);
+            impl_->deviceContext_->DSSetConstantBuffers(0, MAX_SHADER_PARAMETER_GROUPS, &impl_->constantBuffers_[VS][0]);
         }
         if (psBuffersChanged)
             impl_->deviceContext_->PSSetConstantBuffers(0, MAX_SHADER_PARAMETER_GROUPS, &impl_->constantBuffers_[PS][0]);
