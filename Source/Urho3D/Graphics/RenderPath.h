@@ -183,9 +183,9 @@ struct URHO3D_API RenderPathCommand
     /// Geometry shader defines.
     String geometryShaderDefines_;
     /// TCS shader defines.
-    String tessCtrlShaderDefines_;
+    String hullShaderDefines_;
     /// TES shader defines.
-    String tessEvalShaderDefines_;
+    String domainShaderDefines_;
     /// Textures.
     String textureNames_[MAX_TEXTURE_UNITS];
     /// %Shader parameters.

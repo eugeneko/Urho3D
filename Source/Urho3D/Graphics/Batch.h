@@ -57,9 +57,9 @@ struct BatchShaders
     /// Geometry shader.
     ShaderVariation* geometryShader_;
     /// Hull/TCS shader.
-    ShaderVariation* tessCtrlShader_;
+    ShaderVariation* hullShader_;
     /// Domain/TES shader.
-    ShaderVariation* tessEvalShader_;
+    ShaderVariation* domainShader_;
 #endif
 };
 
@@ -299,10 +299,10 @@ public:
 #if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
     /// Geometry shader extra defines.
     ExtraShaderDefines gsExtraDefines_;
-    /// TCS shader extra defines.
-    ExtraShaderDefines tcsExtraDefines_;
-    /// TES shader extra defines.
-    ExtraShaderDefines tesExtraDefines_;
+    /// Hull/TCS shader extra defines.
+    ExtraShaderDefines hsExtraDefines_;
+    /// Domain/TES shader extra defines.
+    ExtraShaderDefines dsExtraDefines_;
 #endif
 };
 

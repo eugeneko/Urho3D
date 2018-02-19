@@ -142,10 +142,10 @@ void Pass::ReleaseShaders()
 #if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
     geometryShaderData_.shaders_.Clear();
     geometryShaderData_.extraShaders_.Clear();
-    tessCtrlShaderData_.shaders_.Clear();
-    tessCtrlShaderData_.extraShaders_.Clear();
-    tessEvalShaderData_.shaders_.Clear();
-    tessEvalShaderData_.extraShaders_.Clear();
+    hullShaderData_.shaders_.Clear();
+    hullShaderData_.extraShaders_.Clear();
+    domainShaderData_.shaders_.Clear();
+    domainShaderData_.extraShaders_.Clear();
 #endif
 }
 
@@ -207,10 +207,10 @@ Pass::ShaderData& Pass::GetShaderData(ShaderType type)
 #if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
     case GS:
         return geometryShaderData_;
-    case TCS:
-        return tessCtrlShaderData_;
-    case TES:
-        return tessEvalShaderData_;
+    case HS:
+        return hullShaderData_;
+    case DS:
+        return domainShaderData_;
 #endif
     }
     return vertexShaderData_;
@@ -227,10 +227,10 @@ const Pass::ShaderData& Pass::GetShaderData(ShaderType type) const
 #if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
     case GS:
         return geometryShaderData_;
-    case TCS:
-        return tessCtrlShaderData_;
-    case TES:
-        return tessEvalShaderData_;
+    case HS:
+        return hullShaderData_;
+    case DS:
+        return domainShaderData_;
 #endif
     }
     return vertexShaderData_;
@@ -287,10 +287,10 @@ bool Technique::BeginLoad(Deserializer& source)
 
     String globalGS = rootElem.GetAttribute("gs");
     String globalGSDefines = rootElem.GetAttribute("gsdefines");
-    String globalTCS = rootElem.GetAttribute("tcs");
-    String globalTCSDefines = rootElem.GetAttribute("tcsdefines");
-    String globalTES = rootElem.GetAttribute("tes");
-    String globalTESDefines = rootElem.GetAttribute("tesdefines");
+    String globalHS = rootElem.GetAttribute("hs");
+    String globalHSDefines = rootElem.GetAttribute("hsdefines");
+    String globalDS = rootElem.GetAttribute("ds");
+    String globalDSDefines = rootElem.GetAttribute("dsdefines");
 
     // End with space so that the pass-specific defines can be appended
     if (!globalVSDefines.Empty())
@@ -299,10 +299,10 @@ bool Technique::BeginLoad(Deserializer& source)
         globalPSDefines += ' ';
     if (!globalGSDefines.Empty())
         globalGSDefines += ' ';
-    if (!globalTCSDefines.Empty())
-        globalTCSDefines += ' ';
-    if (!globalTESDefines.Empty())
-        globalTESDefines += ' ';
+    if (!globalHSDefines.Empty())
+        globalHSDefines += ' ';
+    if (!globalDSDefines.Empty())
+        globalDSDefines += ' ';
 
     XMLElement passElem = rootElem.GetChild("pass");
     while (passElem)
@@ -348,26 +348,26 @@ bool Technique::BeginLoad(Deserializer& source)
                 newPass->SetGeometryShaderDefines(globalGSDefines + passElem.GetAttribute("gsdefines"));
             }
 
-            if (passElem.HasAttribute("tcs"))
+            if (passElem.HasAttribute("hs"))
             {
-                newPass->SetTessCtrlShader(passElem.GetAttribute("tcs"));
-                newPass->SetTessCtrlShaderDefines(globalTCSDefines + passElem.GetAttribute("tcsdefines"));
+                newPass->SetHullShader(passElem.GetAttribute("hs"));
+                newPass->SetHullShaderDefines(globalHSDefines + passElem.GetAttribute("hsdefines"));
             }
             else
             {
-                newPass->SetTessCtrlShader(globalTCS);
-                newPass->SetTessCtrlShaderDefines(globalTCSDefines + passElem.GetAttribute("tcsdefines"));
+                newPass->SetHullShader(globalHS);
+                newPass->SetHullShaderDefines(globalHSDefines + passElem.GetAttribute("hsdefines"));
             }
 
-            if (passElem.HasAttribute("tes"))
+            if (passElem.HasAttribute("ds"))
             {
-                newPass->SetTessEvalShader(passElem.GetAttribute("tes"));
-                newPass->SetTessEvalShaderDefines(globalTESDefines + passElem.GetAttribute("tesdefines"));
+                newPass->SetDomainShader(passElem.GetAttribute("ds"));
+                newPass->SetDomainShaderDefines(globalDSDefines + passElem.GetAttribute("dsdefines"));
             }
             else
             {
-                newPass->SetTessEvalShader(globalTES);
-                newPass->SetTessEvalShaderDefines(globalTESDefines + passElem.GetAttribute("tesdefines"));
+                newPass->SetDomainShader(globalDS);
+                newPass->SetDomainShaderDefines(globalDSDefines + passElem.GetAttribute("dsdefines"));
             }
 #endif
 
@@ -376,8 +376,8 @@ bool Technique::BeginLoad(Deserializer& source)
 
 #if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
             newPass->SetGeometryShaderDefineExcludes(passElem.GetAttribute("gsexcludes"));
-            newPass->SetTessCtrlShaderDefineExcludes(passElem.GetAttribute("tcsexcludes"));
-            newPass->SetTessEvalShaderDefineExcludes(passElem.GetAttribute("tesexcludes"));
+            newPass->SetHullShaderDefineExcludes(passElem.GetAttribute("hsexcludes"));
+            newPass->SetDomainShaderDefineExcludes(passElem.GetAttribute("dsexcludes"));
 #endif
 
             if (passElem.HasAttribute("lighting"))
@@ -469,12 +469,12 @@ SharedPtr<Technique> Technique::Clone(const String& cloneName) const
         newPass->SetGeometryShader(srcPass->GetGeometryShader());
         newPass->SetGeometryShaderDefines(srcPass->GetGeometryShaderDefines());
         newPass->SetGeometryShaderDefineExcludes(srcPass->GetGeometryShaderDefineExcludes());
-        newPass->SetTessCtrlShader(srcPass->GetTessCtrlShader());
-        newPass->SetTessCtrlShaderDefines(srcPass->GetTessCtrlShaderDefines());
-        newPass->SetTessCtrlShaderDefineExcludes(srcPass->GetTessCtrlShaderDefineExcludes());
-        newPass->SetTessEvalShader(srcPass->GetTessEvalShader());
-        newPass->SetTessEvalShaderDefines(srcPass->GetTessEvalShaderDefines());
-        newPass->SetTessEvalShaderDefineExcludes(srcPass->GetTessEvalShaderDefineExcludes());
+        newPass->SetHullShader(srcPass->GetHullShader());
+        newPass->SetHullShaderDefines(srcPass->GetHullShaderDefines());
+        newPass->SetHullShaderDefineExcludes(srcPass->GetHullShaderDefineExcludes());
+        newPass->SetDomainShader(srcPass->GetDomainShader());
+        newPass->SetDomainShaderDefines(srcPass->GetDomainShaderDefines());
+        newPass->SetDomainShaderDefineExcludes(srcPass->GetDomainShaderDefineExcludes());
 #endif
     }
 
@@ -570,7 +570,7 @@ PODVector<Pass*> Technique::GetPasses() const
     return ret;
 }
 
-SharedPtr<Technique> Technique::CloneWithDefines(const String& vsDefines, const String& psDefines, const String& gsDefines, const String& tcsDefines, const String& tesDefines)
+SharedPtr<Technique> Technique::CloneWithDefines(const String& vsDefines, const String& psDefines, const String& gsDefines, const String& hsDefines, const String& dsDefines)
 {
     // Return self if no actual defines
     if (vsDefines.Empty() && psDefines.Empty())
@@ -600,10 +600,10 @@ SharedPtr<Technique> Technique::CloneWithDefines(const String& vsDefines, const 
 #if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
         if (!gsDefines.Empty())
             pass->SetGeometryShaderDefines(pass->GetGeometryShaderDefines() + " " + gsDefines);
-        if (!tcsDefines.Empty())
-            pass->SetTessCtrlShaderDefines(pass->GetTessCtrlShaderDefines() + " " + tcsDefines);
-        if (!tesDefines.Empty())
-            pass->SetTessEvalShaderDefines(pass->GetTessEvalShaderDefines() + " " + tesDefines);
+        if (!hsDefines.Empty())
+            pass->SetHullShaderDefines(pass->GetHullShaderDefines() + " " + hsDefines);
+        if (!dsDefines.Empty())
+            pass->SetDomainShaderDefines(pass->GetDomainShaderDefines() + " " + dsDefines);
 #endif
     }
 

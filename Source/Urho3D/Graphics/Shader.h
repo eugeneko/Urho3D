@@ -86,9 +86,9 @@ private:
     /// Geometry shader source and variations.
     ShaderData geometryShader_;
     /// TCS shader source and variations.
-    ShaderData tessCtrlShader_;
+    ShaderData hullShader_;
     /// TES shader source and variations.
-    ShaderData tessEvalShader_;
+    ShaderData domainShader_;
 #endif
     /// Source code timestamp.
     unsigned timeStamp_;

@@ -191,12 +191,16 @@ static void GetD3DPrimitiveType(unsigned elementCount, PrimitiveType type, unsig
         primitiveCount = elementCount / 6;
         d3dPrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST_ADJ;
         break;
+    case QUAD_PATCH:
+        primitiveCount = elementCount / 4;
+        d3dPrimitiveType = D3D_PRIMITIVE_TOPOLOGY_4_CONTROL_POINT_PATCHLIST;
+        break;
     }
 }
 
 inline static void GetTessellationType(D3D_PRIMITIVE_TOPOLOGY& d3dPrimitiveType, bool isTessellating)
 {
-    if (isTessellating)
+    if (isTessellating && (d3dPrimitiveType != D3D_PRIMITIVE_TOPOLOGY_4_CONTROL_POINT_PATCHLIST))
         d3dPrimitiveType = D3D_PRIMITIVE_TOPOLOGY_3_CONTROL_POINT_PATCHLIST;
 }
 
@@ -822,7 +826,7 @@ void Graphics::Draw(PrimitiveType type, unsigned vertexStart, unsigned vertexCou
     GetD3DPrimitiveType(vertexCount, type, primitiveCount, d3dPrimitiveType);
     
     // If tessellating then remap primitive type
-    GetTessellationType(d3dPrimitiveType, tessCtrlShader_ && tessEvalShader_);
+    GetTessellationType(d3dPrimitiveType, hullShader_ && domainShader_);
 
     if (d3dPrimitiveType != primitiveType_)
     {
@@ -851,7 +855,7 @@ void Graphics::Draw(PrimitiveType type, unsigned indexStart, unsigned indexCount
     GetD3DPrimitiveType(indexCount, type, primitiveCount, d3dPrimitiveType);
     
     // If tessellating then remap primitive type
-    GetTessellationType(d3dPrimitiveType, tessCtrlShader_ && tessEvalShader_);
+    GetTessellationType(d3dPrimitiveType, hullShader_ && domainShader_);
 
     if (d3dPrimitiveType != primitiveType_)
     {
@@ -880,7 +884,7 @@ void Graphics::Draw(PrimitiveType type, unsigned indexStart, unsigned indexCount
     GetD3DPrimitiveType(indexCount, type, primitiveCount, d3dPrimitiveType);
 
     // If tessellating then remap primitive type
-    GetTessellationType(d3dPrimitiveType, tessCtrlShader_ && tessEvalShader_);
+    GetTessellationType(d3dPrimitiveType, hullShader_ && domainShader_);
 
     if (d3dPrimitiveType != primitiveType_)
     {
@@ -910,7 +914,7 @@ void Graphics::DrawInstanced(PrimitiveType type, unsigned indexStart, unsigned i
     GetD3DPrimitiveType(indexCount, type, primitiveCount, d3dPrimitiveType);
 
     // If tessellating then remap primitive type
-    GetTessellationType(d3dPrimitiveType, tessCtrlShader_ && tessEvalShader_);
+    GetTessellationType(d3dPrimitiveType, hullShader_ && domainShader_);
 
     if (d3dPrimitiveType != primitiveType_)
     {
@@ -940,7 +944,7 @@ void Graphics::DrawInstanced(PrimitiveType type, unsigned indexStart, unsigned i
     GetD3DPrimitiveType(indexCount, type, primitiveCount, d3dPrimitiveType);
 
     // If tessellating then remap primitive type
-    GetTessellationType(d3dPrimitiveType, tessCtrlShader_ && tessEvalShader_);
+    GetTessellationType(d3dPrimitiveType, hullShader_ && domainShader_);
 
     if (d3dPrimitiveType != primitiveType_)
     {
@@ -1038,7 +1042,7 @@ void Graphics::SetIndexBuffer(IndexBuffer* buffer)
     }
 }
 
-void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps, ShaderVariation* gs, ShaderVariation* tcs, ShaderVariation* tes)
+void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps, ShaderVariation* gs, ShaderVariation* hs, ShaderVariation* ds)
 {
     // Switch to the clip plane variations if necessary
     if (useClipPlane_)
@@ -1055,21 +1059,21 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps, ShaderVariat
         gs = nullptr;
     }
 
-    if ((tcs || tes) && !GetTessellationSupport())
+    if ((hs || ds) && !GetTessellationSupport())
     {
         URHO3D_LOGERROR("Attempted to use tessellation without D3D_FEATURE_LEVEL_11_0");
-        tcs = nullptr;
-        tes = nullptr;
+        hs = nullptr;
+        ds = nullptr;
     }
 
-    if ((tcs && !tes) || (!tcs && tes))
+    if ((hs && !ds) || (!hs && ds))
     {
         URHO3D_LOGERROR("Attempted to use incomplete tessellation shader, both stages are required");
-        tcs = nullptr;
-        tes = nullptr;
+        hs = nullptr;
+        ds = nullptr;
     }
 
-    if (vs == vertexShader_ && ps == pixelShader_ && gs == geometryShader_ && tcs == tessCtrlShader_ && tes == tessEvalShader_)
+    if (vs == vertexShader_ && ps == pixelShader_ && gs == geometryShader_ && hs == hullShader_ && ds == domainShader_)
         return;
 
     if (vs != vertexShader_)
@@ -1098,63 +1102,63 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps, ShaderVariat
     }
 
     bool tessellationFailure = false;
-    if (tcs != tessCtrlShader_)
+    if (hs != hullShader_)
     {
-        if (tcs && !tcs->GetGPUObject())
+        if (hs && !hs->GetGPUObject())
         {
-            if (tcs->GetCompilerOutput().Empty())
+            if (hs->GetCompilerOutput().Empty())
             {
                 URHO3D_PROFILE(CompileTessCtrlShader);
 
-                bool success = tcs->Create();
+                bool success = hs->Create();
                 if (!success)
                 {
-                    URHO3D_LOGERROR("Failed to compile TCS shader " + tcs->GetFullName() + ":\n" + tcs->GetCompilerOutput());
-                    tcs = nullptr;
+                    URHO3D_LOGERROR("Failed to compile hull shader " + hs->GetFullName() + ":\n" + hs->GetCompilerOutput());
+                    hs = nullptr;
                 }
             }
             else
-                tcs = nullptr;
+                hs = nullptr;
         }
 
-        impl_->deviceContext_->HSSetShader((ID3D11HullShader*)(tcs ? tcs->GetGPUObject() : nullptr), nullptr, 0);
-        tessCtrlShader_ = tcs;
-        tessellationFailure = tcs != nullptr;
+        impl_->deviceContext_->HSSetShader((ID3D11HullShader*)(hs ? hs->GetGPUObject() : nullptr), nullptr, 0);
+        hullShader_ = hs;
+        tessellationFailure = hs == nullptr;
     }
 
-    if (tes != tessEvalShader_)
+    if (ds != domainShader_)
     {
-        if (tes && !tes->GetGPUObject())
+        if (ds && !ds->GetGPUObject())
         {
-            if (tes->GetCompilerOutput().Empty())
+            if (ds->GetCompilerOutput().Empty())
             {
                 URHO3D_PROFILE(CompileTessEvalShader);
 
-                bool success = tes->Create();
+                bool success = ds->Create();
                 if (!success)
                 {
-                    URHO3D_LOGERROR("Failed to compile TES shader " + tes->GetFullName() + ":\n" + tes->GetCompilerOutput());
-                    tes = nullptr;
+                    URHO3D_LOGERROR("Failed to compile domain shader " + ds->GetFullName() + ":\n" + ds->GetCompilerOutput());
+                    ds = nullptr;
                 }
             }
             else
-                tes = nullptr;
+                ds = nullptr;
         }
 
-        impl_->deviceContext_->DSSetShader((ID3D11DomainShader*)(tes ? tes->GetGPUObject() : nullptr), nullptr, 0);
-        tessEvalShader_ = tes;
-        tessellationFailure = tes != nullptr;
+        impl_->deviceContext_->DSSetShader((ID3D11DomainShader*)(ds ? ds->GetGPUObject() : nullptr), nullptr, 0);
+        domainShader_ = ds;
+        tessellationFailure = ds == nullptr;
     }
 
     // If tessellation fails to compile then clear any partial state and nil the locally tracked version
     if (tessellationFailure)
     {
-        if (tessCtrlShader_)
+        if (hullShader_)
             impl_->deviceContext_->HSSetShader(nullptr, nullptr, 0);
-        if (tessEvalShader_)
+        if (domainShader_)
             impl_->deviceContext_->DSSetShader(nullptr, nullptr, 0);
-        tcs = tes = nullptr;
-        tessCtrlShader_ = tessEvalShader_ = nullptr;
+        hs = ds = nullptr;
+        hullShader_ = domainShader_ = nullptr;
     }
 
     if (gs != geometryShader_)
@@ -1203,13 +1207,13 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps, ShaderVariat
     // Update current shader parameters & constant buffers
     if (vertexShader_ && pixelShader_)
     {
-        ShaderCombination key = { vertexShader_, pixelShader_, geometryShader_, tessCtrlShader_, tessEvalShader_ };
+        ShaderCombination key = { vertexShader_, pixelShader_, geometryShader_, hullShader_, domainShader_ };
         ShaderProgramMap::Iterator i = impl_->shaderPrograms_.Find(key);
         if (i != impl_->shaderPrograms_.End())
             impl_->shaderProgram_ = i->second_.Get();
         else
         {
-            ShaderProgram* newProgram = impl_->shaderPrograms_[key] = new ShaderProgram(this, vertexShader_, pixelShader_, geometryShader_, tessCtrlShader_, tessEvalShader_);
+            ShaderProgram* newProgram = impl_->shaderPrograms_[key] = new ShaderProgram(this, vertexShader_, pixelShader_, geometryShader_, hullShader_, domainShader_);
             impl_->shaderProgram_ = newProgram;
         }
 
@@ -1255,7 +1259,7 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps, ShaderVariat
 
     // Store shader combination if shader dumping in progress
     if (shaderPrecache_)
-        shaderPrecache_->StoreShaders(vertexShader_, pixelShader_, geometryShader_, tessCtrlShader_, tessEvalShader_);
+        shaderPrecache_->StoreShaders(vertexShader_, pixelShader_, geometryShader_, hullShader_, domainShader_);
 
     // Update clip plane parameter if necessary
     if (useClipPlane_)
@@ -2051,13 +2055,13 @@ void Graphics::CleanupShaderPrograms(ShaderVariation* variation)
 {
     for (ShaderProgramMap::Iterator i = impl_->shaderPrograms_.Begin(); i != impl_->shaderPrograms_.End();)
     {
-        if (i->first_.vertexShader_ == variation || i->first_.pixelShader_ == variation || i->first_.geometryShader_ == variation || i->first_.tessCtrlShader_ == variation || i->first_.tessEvalShader_)
+        if (i->first_.vertexShader_ == variation || i->first_.pixelShader_ == variation || i->first_.geometryShader_ == variation || i->first_.hullShader_ == variation || i->first_.domainShader_)
             i = impl_->shaderPrograms_.Erase(i);
         else
             ++i;
     }
 
-    if (vertexShader_ == variation || pixelShader_ == variation || geometryShader_ == variation || tessCtrlShader_ == variation || tessEvalShader_ == variation)
+    if (vertexShader_ == variation || pixelShader_ == variation || geometryShader_ == variation || hullShader_ == variation || domainShader_ == variation)
         impl_->shaderProgram_ = nullptr;
 }
 
@@ -2530,8 +2534,8 @@ void Graphics::ResetCachedState()
     vertexShader_ = nullptr;
     pixelShader_ = nullptr;
     geometryShader_ = nullptr;
-    tessCtrlShader_ = nullptr;
-    tessEvalShader_ = nullptr;
+    hullShader_ = nullptr;
+    domainShader_ = nullptr;
     blendMode_ = BLEND_REPLACE;
     alphaToCoverage_ = false;
     colorWrite_ = true;

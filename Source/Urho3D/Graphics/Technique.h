@@ -162,42 +162,42 @@ public:
     /// Return the effective geometry shader defines, accounting for excludes. Called internally by Renderer.
     String GetEffectiveGeometryShaderDefines() const { return GetEffectiveShaderDefines(GS); }
     
-    /// Set TCS shader name.
-    void SetTessCtrlShader(const String& name) { SetShader(TCS, name); }
-    /// Set TES shader name.
-    void SetTessEvalShader(const String& name) { SetShader(TES, name); }
-    /// Set TCS shader defines. Separate multiple defines with spaces.
-    void SetTessCtrlShaderDefines(const String& defines) { SetShaderDefines(TCS, defines); }
-    /// Set TES shader defines. Separate multiple defines with spaces.
-    void SetTessEvalShaderDefines(const String& defines) { SetShaderDefines(TES, defines); }
-    /// Set TCS shader define excludes. Use to mark defines that the shader code will not recognize, to prevent compiling redundant shader variations.
-    void SetTessCtrlShaderDefineExcludes(const String& excludes) { SetShaderExcludeDefines(TCS, excludes); }
-    /// Set TES shader define excludes. Use to mark defines that the shader code will not recognize, to prevent compiling redundant shader variations.
-    void SetTessEvalShaderDefineExcludes(const String& excludes) { SetShaderExcludeDefines(TES, excludes); }
-    /// Return TCS shader name.
-    const String& GetTessCtrlShader() const { return tessCtrlShaderData_.shaderName_; }
-    /// Return TES shader name.
-    const String& GetTessEvalShader() const { return tessEvalShaderData_.shaderName_; }
-    /// Return geometry shader defines.
-    const String& GetTessCtrlShaderDefines() const { return tessCtrlShaderData_.defines_; }
-    /// Return geometry shader defines.
-    const String& GetTessEvalShaderDefines() const { return tessEvalShaderData_.defines_; }
-    /// Return TCS shader define excludes.
-    const String& GetTessCtrlShaderDefineExcludes() const { return tessCtrlShaderData_.defineExcludes_; }
-    /// Return TES shader define excludes.
-    const String& GetTessEvalShaderDefineExcludes() const { return tessEvalShaderData_.defineExcludes_; }
-    /// Return TCS shaders.
-    Vector<SharedPtr<ShaderVariation> >& GetTessCtrlShaders() { return tessCtrlShaderData_.shaders_; }
-    /// Return TES shaders.
-    Vector<SharedPtr<ShaderVariation> >& GetTessEvalShaders() { return tessEvalShaderData_.shaders_; }
-    /// Return TCS shaders with extra defines from the renderpath.
-    Vector<SharedPtr<ShaderVariation> >& GetTessCtrlShaders(const StringHash& extraDefinesHash) { return GetShaders(TCS, extraDefinesHash); }
-    /// Return TES shaders with extra defines from the renderpath.
-    Vector<SharedPtr<ShaderVariation> >& GetTessEvalShaders(const StringHash& extraDefinesHash) { return GetShaders(TES, extraDefinesHash); }
-    /// Return the effective TES shader defines, accounting for excludes. Called internally by Renderer.
-    String GetEffectiveTessCtrlShaderDefines() const { return GetEffectiveShaderDefines(TCS); }
-    /// Return the effective TCS shader defines, accounting for excludes. Called internally by Renderer.
-    String GetEffectiveTessEvalShaderDefines() const { return GetEffectiveShaderDefines(TES); }
+    /// Set hull shader name.
+    void SetHullShader(const String& name) { SetShader(HS, name); }
+    /// Set omain shader name.
+    void SetDomainShader(const String& name) { SetShader(DS, name); }
+    /// Set hull shader defines. Separate multiple defines with spaces.
+    void SetHullShaderDefines(const String& defines) { SetShaderDefines(HS, defines); }
+    /// Set domain shader defines. Separate multiple defines with spaces.
+    void SetDomainShaderDefines(const String& defines) { SetShaderDefines(DS, defines); }
+    /// Set hull shader define excludes. Use to mark defines that the shader code will not recognize, to prevent compiling redundant shader variations.
+    void SetHullShaderDefineExcludes(const String& excludes) { SetShaderExcludeDefines(HS, excludes); }
+    /// Set domain shader define excludes. Use to mark defines that the shader code will not recognize, to prevent compiling redundant shader variations.
+    void SetDomainShaderDefineExcludes(const String& excludes) { SetShaderExcludeDefines(DS, excludes); }
+    /// Return hull shader name.
+    const String& GetHullShader() const { return hullShaderData_.shaderName_; }
+    /// Return domain shader name.
+    const String& GetDomainShader() const { return domainShaderData_.shaderName_; }
+    /// Return hull shader defines.
+    const String& GetHullShaderDefines() const { return hullShaderData_.defines_; }
+    /// Return domain shader defines.
+    const String& GetDomainShaderDefines() const { return domainShaderData_.defines_; }
+    /// Return hull shader define excludes.
+    const String& GetHullShaderDefineExcludes() const { return hullShaderData_.defineExcludes_; }
+    /// Return domain shader define excludes.
+    const String& GetDomainShaderDefineExcludes() const { return domainShaderData_.defineExcludes_; }
+    /// Return hull shaders.
+    Vector<SharedPtr<ShaderVariation> >& GetHullShaders() { return hullShaderData_.shaders_; }
+    /// Return domain shaders.
+    Vector<SharedPtr<ShaderVariation> >& GetDomainShaders() { return domainShaderData_.shaders_; }
+    /// Return hull shaders with extra defines from the renderpath.
+    Vector<SharedPtr<ShaderVariation> >& GetHullShaders(const StringHash& extraDefinesHash) { return GetShaders(HS, extraDefinesHash); }
+    /// Return domain shaders with extra defines from the renderpath.
+    Vector<SharedPtr<ShaderVariation> >& GetDomainShaders(const StringHash& extraDefinesHash) { return GetShaders(DS, extraDefinesHash); }
+    /// Return the effective hull shader defines, accounting for excludes. Called internally by Renderer.
+    String GetEffectiveHullShaderDefines() const { return GetEffectiveShaderDefines(HS); }
+    /// Return the effective domain shader defines, accounting for excludes. Called internally by Renderer.
+    String GetEffectiveDomainShaderDefines() const { return GetEffectiveShaderDefines(DS); }
 #endif
 
 private:
@@ -260,9 +260,9 @@ private:
     /// Geometry shader data.
     ShaderData geometryShaderData_;
     /// TCS shader data.
-    ShaderData tessCtrlShaderData_;
+    ShaderData hullShaderData_;
     /// TES shader data.
-    ShaderData tessEvalShaderData_;
+    ShaderData domainShaderData_;
 #endif
 
     /// Pass name.

@@ -86,11 +86,11 @@ bool ShaderVariation::Create()
     case GS:
         extension = usingSM5 ? ".gs5" : ".gs4";
         break;
-    case TCS:
-        extension = ".tcs5";
+    case HS:
+        extension = ".hs5";
         break;
-    case TES:
-        extension = ".tes5";
+    case DS:
+        extension = ".ds5";
         break;
     }
 
@@ -150,7 +150,7 @@ bool ShaderVariation::Create()
         else
             compilerOutput_ = "Could not create geometry shader, empty bytecode";
     }
-    else if (type_ == TCS)
+    else if (type_ == HS)
     {
         if (device && byteCode_.Size())
         {
@@ -164,7 +164,7 @@ bool ShaderVariation::Create()
         else
             compilerOutput_ = "Could not create hull shader, empty bytecode";
     }
-    else if (type_ == TES)
+    else if (type_ == DS)
     {
         if (device && byteCode_.Size())
         {
@@ -206,14 +206,14 @@ void ShaderVariation::Release()
             if (graphics_->GetGeometryShader() == this)
                 graphics_->SetShaders(nullptr, nullptr, nullptr, nullptr, nullptr);
         }
-        else if (type_ == TCS)
+        else if (type_ == HS)
         {
-            if (graphics_->GetTessCtrlShader() == this)
+            if (graphics_->GetHullShader() == this)
                 graphics_->SetShaders(nullptr, nullptr, nullptr, nullptr, nullptr);
         }
-        else if (type_ == TES)
+        else if (type_ == DS)
         {
-            if (graphics_->GetTessEvalShader() == this)
+            if (graphics_->GetDomainShader() == this)
                 graphics_->SetShaders(nullptr, nullptr, nullptr, nullptr, nullptr);
         }
 
@@ -300,9 +300,9 @@ bool ShaderVariation::LoadByteCode(const String& binaryShaderName)
             URHO3D_LOGDEBUG("Loaded cached pixel shader " + GetFullName());
         else if (type_ == GS)
             URHO3D_LOGDEBUG("Loaded cached geometry shader " + GetFullName());
-        else if (type_ == TCS)
+        else if (type_ == HS)
             URHO3D_LOGDEBUG("Loaded cached hull shader " + GetFullName());
-        else if (type_ == TES)
+        else if (type_ == DS)
             URHO3D_LOGDEBUG("Loaded cached domain shader " + GetFullName());
 
         CalculateConstantBufferSizes();
@@ -348,13 +348,13 @@ bool ShaderVariation::Compile()
         defines.Push("COMPILEGS");
         profile = shouldUseV5 ? "gs_5_0" : "gs_4_0";
     }
-    else if (type_ == TCS)
+    else if (type_ == HS)
     {
         entryPoint = "HS";
         defines.Push("COMPILEHS");
         profile = "hs_5_0";
     }
-    else if (type_ == TES) 
+    else if (type_ == DS) 
     {
         entryPoint = "DS";
         defines.Push("COMPILEDS");
@@ -416,9 +416,9 @@ bool ShaderVariation::Compile()
             URHO3D_LOGDEBUG("Compiled pixel shader " + GetFullName());
         else if (type_ == GS)
             URHO3D_LOGDEBUG("Compiled geometry shader " + GetFullName());
-        else if (type_ == TCS)
+        else if (type_ == HS)
             URHO3D_LOGDEBUG("Compiled hull shader " + GetFullName());
-        else if (type_ == TES)
+        else if (type_ == DS)
             URHO3D_LOGDEBUG("Compiled domain shader " + GetFullName());
 
         unsigned char* bufData = (unsigned char*)shaderCode->GetBufferPointer();

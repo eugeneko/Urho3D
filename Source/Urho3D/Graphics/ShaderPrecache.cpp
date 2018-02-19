@@ -75,13 +75,13 @@ ShaderPrecache::~ShaderPrecache()
     xmlFile_.Save(dest);
 }
 
-void ShaderPrecache::StoreShaders(ShaderVariation* vs, ShaderVariation* ps, ShaderVariation* gs, ShaderVariation* tcs, ShaderVariation* tes)
+void ShaderPrecache::StoreShaders(ShaderVariation* vs, ShaderVariation* ps, ShaderVariation* gs, ShaderVariation* hs, ShaderVariation* ds)
 {
     if (!vs || !ps)
         return;
 
     // Check for duplicate using pointers first (fast)
-    ShaderCombination shaderCombo = { vs, ps, gs, tcs, tes };
+    ShaderCombination shaderCombo = { vs, ps, gs, hs, ds };
     if (usedPtrCombinations_.Contains(shaderCombo))
         return;
     usedPtrCombinations_.Insert(shaderCombo);
@@ -98,10 +98,10 @@ void ShaderPrecache::StoreShaders(ShaderVariation* vs, ShaderVariation* ps, Shad
 #if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
     if (gs)
         newCombination += gs->GetName() + " " + gs->GetDefines();
-    if (tcs)
-        newCombination += tcs->GetName() + " " + tcs->GetDefines();
-    if (tes)
-        newCombination += tes->GetName() + " " + tes->GetDefines();
+    if (hs)
+        newCombination += hs->GetName() + " " + hs->GetDefines();
+    if (ds)
+        newCombination += ds->GetName() + " " + ds->GetDefines();
 #endif
 
     if (usedCombinations_.Contains(newCombination))
@@ -120,15 +120,15 @@ void ShaderPrecache::StoreShaders(ShaderVariation* vs, ShaderVariation* ps, Shad
         shaderElem.SetAttribute("gs", gs->GetName());
         shaderElem.SetAttribute("gsdefines", gs->GetDefines());
     }
-    if (tcs)
+    if (hs)
     {
-        shaderElem.SetAttribute("tcs", tcs->GetName());
-        shaderElem.SetAttribute("tcsdefines", tcs->GetDefines());
+        shaderElem.SetAttribute("hs", hs->GetName());
+        shaderElem.SetAttribute("hsdefines", hs->GetDefines());
     }
-    if (tes)
+    if (ds)
     {
-        shaderElem.SetAttribute("tes", tcs->GetName());
-        shaderElem.SetAttribute("tesdefines", tcs->GetDefines());
+        shaderElem.SetAttribute("ds", ds->GetName());
+        shaderElem.SetAttribute("dsdefines", ds->GetDefines());
     }
 #endif
 }
@@ -146,8 +146,8 @@ void ShaderPrecache::LoadShaders(Graphics* graphics, Deserializer& source)
         String vsDefines = shader.GetAttribute("vsdefines");
 #if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
         String gsDefines = shader.GetAttribute("gsdefines");
-        String tcsDefines = shader.GetAttribute("tcsdefines");
-        String tesDefines = shader.GetAttribute("tesdefines");
+        String hsDefines = shader.GetAttribute("hsdefines");
+        String dsDefines = shader.GetAttribute("dsdefines");
 #endif
         String psDefines = shader.GetAttribute("psdefines");
 
@@ -166,12 +166,12 @@ void ShaderPrecache::LoadShaders(Graphics* graphics, Deserializer& source)
 
 #if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
         ShaderVariation* vs = graphics->GetShader(VS, shader.GetAttribute("vs"), vsDefines);
-        ShaderVariation* tcs = graphics->GetShader(TCS, shader.GetAttribute("tcs"), tcsDefines);
-        ShaderVariation* tes = graphics->GetShader(TES, shader.GetAttribute("tes"), tesDefines);
+        ShaderVariation* hs = graphics->GetShader(HS, shader.GetAttribute("hs"), hsDefines);
+        ShaderVariation* ds = graphics->GetShader(DS, shader.GetAttribute("ds"), dsDefines);
         ShaderVariation* gs = graphics->GetShader(GS, shader.GetAttribute("gs"), gsDefines);
         ShaderVariation* ps = graphics->GetShader(PS, shader.GetAttribute("ps"), psDefines);
         // Set the shaders active to actually compile them
-        graphics->SetShaders(vs, ps, gs, tcs, tes);
+        graphics->SetShaders(vs, ps, gs, hs, ds);
 #else
         ShaderVariation* vs = graphics->GetShader(VS, shader.GetAttribute("vs"), vsDefines);
         ShaderVariation* ps = graphics->GetShader(PS, shader.GetAttribute("ps"), psDefines);

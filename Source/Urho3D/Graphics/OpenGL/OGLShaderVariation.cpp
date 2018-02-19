@@ -106,10 +106,10 @@ bool ShaderVariation::Create()
     case GS:
         object_.name_ = glCreateShader(GL_GEOMETRY_SHADER);
         break;
-    case TCS:
+    case HS:
         object_.name_ = glCreateShader(GL_TESS_CONTROL_SHADER);
         break;
-    case TES:
+    case DS:
         object_.name_ = glCreateShader(GL_TESS_EVALUATION_SHADER);
         break;
     }
@@ -163,10 +163,10 @@ bool ShaderVariation::Create()
     case GS:
         shaderCode += "#define COMPILEGS\n";
         break;
-    case TCS:
+    case HS:
         shaderCode += "#define COMPILEHS\n";
         break;
-    case TES:
+    case DS:
         shaderCode += "#define COMPILEDS\n";
         break;
     }

@@ -144,9 +144,9 @@ public:
     /// Set additional geometry shader defines. Separate multiple defines with spaces. Setting defines at the material level causes technique(s) to be cloned as necessary.
     void SetGeometryShaderDefines(const String& defines);
     /// Set additional TCS/Hull shader defines. Separate multiple defines with spaces. Setting defines at the material level causes technique(s) to be cloned as necessary.
-    void SetTessCtrlShaderDefines(const String& defines);
-    /// Set additional TCS/Domain shader defines. Separate multiple defines with spaces. Setting defines at the material level causes technique(s) to be cloned as necessary.
-    void SetTessEvalShaderDefines(const String& defines);
+    void SetHullShaderDefines(const String& defines);
+    /// Set additional TES/Domain shader defines. Separate multiple defines with spaces. Setting defines at the material level causes technique(s) to be cloned as necessary.
+    void SetDomainShaderDefines(const String& defines);
 #endif
     /// Set shader parameter.
     void SetShaderParameter(const String& name, const Variant& value);
@@ -217,9 +217,9 @@ public:
     /// Return additional geometry shader defines.
     const String& GetGeometryShaderDefines() const { return geometryShaderDefines_; }
     /// Return additional TCS/Hull shader defines.
-    const String& GetTessCtrlShaderDefines() const { return tessCtrlShaderDefines_; }
+    const String& GetHullShaderDefines() const { return hullShaderDefines_; }
     /// Return additional TES/Domain shader defines.
-    const String& GetTessEvalShaderDefines() const { return tessEvalShaderDefines_; }
+    const String& GetDomainShaderDefines() const { return domainShaderDefines_; }
 #endif
 
     /// Return shader parameter.
@@ -313,9 +313,9 @@ private:
     /// Geometry shader defines.
     String geometryShaderDefines_;
     /// TCS/Hull shader defines.
-    String tessCtrlShaderDefines_;
+    String hullShaderDefines_;
     /// TES/Domain shader defines.
-    String tessEvalShaderDefines_;
+    String domainShaderDefines_;
 #endif
     /// Normal culling mode.
     CullMode cullMode_;

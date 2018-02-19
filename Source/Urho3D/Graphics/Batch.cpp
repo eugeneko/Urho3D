@@ -166,8 +166,8 @@ void Batch::CalculateSortKey()
         ((*((unsigned*)&shaders_.vertexShader_) / sizeof(ShaderVariation)) + 
         (*((unsigned*)&shaders_.pixelShader_) / sizeof(ShaderVariation)) + 
         (*((unsigned*)&shaders_.geometryShader_) / sizeof(ShaderVariation)) +
-        (*((unsigned*)&shaders_.tessCtrlShader_) / sizeof(ShaderVariation)) +
-        (*((unsigned*)&shaders_.tessEvalShader_) / sizeof(ShaderVariation))) &
+        (*((unsigned*)&shaders_.hullShader_) / sizeof(ShaderVariation)) +
+        (*((unsigned*)&shaders_.domainShader_) / sizeof(ShaderVariation))) &
         0x7fff);
 #else
     auto shaderID = (unsigned)(((*((unsigned*)&shaders_.vertexShader_) / sizeof(ShaderVariation)) + (*((unsigned*)&shaders_.pixelShader_) / sizeof(ShaderVariation))) & 0x7fff);
@@ -196,7 +196,7 @@ void Batch::Prepare(View* view, Camera* camera, bool setModelTransform, bool all
 
     // Set shaders first. The available shader parameters and their register/uniform positions depend on the currently set shaders
 #if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
-    graphics->SetShaders(shaders_.vertexShader_, shaders_.pixelShader_, shaders_.geometryShader_, shaders_.tessCtrlShader_, shaders_.tessEvalShader_);
+    graphics->SetShaders(shaders_.vertexShader_, shaders_.pixelShader_, shaders_.geometryShader_, shaders_.hullShader_, shaders_.domainShader_);
 #else
     graphics->SetShaders(shaders_.vertexShader_, shaders_.pixelShader_, nullptr, nullptr, nullptr);
 #endif
