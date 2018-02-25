@@ -93,6 +93,7 @@ BillboardSet::BillboardSet(Context* context) :
     geometryTypeUpdate_(false),
     sortThisFrame_(false),
     hasOrthoCamera_(false),
+    generatePoints_(false),
     sortFrameNumber_(0),
     previousOffset_(Vector3::ZERO)
 {
@@ -118,6 +119,7 @@ void BillboardSet::RegisterObject(Context* context)
     URHO3D_ACCESSOR_ATTRIBUTE("Relative Scale", IsScaled, SetScaled, bool, true, AM_DEFAULT);
     URHO3D_ACCESSOR_ATTRIBUTE("Sort By Distance", IsSorted, SetSorted, bool, false, AM_DEFAULT);
     URHO3D_ACCESSOR_ATTRIBUTE("Fixed Screen Size", IsFixedScreenSize, SetFixedScreenSize, bool, false, AM_DEFAULT);
+    URHO3D_ATTRIBUTE("Generate Points", bool, generatePoints_, false, AM_DEFAULT);
     URHO3D_ACCESSOR_ATTRIBUTE("Can Be Occluded", IsOccludee, SetOccludee, bool, true, AM_DEFAULT);
     URHO3D_ATTRIBUTE("Cast Shadows", bool, castShadows_, false, AM_DEFAULT);
     URHO3D_ENUM_ACCESSOR_ATTRIBUTE("Face Camera Mode", GetFaceCameraMode, SetFaceCameraMode, FaceCameraMode, faceCameraModeNames, FC_ROTATE_XYZ, AM_DEFAULT);
@@ -308,6 +310,14 @@ void BillboardSet::SetSorted(bool enable)
 void BillboardSet::SetFixedScreenSize(bool enable)
 {
     fixedScreenSize_ = enable;
+    Commit();
+}
+
+void BillboardSet::SetGeneratePoints(bool enable)
+{
+    if (generatePoints_ != enable)
+        bufferSizeDirty_ = bufferDirty_ = true;
+    generatePoints_ = enable;
     Commit();
 }
 
@@ -502,26 +512,53 @@ void BillboardSet::UpdateBufferSize()
 {
     unsigned numBillboards = billboards_.Size();
 
-    if (vertexBuffer_->GetVertexCount() != numBillboards * 4 || geometryTypeUpdate_)
+    const unsigned vertCt = numBillboards * (generatePoints_ ? 1 : 4);
+    if (vertexBuffer_->GetVertexCount() != vertCt || geometryTypeUpdate_)
     {
-        if (faceCameraMode_ == FC_DIRECTION)
+        if (generatePoints_)
         {
-            vertexBuffer_->SetSize(numBillboards * 4, MASK_POSITION | MASK_NORMAL | MASK_COLOR | MASK_TEXCOORD1 | MASK_TEXCOORD2, true);
-            geometry_->SetVertexBuffer(0, vertexBuffer_);
-
+            if (faceCameraMode_ == FC_DIRECTION)
+            {
+                vertexBuffer_->SetSize(vertCt, {
+                    VertexElement(TYPE_VECTOR3, SEM_POSITION, 0),
+                    VertexElement(TYPE_VECTOR3, SEM_NORMAL, 0),
+                    VertexElement(TYPE_UBYTE4_NORM, SEM_COLOR, 0),
+                    VertexElement(TYPE_VECTOR4, SEM_TEXCOORD, 0),
+                    VertexElement(TYPE_VECTOR4, SEM_TEXCOORD, 1),
+                }, true);
+            }
+            else
+            {
+                vertexBuffer_->SetSize(vertCt, {
+                    VertexElement(TYPE_VECTOR3, SEM_POSITION, 0),
+                    VertexElement(TYPE_UBYTE4_NORM, SEM_COLOR, 0),
+                    VertexElement(TYPE_VECTOR4, SEM_TEXCOORD, 0),
+                    VertexElement(TYPE_VECTOR4, SEM_TEXCOORD, 1),
+                }, true);
+            }
         }
         else
         {
-            vertexBuffer_->SetSize(numBillboards * 4, MASK_POSITION | MASK_COLOR | MASK_TEXCOORD1 | MASK_TEXCOORD2, true);
-            geometry_->SetVertexBuffer(0, vertexBuffer_);
+            if (faceCameraMode_ == FC_DIRECTION)
+            {
+                vertexBuffer_->SetSize(vertCt, MASK_POSITION | MASK_NORMAL | MASK_COLOR | MASK_TEXCOORD1 | MASK_TEXCOORD2, true);
+                geometry_->SetVertexBuffer(0, vertexBuffer_);
+
+            }
+            else
+            {
+                vertexBuffer_->SetSize(vertCt, MASK_POSITION | MASK_COLOR | MASK_TEXCOORD1 | MASK_TEXCOORD2, true);
+                geometry_->SetVertexBuffer(0, vertexBuffer_);
+            }
         }
         geometryTypeUpdate_ = false;
     }
 
-    bool largeIndices = (numBillboards * 4) >= 65536;
+    bool largeIndices = (vertCt) >= 65536;
 
-    if (indexBuffer_->GetIndexCount() != numBillboards * 6)
-        indexBuffer_->SetSize(numBillboards * 6, largeIndices);
+    const unsigned numIndices = numBillboards * (generatePoints_ ? 1 : 6);
+    if (indexBuffer_->GetIndexCount() != numIndices)
+        indexBuffer_->SetSize(numIndices, largeIndices);
 
     bufferSizeDirty_ = false;
     bufferDirty_ = true;
@@ -531,7 +568,7 @@ void BillboardSet::UpdateBufferSize()
         return;
 
     // Indices do not change for a given billboard capacity
-    void* destPtr = indexBuffer_->Lock(0, numBillboards * 6, true);
+    void* destPtr = indexBuffer_->Lock(0, numIndices, true);
     if (!destPtr)
         return;
 
@@ -539,34 +576,58 @@ void BillboardSet::UpdateBufferSize()
     {
         auto* dest = (unsigned short*)destPtr;
         unsigned short vertexIndex = 0;
-        while (numBillboards--)
-        {
-            dest[0] = vertexIndex;
-            dest[1] = vertexIndex + 1;
-            dest[2] = vertexIndex + 2;
-            dest[3] = vertexIndex + 2;
-            dest[4] = vertexIndex + 3;
-            dest[5] = vertexIndex;
 
-            dest += 6;
-            vertexIndex += 4;
+        if (generatePoints_)
+        {
+            while (numBillboards--)
+            {
+                dest[0] = vertexIndex++;
+                ++dest;
+            }
+        }
+        else
+        {
+            while (numBillboards--)
+            {
+                dest[0] = vertexIndex;
+                dest[1] = vertexIndex + 1;
+                dest[2] = vertexIndex + 2;
+                dest[3] = vertexIndex + 2;
+                dest[4] = vertexIndex + 3;
+                dest[5] = vertexIndex;
+
+                dest += 6;
+                vertexIndex += 4;
+            }
         }
     }
     else
     {
         auto* dest = (unsigned*)destPtr;
         unsigned vertexIndex = 0;
-        while (numBillboards--)
-        {
-            dest[0] = vertexIndex;
-            dest[1] = vertexIndex + 1;
-            dest[2] = vertexIndex + 2;
-            dest[3] = vertexIndex + 2;
-            dest[4] = vertexIndex + 3;
-            dest[5] = vertexIndex;
 
-            dest += 6;
-            vertexIndex += 4;
+        if (generatePoints_)
+        {
+            while (numBillboards--)
+            {
+                dest[0] = vertexIndex++;
+                ++dest;
+            }
+        }
+        else
+        {
+            while (numBillboards--)
+            {
+                dest[0] = vertexIndex;
+                dest[1] = vertexIndex + 1;
+                dest[2] = vertexIndex + 2;
+                dest[3] = vertexIndex + 2;
+                dest[4] = vertexIndex + 3;
+                dest[5] = vertexIndex;
+
+                dest += 6;
+                vertexIndex += 4;
+            }
         }
     }
 
@@ -618,7 +679,10 @@ void BillboardSet::UpdateVertexBuffer(const FrameInfo& frame)
         }
     }
 
-    batches_[0].geometry_->SetDrawRange(TRIANGLE_LIST, 0, enabledBillboards * 6, false);
+    if (generatePoints_)
+        batches_[0].geometry_->SetDrawRange(POINT_LIST, 0, enabledBillboards, false);
+    else
+        batches_[0].geometry_->SetDrawRange(TRIANGLE_LIST, 0, enabledBillboards * 6, false);
 
     bufferDirty_ = false;
     forceUpdate_ = false;
@@ -633,130 +697,208 @@ void BillboardSet::UpdateVertexBuffer(const FrameInfo& frame)
         previousOffset_ = (worldPos - frame.camera_->GetNode()->GetWorldPosition());
     }
 
-    auto* dest = (float*)vertexBuffer_->Lock(0, enabledBillboards * 4, true);
+    const unsigned vertexCt = enabledBillboards * (generatePoints_ ? 1 : 4);
+    auto* dest = (float*)vertexBuffer_->Lock(0, vertexCt, true);
     if (!dest)
         return;
 
-    if (faceCameraMode_ != FC_DIRECTION)
+    if (generatePoints_)
     {
-        for (unsigned i = 0; i < enabledBillboards; ++i)
+        if (faceCameraMode_ != FC_DIRECTION)
         {
-            Billboard& billboard = *sortedBillboards_[i];
+            for (unsigned i = 0; i < enabledBillboards; ++i)
+            {
+                Billboard& billboard = *sortedBillboards_[i];
 
-            Vector2 size(billboard.size_.x_ * billboardScale.x_, billboard.size_.y_ * billboardScale.y_);
-            unsigned color = billboard.color_.ToUInt();
-            if (fixedScreenSize_)
-                size *= billboard.screenScaleFactor_;
+                Vector2 size(billboard.size_.x_ * billboardScale.x_, billboard.size_.y_ * billboardScale.y_);
+                unsigned color = billboard.color_.ToUInt();
+                if (fixedScreenSize_)
+                    size *= billboard.screenScaleFactor_;
 
-            float rotationMatrix[2][2];
-            SinCos(billboard.rotation_, rotationMatrix[0][1], rotationMatrix[0][0]);
-            rotationMatrix[1][0] = -rotationMatrix[0][1];
-            rotationMatrix[1][1] = rotationMatrix[0][0];
+                float rotationMatrix[2][2];
+                SinCos(billboard.rotation_, rotationMatrix[0][1], rotationMatrix[0][0]);
+                rotationMatrix[1][0] = -rotationMatrix[0][1];
+                rotationMatrix[1][1] = rotationMatrix[0][0];
 
-            dest[0] = billboard.position_.x_;
-            dest[1] = billboard.position_.y_;
-            dest[2] = billboard.position_.z_;
-            ((unsigned&)dest[3]) = color;
-            dest[4] = billboard.uv_.min_.x_;
-            dest[5] = billboard.uv_.min_.y_;
-            dest[6] = -size.x_ * rotationMatrix[0][0] + size.y_ * rotationMatrix[0][1];
-            dest[7] = -size.x_ * rotationMatrix[1][0] + size.y_ * rotationMatrix[1][1];
+                dest[0] = billboard.position_.x_;
+                dest[1] = billboard.position_.y_;
+                dest[2] = billboard.position_.z_;
+                ((unsigned&)dest[3]) = color;
+                // vector4 UV
+                dest[4] = billboard.uv_.min_.x_;
+                dest[5] = billboard.uv_.min_.y_;
+                dest[6] = billboard.uv_.max_.x_;
+                dest[7] = billboard.uv_.max_.y_;
+                // Vector4 sizes
+                dest[8] = -size.x_ * rotationMatrix[0][0] - size.y_ * rotationMatrix[0][1];
+                dest[9] = -size.x_ * rotationMatrix[1][0] - size.y_ * rotationMatrix[1][1];
+                dest[10] = size.x_ * rotationMatrix[0][0] + size.y_ * rotationMatrix[0][1];
+                dest[11] = size.x_ * rotationMatrix[1][0] + size.y_ * rotationMatrix[1][1];
 
-            dest[8] = billboard.position_.x_;
-            dest[9] = billboard.position_.y_;
-            dest[10] = billboard.position_.z_;
-            ((unsigned&)dest[11]) = color;
-            dest[12] = billboard.uv_.max_.x_;
-            dest[13] = billboard.uv_.min_.y_;
-            dest[14] = size.x_ * rotationMatrix[0][0] + size.y_ * rotationMatrix[0][1];
-            dest[15] = size.x_ * rotationMatrix[1][0] + size.y_ * rotationMatrix[1][1];
+                dest += 12;
+            }
+        }
+        else
+        {
+            for (unsigned i = 0; i < enabledBillboards; ++i)
+            {
+                Billboard& billboard = *sortedBillboards_[i];
 
-            dest[16] = billboard.position_.x_;
-            dest[17] = billboard.position_.y_;
-            dest[18] = billboard.position_.z_;
-            ((unsigned&)dest[19]) = color;
-            dest[20] = billboard.uv_.max_.x_;
-            dest[21] = billboard.uv_.max_.y_;
-            dest[22] = size.x_ * rotationMatrix[0][0] - size.y_ * rotationMatrix[0][1];
-            dest[23] = size.x_ * rotationMatrix[1][0] - size.y_ * rotationMatrix[1][1];
+                Vector2 size(billboard.size_.x_ * billboardScale.x_, billboard.size_.y_ * billboardScale.y_);
+                unsigned color = billboard.color_.ToUInt();
+                if (fixedScreenSize_)
+                    size *= billboard.screenScaleFactor_;
 
-            dest[24] = billboard.position_.x_;
-            dest[25] = billboard.position_.y_;
-            dest[26] = billboard.position_.z_;
-            ((unsigned&)dest[27]) = color;
-            dest[28] = billboard.uv_.min_.x_;
-            dest[29] = billboard.uv_.max_.y_;
-            dest[30] = -size.x_ * rotationMatrix[0][0] - size.y_ * rotationMatrix[0][1];
-            dest[31] = -size.x_ * rotationMatrix[1][0] - size.y_ * rotationMatrix[1][1];
+                float rot2D[2][2];
+                SinCos(billboard.rotation_, rot2D[0][1], rot2D[0][0]);
+                rot2D[1][0] = -rot2D[0][1];
+                rot2D[1][1] = rot2D[0][0];
 
-            dest += 32;
+                dest[0] = billboard.position_.x_;
+                dest[1] = billboard.position_.y_;
+                dest[2] = billboard.position_.z_;
+                dest[3] = billboard.direction_.x_;
+                dest[4] = billboard.direction_.y_;
+                dest[5] = billboard.direction_.z_;
+                ((unsigned&)dest[6]) = color;
+                // Vector4 UV
+                dest[7] = billboard.uv_.min_.x_;
+                dest[8] = billboard.uv_.min_.y_;
+                dest[9] = billboard.uv_.max_.x_;
+                dest[10] = billboard.uv_.max_.y_;
+                // Vector4 sizes
+                dest[11] = -size.x_ * rot2D[0][0] - size.y_ * rot2D[0][1];
+                dest[12] = -size.x_ * rot2D[1][0] - size.y_ * rot2D[1][1];
+                dest[13] = size.x_ * rot2D[0][0] + size.y_ * rot2D[0][1];
+                dest[14] = size.x_ * rot2D[1][0] + size.y_ * rot2D[1][1];
+
+                dest += 15;
+            }
         }
     }
     else
     {
-        for (unsigned i = 0; i < enabledBillboards; ++i)
+        if (faceCameraMode_ != FC_DIRECTION)
         {
-            Billboard& billboard = *sortedBillboards_[i];
+            for (unsigned i = 0; i < enabledBillboards; ++i)
+            {
+                Billboard& billboard = *sortedBillboards_[i];
 
-            Vector2 size(billboard.size_.x_ * billboardScale.x_, billboard.size_.y_ * billboardScale.y_);
-            unsigned color = billboard.color_.ToUInt();
-            if (fixedScreenSize_)
-                size *= billboard.screenScaleFactor_;
+                Vector2 size(billboard.size_.x_ * billboardScale.x_, billboard.size_.y_ * billboardScale.y_);
+                unsigned color = billboard.color_.ToUInt();
+                if (fixedScreenSize_)
+                    size *= billboard.screenScaleFactor_;
 
-            float rot2D[2][2];
-            SinCos(billboard.rotation_, rot2D[0][1], rot2D[0][0]);
-            rot2D[1][0] = -rot2D[0][1];
-            rot2D[1][1] = rot2D[0][0];
+                float rotationMatrix[2][2];
+                SinCos(billboard.rotation_, rotationMatrix[0][1], rotationMatrix[0][0]);
+                rotationMatrix[1][0] = -rotationMatrix[0][1];
+                rotationMatrix[1][1] = rotationMatrix[0][0];
 
-            dest[0] = billboard.position_.x_;
-            dest[1] = billboard.position_.y_;
-            dest[2] = billboard.position_.z_;
-            dest[3] = billboard.direction_.x_;
-            dest[4] = billboard.direction_.y_;
-            dest[5] = billboard.direction_.z_;
-            ((unsigned&)dest[6]) = color;
-            dest[7] = billboard.uv_.min_.x_;
-            dest[8] = billboard.uv_.min_.y_;
-            dest[9] = -size.x_ * rot2D[0][0] + size.y_ * rot2D[0][1];
-            dest[10] = -size.x_ * rot2D[1][0] + size.y_ * rot2D[1][1];
+                dest[0] = billboard.position_.x_;
+                dest[1] = billboard.position_.y_;
+                dest[2] = billboard.position_.z_;
+                ((unsigned&)dest[3]) = color;
+                dest[4] = billboard.uv_.min_.x_;
+                dest[5] = billboard.uv_.min_.y_;
+                dest[6] = -size.x_ * rotationMatrix[0][0] + size.y_ * rotationMatrix[0][1];
+                dest[7] = -size.x_ * rotationMatrix[1][0] + size.y_ * rotationMatrix[1][1];
 
-            dest[11] = billboard.position_.x_;
-            dest[12] = billboard.position_.y_;
-            dest[13] = billboard.position_.z_;
-            dest[14] = billboard.direction_.x_;
-            dest[15] = billboard.direction_.y_;
-            dest[16] = billboard.direction_.z_;
-            ((unsigned&)dest[17]) = color;
-            dest[18] = billboard.uv_.max_.x_;
-            dest[19] = billboard.uv_.min_.y_;
-            dest[20] = size.x_ * rot2D[0][0] + size.y_ * rot2D[0][1];
-            dest[21] = size.x_ * rot2D[1][0] + size.y_ * rot2D[1][1];
+                dest[8] = billboard.position_.x_;
+                dest[9] = billboard.position_.y_;
+                dest[10] = billboard.position_.z_;
+                ((unsigned&)dest[11]) = color;
+                dest[12] = billboard.uv_.max_.x_;
+                dest[13] = billboard.uv_.min_.y_;
+                dest[14] = size.x_ * rotationMatrix[0][0] + size.y_ * rotationMatrix[0][1];
+                dest[15] = size.x_ * rotationMatrix[1][0] + size.y_ * rotationMatrix[1][1];
 
-            dest[22] = billboard.position_.x_;
-            dest[23] = billboard.position_.y_;
-            dest[24] = billboard.position_.z_;
-            dest[25] = billboard.direction_.x_;
-            dest[26] = billboard.direction_.y_;
-            dest[27] = billboard.direction_.z_;
-            ((unsigned&)dest[28]) = color;
-            dest[29] = billboard.uv_.max_.x_;
-            dest[30] = billboard.uv_.max_.y_;
-            dest[31] = size.x_ * rot2D[0][0] - size.y_ * rot2D[0][1];
-            dest[32] = size.x_ * rot2D[1][0] - size.y_ * rot2D[1][1];
+                dest[16] = billboard.position_.x_;
+                dest[17] = billboard.position_.y_;
+                dest[18] = billboard.position_.z_;
+                ((unsigned&)dest[19]) = color;
+                dest[20] = billboard.uv_.max_.x_;
+                dest[21] = billboard.uv_.max_.y_;
+                dest[22] = size.x_ * rotationMatrix[0][0] - size.y_ * rotationMatrix[0][1];
+                dest[23] = size.x_ * rotationMatrix[1][0] - size.y_ * rotationMatrix[1][1];
 
-            dest[33] = billboard.position_.x_;
-            dest[34] = billboard.position_.y_;
-            dest[35] = billboard.position_.z_;
-            dest[36] = billboard.direction_.x_;
-            dest[37] = billboard.direction_.y_;
-            dest[38] = billboard.direction_.z_;
-            ((unsigned&)dest[39]) = color;
-            dest[40] = billboard.uv_.min_.x_;
-            dest[41] = billboard.uv_.max_.y_;
-            dest[42] = -size.x_ * rot2D[0][0] - size.y_ * rot2D[0][1];
-            dest[43] = -size.x_ * rot2D[1][0] - size.y_ * rot2D[1][1];
+                dest[24] = billboard.position_.x_;
+                dest[25] = billboard.position_.y_;
+                dest[26] = billboard.position_.z_;
+                ((unsigned&)dest[27]) = color;
+                dest[28] = billboard.uv_.min_.x_;
+                dest[29] = billboard.uv_.max_.y_;
+                dest[30] = -size.x_ * rotationMatrix[0][0] - size.y_ * rotationMatrix[0][1];
+                dest[31] = -size.x_ * rotationMatrix[1][0] - size.y_ * rotationMatrix[1][1];
 
-            dest += 44;
+                dest += 32;
+            }
+        }
+        else
+        {
+            for (unsigned i = 0; i < enabledBillboards; ++i)
+            {
+                Billboard& billboard = *sortedBillboards_[i];
+
+                Vector2 size(billboard.size_.x_ * billboardScale.x_, billboard.size_.y_ * billboardScale.y_);
+                unsigned color = billboard.color_.ToUInt();
+                if (fixedScreenSize_)
+                    size *= billboard.screenScaleFactor_;
+
+                float rot2D[2][2];
+                SinCos(billboard.rotation_, rot2D[0][1], rot2D[0][0]);
+                rot2D[1][0] = -rot2D[0][1];
+                rot2D[1][1] = rot2D[0][0];
+
+                dest[0] = billboard.position_.x_;
+                dest[1] = billboard.position_.y_;
+                dest[2] = billboard.position_.z_;
+                dest[3] = billboard.direction_.x_;
+                dest[4] = billboard.direction_.y_;
+                dest[5] = billboard.direction_.z_;
+                ((unsigned&)dest[6]) = color;
+                dest[7] = billboard.uv_.min_.x_;
+                dest[8] = billboard.uv_.min_.y_;
+                dest[9] = -size.x_ * rot2D[0][0] + size.y_ * rot2D[0][1];
+                dest[10] = -size.x_ * rot2D[1][0] + size.y_ * rot2D[1][1];
+
+                dest[11] = billboard.position_.x_;
+                dest[12] = billboard.position_.y_;
+                dest[13] = billboard.position_.z_;
+                dest[14] = billboard.direction_.x_;
+                dest[15] = billboard.direction_.y_;
+                dest[16] = billboard.direction_.z_;
+                ((unsigned&)dest[17]) = color;
+                dest[18] = billboard.uv_.max_.x_;
+                dest[19] = billboard.uv_.min_.y_;
+                dest[20] = size.x_ * rot2D[0][0] + size.y_ * rot2D[0][1];
+                dest[21] = size.x_ * rot2D[1][0] + size.y_ * rot2D[1][1];
+
+                dest[22] = billboard.position_.x_;
+                dest[23] = billboard.position_.y_;
+                dest[24] = billboard.position_.z_;
+                dest[25] = billboard.direction_.x_;
+                dest[26] = billboard.direction_.y_;
+                dest[27] = billboard.direction_.z_;
+                ((unsigned&)dest[28]) = color;
+                dest[29] = billboard.uv_.max_.x_;
+                dest[30] = billboard.uv_.max_.y_;
+                dest[31] = size.x_ * rot2D[0][0] - size.y_ * rot2D[0][1];
+                dest[32] = size.x_ * rot2D[1][0] - size.y_ * rot2D[1][1];
+
+                dest[33] = billboard.position_.x_;
+                dest[34] = billboard.position_.y_;
+                dest[35] = billboard.position_.z_;
+                dest[36] = billboard.direction_.x_;
+                dest[37] = billboard.direction_.y_;
+                dest[38] = billboard.direction_.z_;
+                ((unsigned&)dest[39]) = color;
+                dest[40] = billboard.uv_.min_.x_;
+                dest[41] = billboard.uv_.max_.y_;
+                dest[42] = -size.x_ * rot2D[0][0] - size.y_ * rot2D[0][1];
+                dest[43] = -size.x_ * rot2D[1][0] - size.y_ * rot2D[1][1];
+
+                dest += 44;
+            }
         }
     }
 

@@ -91,6 +91,8 @@ public:
     void SetSorted(bool enable);
     /// Set whether billboards have fixed size on screen (measured in pixels) regardless of distance to camera. Default false.
     void SetFixedScreenSize(bool enable);
+    /// Set whether to output geometry as points instead of quads.
+    void SetGeneratePoints(bool enable);
     /// Set how the billboards should rotate in relation to the camera. Default is to follow camera rotation on all axes (FC_ROTATE_XYZ.)
     void SetFaceCameraMode(FaceCameraMode mode);
     /// Set minimal angle between billboard normal and look-at direction.
@@ -123,6 +125,9 @@ public:
 
     /// Return whether billboards are fixed screen size.
     bool IsFixedScreenSize() const { return fixedScreenSize_; }
+
+    /// Return whether bilboards are output as points instead of quads.
+    bool IsGeneratePoints() const { return generatePoints_; }
 
     /// Return how the billboards rotate in relation to the camera.
     FaceCameraMode GetFaceCameraMode() const { return faceCameraMode_; }
@@ -199,6 +204,8 @@ private:
     bool sortThisFrame_;
     /// Whether was last rendered from an ortho camera.
     bool hasOrthoCamera_;
+    /// Whether to generate a point list instead of quads.
+    bool generatePoints_;
     /// Frame number on which was last sorted.
     unsigned sortFrameNumber_;
     /// Previous offset to camera for determining whether sorting is necessary.
