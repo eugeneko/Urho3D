@@ -1855,7 +1855,7 @@ void View::RenderQuad(RenderPathCommand& command)
     if (!vs)
         command.vertexShaderName_ = String::EMPTY;
 
-#ifndef GL_ES_VERSION_2_0
+#if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
     if (!command.hullShaderName_.Empty())
         hs = graphics_->GetShader(HS, command.hullShaderName_, command.hullShaderDefines_);
 
