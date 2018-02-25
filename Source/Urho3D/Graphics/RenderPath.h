@@ -172,6 +172,10 @@ struct URHO3D_API RenderPathCommand
     String metadata_;
     /// Vertex shader name.
     String vertexShaderName_;
+    /// Hull shader name.
+    String hullShaderName_;
+    /// Hull shader name.
+    String domainShaderName_;
     /// Geometry shader name.
     String geometryShaderName_;
     /// Pixel shader name.

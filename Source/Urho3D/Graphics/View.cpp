@@ -1846,16 +1846,32 @@ void View::RenderQuad(RenderPathCommand& command)
     if (command.vertexShaderName_.Empty() || command.pixelShaderName_.Empty())
         return;
 
+    ShaderVariation* hs = nullptr;
+    ShaderVariation* ds = nullptr;
+    ShaderVariation* gs = nullptr;
+
     // If shader can not be found, clear it from the command to prevent redundant attempts
     ShaderVariation* vs = graphics_->GetShader(VS, command.vertexShaderName_, command.vertexShaderDefines_);
     if (!vs)
         command.vertexShaderName_ = String::EMPTY;
+
+#ifndef GL_ES_VERSION_2_0
+    if (!command.hullShaderName_.Empty())
+        hs = graphics_->GetShader(HS, command.hullShaderName_, command.hullShaderDefines_);
+
+    if (!command.domainShaderName_.Empty())
+        ds = graphics_->GetShader(DS, command.domainShaderName_, command.domainShaderDefines_);
+
+    if (!command.geometryShaderName_.Empty())
+        gs = graphics_->GetShader(GS, command.geometryShaderName_, command.geometryShaderDefines_);
+#endif
+
     ShaderVariation* ps = graphics_->GetShader(PS, command.pixelShaderName_, command.pixelShaderDefines_);
     if (!ps)
         command.pixelShaderName_ = String::EMPTY;
 
     // Set shaders & shader parameters and textures
-    graphics_->SetShaders(vs, ps, nullptr, nullptr, nullptr);
+    graphics_->SetShaders(vs, ps, gs, hs, ds);
 
     SetGlobalShaderParameters();
     SetCameraShaderParameters(camera_);

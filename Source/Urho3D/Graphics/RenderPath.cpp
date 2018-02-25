@@ -164,13 +164,21 @@ void RenderPathCommand::Load(const XMLElement& element)
     case CMD_LIGHTVOLUMES:
     case CMD_QUAD:
         vertexShaderName_ = element.GetAttribute("vs");
-        geometryShaderName_ = element.GetAttribute("gs");
         pixelShaderName_ = element.GetAttribute("ps");
 
-        if (type_ == CMD_QUAD && element.HasAttribute("blend"))
+        if (type_ == CMD_QUAD)
         {
-            String blend = element.GetAttributeLower("blend");
-            blendMode_ = ((BlendMode)GetStringListIndex(blend.CString(), blendModeNames, BLEND_REPLACE));
+            // Tessellator uses include waves, barrel distortion, etc.
+            // Geometry shader uses mosaics, glass, fractures, triangle discard, etc.
+            hullShaderName_ = element.GetAttribute("hs");
+            domainShaderName_ = element.GetAttribute("ds");
+            geometryShaderName_ = element.GetAttribute("gs");
+
+            if (element.HasAttribute("blend"))
+            {
+                String blend = element.GetAttributeLower("blend");
+                blendMode_ = ((BlendMode)GetStringListIndex(blend.CString(), blendModeNames, BLEND_REPLACE));
+            }
         }
         break;
 
@@ -208,6 +216,8 @@ void RenderPathCommand::Load(const XMLElement& element)
 
     // Shader compile flags & parameters
     vertexShaderDefines_ = element.GetAttribute("vsdefines");
+    hullShaderDefines_ = element.GetAttribute("hsdefines");
+    domainShaderDefines_ = element.GetAttribute("dsdefines");
     geometryShaderDefines_ = element.GetAttribute("gsdefines");
     pixelShaderDefines_ = element.GetAttribute("psdefines");
     XMLElement parameterElem = element.GetChild("parameter");
