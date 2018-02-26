@@ -1,4 +1,4 @@
-#if defined(COMPILEVS) || defined(COMPILEGS)
+#if defined(COMPILEVS) || defined(COMPILEGS) || defined(COMPILEDS)
 
 #ifdef D3D11
 #define OUTPOSITION SV_POSITION
@@ -36,7 +36,7 @@ float GetDepth(float4 clipPos)
     return dot(clipPos.zw, cDepthMode.zw);
 }
 
-#ifdef BILLBOARD
+#if defined(BILLBOARD) || defined(POINTBILLBOARD)
 float3 GetBillboardPos(float4 iPos, float2 iSize, float4x3 modelMatrix)
 {
     return mul(iPos, modelMatrix) + mul(float3(iSize.x, iSize.y, 0.0), cBillboardRot);
@@ -48,7 +48,7 @@ float3 GetBillboardNormal()
 }
 #endif
 
-#ifdef DIRBILLBOARD
+#if defined(DIRBILLBOARD) || defined(POINTDIRBILLBOARD)
 float3x3 GetFaceCameraRotation(float3 position, float3 direction)
 {
     float3 cameraDir = normalize(position - cCameraPos);
@@ -113,9 +113,9 @@ float3 GetTrailNormal(float4 iPos, float3 iParentPos, float3 iForward)
     #define iModelMatrix cModel
 #endif
 
-#if defined(BILLBOARD)
+#if defined(BILLBOARD) || defined(POINTBILLBOARD)
     #define GetWorldPos(modelMatrix) GetBillboardPos(iPos, iSize, modelMatrix)
-#elif defined(DIRBILLBOARD)
+#elif defined(DIRBILLBOARD) || defined(POINTDIRBILLBOARD)
     #define GetWorldPos(modelMatrix) GetBillboardPos(iPos, iSize, iNormal, modelMatrix)
 #elif defined(TRAILFACECAM)
     #define GetWorldPos(modelMatrix) GetTrailPos(iPos, iTangent.xyz, iTangent.w, modelMatrix)

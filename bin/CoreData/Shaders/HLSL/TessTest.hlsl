@@ -53,23 +53,24 @@ PatchTess PatchHS(InputPatch<VS_OUTPUT,3> patch, uint patchID : SV_PrimitiveID)
     PatchTess pt;
     
     // just using a constant factor of 2
-    pt.EdgeTess[0] = 2;
-    pt.EdgeTess[1] = 2;
-    pt.EdgeTess[2] = 2;
-    pt.InsideTess  = pt.EdgeTess[0];
+    pt.EdgeTess[0] = 4;
+    pt.EdgeTess[1] = 4;
+    pt.EdgeTess[2] = 4;
+    pt.InsideTess  = 3;
     
     return pt;
 }
 
-[domain("tri")]
-[partitioning("fractional_odd")]
+
+[partitioning("integer")]
 [outputtopology("triangle_cw")]
-[outputcontrolpoints(OUTPUT_PATCH_SIZE)]
+[outputcontrolpoints(3)]
 [patchconstantfunc("PatchHS")]
+[domain("tri")]
 HULL_OUTPUT HS(InputPatch<VS_OUTPUT,3> patch, uint pointIdx : SV_OutputControlPointID, uint patchId : SV_PrimitiveID)
 {
     HULL_OUTPUT dataOut;
-    dataOut.oPos = patch[pointIdx].oWorldPos;
+    //dataOut.oPos = patch[pointIdx].oWorldPos;
     dataOut.oWorldPos = patch[pointIdx].oWorldPos;
     dataOut.oColor = patch[pointIdx].oColor;
     return dataOut;
@@ -100,7 +101,7 @@ float4 dBernsteinBasis(float t)
 }
 
 //--------------------------------------------------------------------------------------
-float3 EvaluateBezier( const OutputPatch<HULL_OUTPUT, OUTPUT_PATCH_SIZE> bezpatch, float4 BasisU, float4 BasisV )
+float3 EvaluateBezier( const OutputPatch<HULL_OUTPUT, 3> bezpatch, float4 BasisU, float4 BasisV )
 {
     float3 Value = float3(0,0,0);
     Value  = BasisV.x * ( bezpatch[0].oWorldPos * BasisU.x + bezpatch[1].oWorldPos * BasisU.y);
@@ -111,22 +112,13 @@ float3 EvaluateBezier( const OutputPatch<HULL_OUTPUT, OUTPUT_PATCH_SIZE> bezpatc
 }
 
 [domain("tri")]
-HULL_OUTPUT DS(PatchTess input, float2 coord : SV_DomainLocation, const OutputPatch<HULL_OUTPUT, OUTPUT_PATCH_SIZE> bezPatch)
+HULL_OUTPUT DS(PatchTess input, float3 uvwCoord : SV_DomainLocation, const OutputPatch<HULL_OUTPUT, 3> patch)
 {
     HULL_OUTPUT dataOut;
     
-    float4 BasisU = BernsteinBasis( coord.x );
-    float4 BasisV = BernsteinBasis( coord.y );
-    float4 dBasisU = dBernsteinBasis( coord.x );
-    float4 dBasisV = dBernsteinBasis( coord.y );
-
-    float3 WorldPos = EvaluateBezier( bezPatch, BasisU, BasisV );
-    float3 Tangent = EvaluateBezier( bezPatch, dBasisU, BasisV );
-    float3 BiTangent = EvaluateBezier( bezPatch, BasisU, dBasisV );
-    float3 Norm = normalize( cross( Tangent, BiTangent ) );
-    
-    dataOut.oPos = float4(WorldPos,0);
-    dataOut.oWorldPos = float4(WorldPos, 0);
+    float4 vertexPosition = uvwCoord.x * patch[0].oWorldPos + uvwCoord.y * patch[1].oWorldPos + uvwCoord.z * patch[2].oWorldPos;
+    dataOut.oPos = GetClipPos(vertexPosition.xyz);
+    dataOut.oWorldPos = GetClipPos(vertexPosition);
     dataOut.oColor = float4(1, 0, 0, 1);
     return dataOut;
 }

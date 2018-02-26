@@ -4,23 +4,84 @@
 #include "ScreenPos.glsl"
 #include "Fog.glsl"
 
-varying vec2 vTexCoord;
-varying vec4 vWorldPos;
-#ifdef VERTEXCOLOR
-    varying vec4 vColor;
-#endif
 #ifdef SOFTPARTICLES
-    varying vec4 vScreenPos;
     uniform float cSoftParticleFadeScale;
 #endif
 
+#ifndef GL3
+
+    varying vec2 vTexCoord;
+    varying vec4 vWorldPos;
+    #ifdef VERTEXCOLOR
+        varying vec4 vColor;
+    #endif
+    #ifdef SOFTPARTICLES
+        varying vec4 vScreenPos;
+    #endif
+
+#else
+
+#ifdef COMPILEGS
+    #define VSDATA_TAIL []
+#else
+    #define VSDATA_TAIL
+#endif
+
+#ifdef COMPILEVS
+    out 
+#else
+    in
+#endif
+    VertexData
+    {
+        #if (defined(POINTBILLBOARD) || defined(POINTDIRBILLBOARD)) && !defined(COMPILEPS)
+            vec4 vTexCoord;
+            vec4 vSize;
+        #else
+            vec2 vTexCoord;
+        #endif
+        #if defined(POINTDIRBILLBOARD) && !defined(COMPILEPS)
+            vec3 vNormal;
+        #endif
+        vec4 vWorldPos;
+        #ifdef VERTEXCOLOR
+            vec4 vColor;
+        #endif
+        #ifdef SOFTPARTICLES
+            vec4 vScreenPos;
+        #endif
+    } vs_out VSDATA_TAIL;
+    
+#endif
+
+#ifdef COMPILEVS
+
+    #define vTexCoord vs_out.vTexCoord
+    #define vWorldPos vs_out.vWorldPos
+    #define vColor vs_out.vColor
+    #define vScreenPos vs_out.vScreenPos
+    #define vSize vs_out.vSize
+    #define vNormal vs_out.vNormal
+
 void VS()
 {
-    mat4 modelMatrix = iModelMatrix;
-    vec3 worldPos = GetWorldPos(modelMatrix);
-    gl_Position = GetClipPos(worldPos);
-    vTexCoord = GetTexCoord(iTexCoord);
-    vWorldPos = vec4(worldPos, GetDepth(gl_Position));
+    #if defined(POINTBILLBOARD) || defined(POINTDIRBILLBOARD)
+        mat4 modelMatrix = iModelMatrix;
+        vec3 worldPos = GetWorldPos(modelMatrix);
+        gl_Position = GetClipPos(worldPos);
+        vTexCoord = iTexCoord;
+        vSize = iTexCoord1;
+        vWorldPos = vec4(worldPos, GetDepth(gl_Position));
+        #if defined(POINTDIRBILLBOARD)
+            vNormal = iNormal;
+        #endif
+    #else
+        mat4 modelMatrix = iModelMatrix;
+        vec3 worldPos = GetWorldPos(modelMatrix);
+        gl_Position = GetClipPos(worldPos);
+        vTexCoord = GetTexCoord(iTexCoord);
+        vWorldPos = vec4(worldPos, GetDepth(gl_Position));
+    #endif
 
     #ifdef SOFTPARTICLES
         vScreenPos = GetScreenPos(gl_Position);
@@ -31,6 +92,96 @@ void VS()
     #endif
 
 }
+
+#endif
+
+#if defined(COMPILEGS) && (defined(POINTBILLBOARD) || defined(POINTDIRBILLBOARD))
+#line 100
+    
+    out VertexData
+    {
+        vec2 vTexCoord;
+        vec4 vWorldPos;
+        #ifdef POINTDIRBILLBOARD
+            vec3 vNormal;
+        #endif
+        #ifdef VERTEXCOLOR
+            vec4 vColor;
+        #endif
+        #ifdef SOFTPARTICLES
+            vec4 vScreenPos;
+        #endif
+    } gs_out;
+    
+    #define oTexCoord gs_out.vTexCoord
+    #define oWorldPos gs_out.vWorldPos
+    #define oColor gs_out.vColor
+    #define oScreenPos gs_out.vScreenPos
+
+layout(points) in;
+layout(triangle_strip, max_vertices = 4) out;
+
+mat3 GetFaceCameraRotation(vec3 position, vec3 direction)
+{
+    vec3 cameraDir = normalize(position - cCameraPos);
+    vec3 front = normalize(direction);
+    vec3 right = normalize(cross(front, cameraDir));
+    vec3 up = normalize(cross(front, right));
+
+    return mat3(
+        right.x, up.x, front.x,
+        right.y, up.y, front.y,
+        right.z, up.z, front.z
+    );
+}
+
+void GS()
+{
+    vec2 minUV = vs_out[0].vTexCoord.xy;
+    vec2 maxUV = vs_out[0].vTexCoord.zw;
+    vec2 minSize = vs_out[0].vSize.xy;
+    vec2 maxSize = vs_out[0].vSize.zw;
+    
+    vec2 partUV[] = {
+        minUV,
+        vec2(minUV.x, maxUV.y),
+        vec2(maxUV.x, minUV.y),
+        maxUV,
+    };
+    
+    vec3 partOffset[] = {
+        vec3(minSize.x, minSize.y, 0),
+        vec3(minSize.x, maxSize.y, 0),
+        vec3(maxSize.x, minSize.y, 0),
+        vec3(maxSize.x, maxSize.y, 0),
+    };
+
+    vec4 wPos = vs_out[0].vWorldPos;
+    for (int i = 0; i < 4; ++i)
+    {        
+        #if defined(POINTBILLBOARD)
+            vec3 vPos = partOffset[i] * cBillboardRot;
+        #elif defined(POINTDIRBILLBOARD)
+            vec3 vPos = vec3(partOffset[i].x, 0, partOffset[i].y) * GetFaceCameraRotation(wPos.xyz, vs_out[0].vNormal);
+        #endif
+        
+        oWorldPos = vec4((wPos + vPos).xyz, 0);
+        oTexCoord = partUV[i];
+        oColor = vs_out[0].vColor;
+        gl_Position = vec4(oWorldPos.xyz, 1.0) * cViewProj;
+        EmitVertex();
+    }
+    EndPrimitive();
+}
+
+#endif
+
+#ifdef COMPILEPS
+
+    #define vTexCoord vs_out.vTexCoord
+    #define vWorldPos vs_out.vWorldPos
+    #define vColor vs_out.vColor
+    #define vScreenPos vs_out.vScreenPos
 
 void PS()
 {
@@ -88,3 +239,5 @@ void PS()
 
     gl_FragColor = vec4(GetFog(diffColor.rgb, fogFactor), diffColor.a);
 }
+
+#endif

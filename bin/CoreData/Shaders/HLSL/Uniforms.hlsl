@@ -82,7 +82,7 @@ uniform float2 cVSMShadowParams;
 
 // D3D11 uniforms (using constant buffers)
 
-#if defined(COMPILEVS) || defined(COMPILEGS)
+#if defined(COMPILEVS) || defined(COMPILEGS) || defined(COMPILEDS)
 
 
 // Vertex shader uniforms
@@ -136,7 +136,7 @@ cbuffer MaterialVS : register(b4)
 cbuffer ObjectVS : register(b5)
 {
     float4x3 cModel;
-#ifdef BILLBOARD
+#if defined(BILLBOARD) || defined(POINTBILLBOARD)
     float3x3 cBillboardRot;
 #endif
 #ifdef SKINNED

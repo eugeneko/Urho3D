@@ -1,27 +1,33 @@
-#ifdef COMPILEVS
-
+#if defined (COMPILEVS) || defined(COMPILEHS) || defined(COMPILEDS)
 // Silence GLSL 150 deprecation warnings
 #ifdef GL3
 #define attribute in
 #define varying out
 #endif
 
-attribute vec4 iPos;
-attribute vec3 iNormal;
-attribute vec4 iColor;
-attribute vec2 iTexCoord;
-attribute vec2 iTexCoord1;
-attribute vec4 iTangent;
-attribute vec4 iBlendWeights;
-attribute vec4 iBlendIndices;
-attribute vec3 iCubeTexCoord;
-attribute vec4 iCubeTexCoord1;
-#ifdef INSTANCED
-    attribute vec4 iTexCoord4;
-    attribute vec4 iTexCoord5;
-    attribute vec4 iTexCoord6;
+#ifndef COMPILEGS
+    attribute vec4 iPos;
+    attribute vec3 iNormal;
+    attribute vec4 iColor;
+    #if defined(POINTBILLBOARD) || defined(POINTDIRBILLBOARD)
+        attribute vec4 iTexCoord;
+        attribute vec4 iTexCoord1;
+    #else
+        attribute vec2 iTexCoord;
+        attribute vec2 iTexCoord1;
+    #endif
+    attribute vec4 iTangent;
+    attribute vec4 iBlendWeights;
+    attribute vec4 iBlendIndices;
+    attribute vec3 iCubeTexCoord;
+    attribute vec4 iCubeTexCoord1;
+    #ifdef INSTANCED
+        attribute vec4 iTexCoord4;
+        attribute vec4 iTexCoord5;
+        attribute vec4 iTexCoord6;
+    #endif
+    attribute float iObjectIndex;
 #endif
-attribute float iObjectIndex;
 
 #ifdef SKINNED
 mat4 GetSkinMatrix(vec4 blendWeights, vec4 blendIndices)
@@ -75,7 +81,7 @@ float GetDepth(vec4 clipPos)
     return dot(clipPos.zw, cDepthMode.zw);
 }
 
-#ifdef BILLBOARD
+#if defined(BILLBOARD) || defined(POINTBILLBOARD)
 vec3 GetBillboardPos(vec4 iPos, vec2 iSize, mat4 modelMatrix)
 {
     return (iPos * modelMatrix).xyz + vec3(iSize.x, iSize.y, 0.0) * cBillboardRot;
@@ -87,7 +93,7 @@ vec3 GetBillboardNormal()
 }
 #endif
 
-#ifdef DIRBILLBOARD
+#if defined(DIRBILLBOARD) || defined(POINTDIRBILLBOARD)
 mat3 GetFaceCameraRotation(vec3 position, vec3 direction)
 {
     vec3 cameraDir = normalize(position - cCameraPos);

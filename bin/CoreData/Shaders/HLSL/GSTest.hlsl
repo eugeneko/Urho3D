@@ -51,18 +51,10 @@ void CreateVertex(inout TriangleStream<GS_OUTPUT> triStream, float3 pos, float4 
 [maxvertexcount(16)]
 void GS(triangle in VS_OUTPUT vertices[3], inout TriangleStream<GS_OUTPUT> triStream)
 {
-    const float gLayers = 3.0;
-
     VS_OUTPUT v1 = vertices[0],
         v2 = vertices[1],
         v3 = vertices[2];
-    float length = 0.1;
-
-    float3 offsets[] = {
-        float3(3, 3, 0),
-        float3(-3, -3, 0),
-        float3(3, 0, -3)
-    };
+        
     float4 colors[] = {
         float4(0.8, 0.6, 0.3, 0.5),
         float4(0.2, 0.9, 0.5, 0.5),
@@ -71,7 +63,6 @@ void GS(triangle in VS_OUTPUT vertices[3], inout TriangleStream<GS_OUTPUT> triSt
         float4(0.4, 0.73, 0.1, 0.5),
     };
 
-    float offset = length / gLayers;
     CreateVertex(triStream, v1.oWorldPos, colors[0]);
     CreateVertex(triStream, v2.oWorldPos, colors[0]);
     CreateVertex(triStream, v3.oWorldPos, colors[0]);

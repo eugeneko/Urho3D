@@ -5,7 +5,7 @@
 
 // OpenGL 2 uniforms (no constant buffers)
 
-#ifdef COMPILEVS
+#if defined(COMPILEVS)
 
 // Vertex shader uniforms
 uniform vec3 cAmbientStartColor;
@@ -93,7 +93,7 @@ uniform vec2 cVSMShadowParams;
 
 // OpenGL 3 uniforms (using constant buffers)
 
-#ifdef COMPILEVS
+#if defined(COMPILEVS) || defined(COMPILEGS) || defined(COMPILEHS) || defined(COMPILEDS)
 
 uniform FrameVS
 {
@@ -145,7 +145,7 @@ uniform MaterialVS
 uniform ObjectVS
 {
     mat4 cModel;
-#ifdef BILLBOARD
+#if defined(BILLBOARD) || defined(POINTBILLBOARD)
     mat3 cBillboardRot;
 #endif
 #ifdef SKINNED

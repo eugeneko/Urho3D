@@ -19,7 +19,11 @@ cbuffer CustomPS : register(b6)
 
 void VS(float4 iPos : POSITION,
     #ifndef NOUV
-        float2 iTexCoord : TEXCOORD0,
+        #if defined(POINTBILLBOARD) || defined(POINTDIRBILLBOARD)
+            float4 iTexCoord : TEXCOORD0,
+        #else
+            float2 iTexCoord : TEXCOORD0,
+        #endif
     #endif
     #ifdef VERTEXCOLOR
         float4 iColor : COLOR0,
@@ -33,14 +37,25 @@ void VS(float4 iPos : POSITION,
     #endif
     #if defined(BILLBOARD) || defined(DIRBILLBOARD)
         float2 iSize : TEXCOORD1,
+    #elif defined(POINTBILLBOARD) || defined(POINTDIRBILLBOARD)
+        float4 iSize : TEXCOORD1,
     #endif
-    #if defined(DIRBILLBOARD) || defined(TRAILBONE)
+    #if defined(DIRBILLBOARD) || defined(TRAILBONE) || defined(POINTDIRBILLBOARD)
         float3 iNormal : NORMAL,
     #endif
     #if defined(TRAILFACECAM) || defined(TRAILBONE)
         float4 iTangent : TANGENT,
     #endif
-    out float2 oTexCoord : TEXCOORD0,
+    
+    #if defined(POINTBILLBOARD) || defined(POINTDIRBILLBOARD)
+        out float4 oTexCoord : TEXCOORD0,
+        out float4 oSize : TEXCOORD1,
+    #else
+        out float2 oTexCoord : TEXCOORD0,
+    #endif
+    #if defined(POINTDIRBILLBOARD)
+        out float3 oNormal : NORMAL,
+    #endif
     #ifdef SOFTPARTICLES
         out float4 oScreenPos : TEXCOORD1,
     #endif
@@ -58,11 +73,23 @@ void VS(float4 iPos : POSITION,
     float2 iTexCoord = float2(0.0, 0.0);
     #endif
 
-    float4x3 modelMatrix = iModelMatrix;
-    float3 worldPos = GetWorldPos(modelMatrix);
-    oPos = GetClipPos(worldPos);
-    oTexCoord = GetTexCoord(iTexCoord);
-    oWorldPos = float4(worldPos, GetDepth(oPos));
+    #if defined(POINTBILLBOARD) || defined(POINTDIRBILLBOARD)
+        float4x3 modelMatrix = iModelMatrix;
+        float3 worldPos = GetWorldPos(modelMatrix);
+        oPos = GetClipPos(worldPos);
+        oTexCoord = iTexCoord;
+        oSize = iSize;
+        oWorldPos = float4(worldPos, GetDepth(oPos));
+        #ifdef POINTDIRBILLBOARD
+            oNormal = iNormal;
+        #endif
+    #else
+        float4x3 modelMatrix = iModelMatrix;
+        float3 worldPos = GetWorldPos(modelMatrix);
+        oPos = GetClipPos(worldPos);
+        oTexCoord = GetTexCoord(iTexCoord);
+        oWorldPos = float4(worldPos, GetDepth(oPos));
+    #endif
 
     #if defined(D3D11) && defined(CLIPPLANE)
         oClip = dot(oPos, cClipPlane);
@@ -76,6 +103,87 @@ void VS(float4 iPos : POSITION,
         oColor = iColor;
     #endif
 }
+
+
+#if defined(COMPILEGS) && (defined(POINTBILLBOARD) || defined(POINTDIRBILLBOARD))
+
+struct VSOutput
+{
+    float4 iTexCoord : TEXCOORD0;
+    float4 iSize : TEXCOORD1;
+    #ifdef POINTDIRBILLBOARD
+        float3 iNormal : NORMAL;
+    #endif
+    #ifdef SOFTPARTICLES
+        float4 iScreenPos: TEXCOORD1;
+    #endif
+    float4 iWorldPos: TEXCOORD2;
+    #ifdef VERTEXCOLOR
+        float4 iColor : COLOR0;
+    #endif
+};
+
+struct GSOutput
+{
+    float2 iTexCoord : TEXCOORD0;
+    #ifdef SOFTPARTICLES
+        float4 iScreenPos: TEXCOORD1;
+    #endif
+    float4 iWorldPos: TEXCOORD2;
+    #ifdef VERTEXCOLOR
+        float4 iColor : COLOR0;
+    #endif
+    float4 oPos : SV_POSITION;
+};
+
+[maxvertexcount(4)]
+void GS(point in VSOutput vertexData[1], inout TriangleStream<GSOutput> triStream)
+{
+    VSOutput vertData = vertexData[0];
+
+    float2 minUV = vertData.iTexCoord.xy;
+    float2 maxUV = vertData.iTexCoord.zw;
+    float2 minSize = vertData.iSize.xy;
+    float2 maxSize = vertData.iSize.zw;
+
+    float2 partUV[] = {
+        minUV,
+        float2(minUV.x, maxUV.y),
+        float2(maxUV.x, minUV.y),
+        maxUV,
+    };
+    
+    float3 partOffset[] = {
+        float3(minSize.x, minSize.y, 0),
+        float3(minSize.x, maxSize.y, 0),
+        float3(maxSize.x, minSize.y, 0),
+        float3(maxSize.x, maxSize.y, 0),
+    };
+    
+    [unroll]
+    for (int i = 0; i < 4; ++i)
+    {
+        GSOutput outVert = (GSOutput)0;
+        
+        #ifdef POINTBILLBOARD       
+            float3 vPos = mul(partOffset[i], cBillboardRot);
+        #elif POINTDIRBILLBOARD
+            float3 vPos = mul(float3(partOffset[i].x, 0, partOffset[i].y), GetFaceCameraRotation(vertData.iWorldPos.xyz, vertData.iNormal));
+        #endif
+        
+        outVert.oPos = float4(vertData.iWorldPos.xyz + vPos, 0);
+        outVert.iWorldPos = outVert.oPos;
+        outVert.oPos = GetClipPos(outVert.oPos);
+        outVert.iTexCoord = partUV[i];
+        outVert.iColor = vertData.iColor;
+        
+        triStream.Append(outVert);
+    }
+}
+
+#endif 
+
+#if COMPILEPS
 
 void PS(float2 iTexCoord : TEXCOORD0,
     #ifdef SOFTPARTICLES
@@ -143,3 +251,5 @@ void PS(float2 iTexCoord : TEXCOORD0,
 
     oColor = float4(GetFog(diffColor.rgb, fogFactor), diffColor.a);
 }
+
+#endif
