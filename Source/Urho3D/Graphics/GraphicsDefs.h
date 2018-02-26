@@ -59,11 +59,13 @@ enum GeometryType
     GEOM_INSTANCED = 2,
     GEOM_BILLBOARD = 3,
     GEOM_DIRBILLBOARD = 4,
-    GEOM_TRAIL_FACE_CAMERA = 5,
-    GEOM_TRAIL_BONE = 6,
-    MAX_GEOMETRYTYPES = 7,
+    GEOM_POINT_BILLBOARD = 5,
+    GEOM_POINT_DIRBILLBOARD = 6,
+    GEOM_TRAIL_FACE_CAMERA = 7,
+    GEOM_TRAIL_BONE = 8,
+    MAX_GEOMETRYTYPES = 9,
     // This is not a real geometry type for VS, but used to mark objects that do not desire to be instanced
-    GEOM_STATIC_NOINSTANCING = 7,
+    GEOM_STATIC_NOINSTANCING = 9,
 };
 
 /// Blending mode.

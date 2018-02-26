@@ -318,6 +318,13 @@ void BillboardSet::SetGeneratePoints(bool enable)
     if (generatePoints_ != enable)
         bufferSizeDirty_ = bufferDirty_ = true;
     generatePoints_ = enable;
+
+    // Set geometry type appropriately
+    if (faceCameraMode_ == FC_DIRECTION)
+        batches_[0].geometryType_ = generatePoints_ ? GEOM_POINT_DIRBILLBOARD : GEOM_DIRBILLBOARD;
+    else
+        batches_[0].geometryType_ = generatePoints_ ? GEOM_POINT_BILLBOARD : GEOM_BILLBOARD;
+
     Commit();
 }
 
@@ -327,9 +334,9 @@ void BillboardSet::SetFaceCameraMode(FaceCameraMode mode)
     {
         faceCameraMode_ = mode;
         if (faceCameraMode_ == FC_DIRECTION)
-            batches_[0].geometryType_ = GEOM_DIRBILLBOARD;
+            batches_[0].geometryType_ = generatePoints_ ? GEOM_POINT_DIRBILLBOARD : GEOM_DIRBILLBOARD;
         else
-            batches_[0].geometryType_ = GEOM_BILLBOARD;
+            batches_[0].geometryType_ = generatePoints_ ? GEOM_POINT_BILLBOARD : GEOM_BILLBOARD;
         geometryTypeUpdate_ = true;
         bufferSizeDirty_ = true;
         Commit();

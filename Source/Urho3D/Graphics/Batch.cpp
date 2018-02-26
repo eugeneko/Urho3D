@@ -263,7 +263,7 @@ void Batch::Prepare(View* view, Camera* camera, bool setModelTransform, bool all
             graphics->SetShaderParameter(VSP_MODEL, *worldTransform_);
 
         // Set the orientation for billboards, either from the object itself or from the camera
-        if (geometryType_ == GEOM_BILLBOARD)
+        if (geometryType_ == GEOM_BILLBOARD || geometryType_ == GEOM_POINT_BILLBOARD)
         {
             if (numWorldTransforms_ > 1)
                 graphics->SetShaderParameter(VSP_BILLBOARDROT, worldTransform_[1].RotationMatrix());
