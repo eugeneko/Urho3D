@@ -722,11 +722,6 @@ void BillboardSet::UpdateVertexBuffer(const FrameInfo& frame)
                 if (fixedScreenSize_)
                     size *= billboard.screenScaleFactor_;
 
-                float rotationMatrix[2][2];
-                SinCos(billboard.rotation_, rotationMatrix[0][1], rotationMatrix[0][0]);
-                rotationMatrix[1][0] = -rotationMatrix[0][1];
-                rotationMatrix[1][1] = rotationMatrix[0][0];
-
                 dest[0] = billboard.position_.x_;
                 dest[1] = billboard.position_.y_;
                 dest[2] = billboard.position_.z_;
@@ -736,11 +731,11 @@ void BillboardSet::UpdateVertexBuffer(const FrameInfo& frame)
                 dest[5] = billboard.uv_.min_.y_;
                 dest[6] = billboard.uv_.max_.x_;
                 dest[7] = billboard.uv_.max_.y_;
-                // Vector4 sizes
-                dest[8] = -size.x_ * rotationMatrix[0][0] - size.y_ * rotationMatrix[0][1];
-                dest[9] = -size.x_ * rotationMatrix[1][0] - size.y_ * rotationMatrix[1][1];
-                dest[10] = size.x_ * rotationMatrix[0][0] + size.y_ * rotationMatrix[0][1];
-                dest[11] = size.x_ * rotationMatrix[1][0] + size.y_ * rotationMatrix[1][1];
+                // Vector4, XY = size, Z = pole rotation, W = sorting distance
+                dest[8] = size.x_;
+                dest[9] = size.y_;
+                dest[10] = billboard.rotation_;
+                dest[11] = billboard.sortDistance_;
 
                 dest += 12;
             }
@@ -756,11 +751,6 @@ void BillboardSet::UpdateVertexBuffer(const FrameInfo& frame)
                 if (fixedScreenSize_)
                     size *= billboard.screenScaleFactor_;
 
-                float rot2D[2][2];
-                SinCos(billboard.rotation_, rot2D[0][1], rot2D[0][0]);
-                rot2D[1][0] = -rot2D[0][1];
-                rot2D[1][1] = rot2D[0][0];
-
                 dest[0] = billboard.position_.x_;
                 dest[1] = billboard.position_.y_;
                 dest[2] = billboard.position_.z_;
@@ -773,11 +763,11 @@ void BillboardSet::UpdateVertexBuffer(const FrameInfo& frame)
                 dest[8] = billboard.uv_.min_.y_;
                 dest[9] = billboard.uv_.max_.x_;
                 dest[10] = billboard.uv_.max_.y_;
-                // Vector4 sizes
-                dest[11] = -size.x_ * rot2D[0][0] - size.y_ * rot2D[0][1];
-                dest[12] = -size.x_ * rot2D[1][0] - size.y_ * rot2D[1][1];
-                dest[13] = size.x_ * rot2D[0][0] + size.y_ * rot2D[0][1];
-                dest[14] = size.x_ * rot2D[1][0] + size.y_ * rot2D[1][1];
+                // Vector4, XY = size, Z = pole rotation, W = sorting distance
+                dest[11] = size.x_;
+                dest[12] = size.y_;
+                dest[13] = billboard.rotation_;
+                dest[14] = billboard.sortDistance_;
 
                 dest += 15;
             }
