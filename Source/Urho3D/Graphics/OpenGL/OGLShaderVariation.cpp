@@ -147,6 +147,8 @@ bool ShaderVariation::Create()
         }
     }
     // Force GLSL version 150 if no version define and GL3 is being used
+    //??if (!verEnd && Graphics::GetTessellationSupport())
+    //??    shaderCode += "#version 410\n";
     if (!verEnd && Graphics::GetGL3Support())
         shaderCode += "#version 150\n";
 
@@ -202,6 +204,8 @@ bool ShaderVariation::Create()
 #endif
     if (Graphics::GetGL3Support())
         shaderCode += "#define GL3\n";
+    if (Graphics::GetTessellationSupport())
+        shaderCode += "#define GL4\n";
 
     // When version define found, do not insert it a second time
     if (verEnd > 0)

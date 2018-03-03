@@ -124,6 +124,44 @@ ShaderProgram::ShaderProgram(Graphics* graphics, ShaderVariation* vertexShader, 
         parameters_[i->first_].bufferPtr_ = vsConstantBuffers_[i->second_.buffer_].Get();
     }
 
+    // Coalesce tessellation stage parameters
+    if (hullShader && domainShader && graphics->GetTessellationSupport())
+    {
+        const auto& hsParams = hullShader->GetParameters();
+        for (auto i = hsParams.Begin(); i != hsParams.End(); ++i)
+        {
+            if (!parameters_.Contains(i->first_))
+            {
+                parameters_[i->first_] = i->second_;
+                parameters_[i->first_].bufferPtr_ = vsConstantBuffers_[i->second_.buffer_].Get();
+            }
+        }
+
+        const auto& dsParams = domainShader->GetParameters();
+        for (auto i = dsParams.Begin(); i != dsParams.End(); ++i)
+        {
+            if (!parameters_.Contains(i->first_))
+            {
+                parameters_[i->first_] = i->second_;
+                parameters_[i->first_].bufferPtr_ = vsConstantBuffers_[i->second_.buffer_].Get();
+            }
+        }
+    }
+
+    // Coalesce geometry shader paramters
+    if (geometryShader && graphics->GetGeometryShaderSupport())
+    {
+        const auto& gsParams = geometryShader->GetParameters();
+        for (auto i = gsParams.Begin(); i != gsParams.End(); ++i)
+        {
+            if (!parameters_.Contains(i->first_))
+            {
+                parameters_[i->first_] = i->second_;
+                parameters_[i->first_].bufferPtr_ = vsConstantBuffers_[i->second_.buffer_].Get();
+            }
+        }
+    }
+
     const HashMap<StringHash, ShaderParameter>& psParams = pixelShader->GetParameters();
     for (HashMap<StringHash, ShaderParameter>::ConstIterator i = psParams.Begin(); i != psParams.End(); ++i)
     {
