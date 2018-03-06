@@ -249,13 +249,17 @@ HashMap<String, unsigned> Technique::passIndices;
 
 Technique::Technique(Context* context) :
     Resource(context),
-    isDesktop_(false)
+    isDesktop_(false),
+    requireGeometryShaderSupport_(false),
+    requireTessellationSupport_(false)
 {
 #ifdef DESKTOP_GRAPHICS
     desktopSupport_ = true;
 #else
     desktopSupport_ = false;
 #endif
+    geometryShaderSupport_ = GetSubsystem<Graphics>()->GetGeometryShaderSupport();
+    tessellationSupport_ = GetSubsystem<Graphics>()->GetTessellationSupport();
 }
 
 Technique::~Technique() = default;
@@ -279,6 +283,10 @@ bool Technique::BeginLoad(Deserializer& source)
     XMLElement rootElem = xml->GetRoot();
     if (rootElem.HasAttribute("desktop"))
         isDesktop_ = rootElem.GetBool("desktop");
+
+    // Requirements will be determined based on the shaders found
+    requireGeometryShaderSupport_ = false;
+    requireTessellationSupport_ = false;
 
     String globalVS = rootElem.GetAttribute("vs");
     String globalPS = rootElem.GetAttribute("ps");
@@ -413,6 +421,9 @@ bool Technique::BeginLoad(Deserializer& source)
 
             if (passElem.HasAttribute("alphatocoverage"))
                 newPass->SetAlphaToCoverage(passElem.GetBool("alphatocoverage"));
+
+            requireGeometryShaderSupport_ |= !newPass->GetGeometryShader().Empty();
+            requireTessellationSupport_ |= (!newPass->GetDomainShader().Empty() || !newPass->GetHullShader().Empty());
         }
         else
             URHO3D_LOGERROR("Missing pass name");

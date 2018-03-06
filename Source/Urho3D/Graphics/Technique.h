@@ -300,9 +300,13 @@ public:
 
     /// Return whether requires desktop level hardware.
     bool IsDesktop() const { return isDesktop_; }
+    /// Return whether geometry shader functionality is required.
+    bool RequiresGeometryShader() const { return requireGeometryShaderSupport_; }
+    /// Return whether tessellation shader functionality is required.
+    bool RequiresTessellation() const { return requireTessellationSupport_; }
 
     /// Return whether technique is supported by the current hardware.
-    bool IsSupported() const { return !isDesktop_ || desktopSupport_; }
+    bool IsSupported() const { return (!isDesktop_ || desktopSupport_) && (!requireGeometryShaderSupport_ || geometryShaderSupport_) && (!requireTessellationSupport_ || tessellationSupport_); }
 
     /// Return whether has a pass.
     bool HasPass(unsigned passIndex) const { return passIndex < passes_.Size() && passes_[passIndex].Get() != nullptr; }
@@ -359,8 +363,16 @@ public:
 private:
     /// Require desktop GPU flag.
     bool isDesktop_;
+    /// Requires GS support to use.
+    bool requireGeometryShaderSupport_;
+    /// Requires tessellation support to use.
+    bool requireTessellationSupport_;
     /// Cached desktop GPU support flag.
     bool desktopSupport_;
+    /// Cached GS support flag.
+    bool geometryShaderSupport_;
+    /// Cached tessellation support flag.
+    bool tessellationSupport_;
     /// Passes.
     Vector<SharedPtr<Pass> > passes_;
     /// Cached clones with added shader compilation defines.
