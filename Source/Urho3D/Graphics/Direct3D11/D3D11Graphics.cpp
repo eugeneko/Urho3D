@@ -2608,6 +2608,30 @@ void Graphics::PrepareDraw()
             &impl_->shaderResourceViews_[impl_->firstDirtyTexture_]);
         impl_->deviceContext_->VSSetSamplers(impl_->firstDirtyTexture_, impl_->lastDirtyTexture_ - impl_->firstDirtyTexture_ + 1,
             &impl_->samplers_[impl_->firstDirtyTexture_]);
+        
+        // If tessellation is available then set shader resources for texture access
+        if (tessellationSupport)
+        {
+            impl_->deviceContext_->HSSetShaderResources(impl_->firstDirtyTexture_, impl_->lastDirtyTexture_ - impl_->firstDirtyTexture_ + 1,
+                &impl_->shaderResourceViews_[impl_->firstDirtyTexture_]);
+            impl_->deviceContext_->HSSetSamplers(impl_->firstDirtyTexture_, impl_->lastDirtyTexture_ - impl_->firstDirtyTexture_ + 1,
+                &impl_->samplers_[impl_->firstDirtyTexture_]);
+
+            impl_->deviceContext_->DSSetShaderResources(impl_->firstDirtyTexture_, impl_->lastDirtyTexture_ - impl_->firstDirtyTexture_ + 1,
+                &impl_->shaderResourceViews_[impl_->firstDirtyTexture_]);
+            impl_->deviceContext_->DSSetSamplers(impl_->firstDirtyTexture_, impl_->lastDirtyTexture_ - impl_->firstDirtyTexture_ + 1,
+                &impl_->samplers_[impl_->firstDirtyTexture_]);
+        }
+        
+        // If geometry shader is available then set shader resources for texture access
+        if (geometryShaderSupport)
+        {
+            impl_->deviceContext_->GSSetShaderResources(impl_->firstDirtyTexture_, impl_->lastDirtyTexture_ - impl_->firstDirtyTexture_ + 1,
+                &impl_->shaderResourceViews_[impl_->firstDirtyTexture_]);
+            impl_->deviceContext_->GSSetSamplers(impl_->firstDirtyTexture_, impl_->lastDirtyTexture_ - impl_->firstDirtyTexture_ + 1,
+                &impl_->samplers_[impl_->firstDirtyTexture_]);
+        }
+
         impl_->deviceContext_->PSSetShaderResources(impl_->firstDirtyTexture_, impl_->lastDirtyTexture_ - impl_->firstDirtyTexture_ + 1,
             &impl_->shaderResourceViews_[impl_->firstDirtyTexture_]);
         impl_->deviceContext_->PSSetSamplers(impl_->firstDirtyTexture_, impl_->lastDirtyTexture_ - impl_->firstDirtyTexture_ + 1,
