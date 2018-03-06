@@ -1289,7 +1289,16 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps, ShaderVariat
             }
             else
             {
-                URHO3D_LOGERROR("Failed to link vertex shader " + vs->GetFullName() + " and pixel shader " + ps->GetFullName() + ":\n" +
+                String linkError = "Failed to link shaders vertex shader: " + vs->GetFullName();
+                if (hs != nullptr)
+                    linkError += " hull shader: " + hs->GetFullName();
+                if (ds != nullptr)
+                    linkError += " domain shader: " + ds->GetFullName();
+                if (gs != nullptr)
+                    linkError += " geometry shader: " + gs->GetFullName();
+                linkError += " pixel shader: " + ps->GetFullName();
+
+                URHO3D_LOGERROR(linkError + ":\n" +
                          newProgram->GetLinkerOutput());
                 glUseProgram(0);
                 impl_->shaderProgram_ = nullptr;
@@ -2683,6 +2692,11 @@ void Graphics::Restore()
             {
                 tessellationSupport = true;
                 apiName_ = "GL4";
+            }
+            if (GLEW_VERSION_4_1)
+            {
+                tessellationSupport = true;
+                apiName_ = "GL4.1";
             }
             if (GLEW_VERSION_4_3)
             {
