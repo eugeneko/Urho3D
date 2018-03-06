@@ -1211,8 +1211,8 @@ void Renderer::SetBatchShaders(Batch& batch, Technique* tech, bool allowShadows,
 #else
     // Provide stubs for LoadPassShaders.
     Vector<SharedPtr<ShaderVariation> > geometryShaders;
-    Vector<SharedPtr<ShaderVariation> > tcsShaders;
-    Vector<SharedPtr<ShaderVariation> > tesShaders;
+    Vector<SharedPtr<ShaderVariation> > hsShaders;
+    Vector<SharedPtr<ShaderVariation> > dsShaders;
 #endif
 
     // Load shaders now if necessary

@@ -2665,8 +2665,8 @@ void Graphics::ResetCachedState()
     vertexShader_ = nullptr;
     pixelShader_ = nullptr;
     geometryShader_ = nullptr;
-    tessCtrlShader_ = nullptr;
-    tessEvalShader_ = nullptr;
+    hullShader_ = nullptr;
+    domainShader_ = nullptr;
     blendMode_ = BLEND_REPLACE;
     alphaToCoverage_ = false;
     colorWrite_ = true;

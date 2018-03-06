@@ -142,7 +142,6 @@ public:
     /// Return the effective pixel shader defines, accounting for excludes. Called internally by Renderer.
     String GetEffectivePixelShaderDefines() const { return GetEffectiveShaderDefines(PS); }
     
-#if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
     /// Set geometry shader name.
     void SetGeometryShader(const String& name) { SetShader(GS, name); }
     /// Set geometry shader defines. Separate multiple defines with spaces.
@@ -198,7 +197,6 @@ public:
     String GetEffectiveHullShaderDefines() const { return GetEffectiveShaderDefines(HS); }
     /// Return the effective domain shader defines, accounting for excludes. Called internally by Renderer.
     String GetEffectiveDomainShaderDefines() const { return GetEffectiveShaderDefines(DS); }
-#endif
 
 private:
     /// Set the name of specific shader stage.
@@ -256,14 +254,12 @@ private:
     ShaderData vertexShaderData_;
     /// Pixel shader data.
     ShaderData pixelShaderData_;
-#if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
     /// Geometry shader data.
     ShaderData geometryShaderData_;
     /// TCS shader data.
     ShaderData hullShaderData_;
     /// TES shader data.
     ShaderData domainShaderData_;
-#endif
 
     /// Pass name.
     String name_;

@@ -139,14 +139,12 @@ void Pass::ReleaseShaders()
     pixelShaderData_.shaders_.Clear();
     pixelShaderData_.extraShaders_.Clear();
 
-#if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
     geometryShaderData_.shaders_.Clear();
     geometryShaderData_.extraShaders_.Clear();
     hullShaderData_.shaders_.Clear();
     hullShaderData_.extraShaders_.Clear();
     domainShaderData_.shaders_.Clear();
     domainShaderData_.extraShaders_.Clear();
-#endif
 }
 
 void Pass::MarkShadersLoaded(unsigned frameNumber)
@@ -204,14 +202,12 @@ Pass::ShaderData& Pass::GetShaderData(ShaderType type)
         return vertexShaderData_;
     case PS:
         return pixelShaderData_;
-#if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
     case GS:
         return geometryShaderData_;
     case HS:
         return hullShaderData_;
     case DS:
         return domainShaderData_;
-#endif
     }
     return vertexShaderData_;
 }
@@ -224,14 +220,12 @@ const Pass::ShaderData& Pass::GetShaderData(ShaderType type) const
         return vertexShaderData_;
     case PS:
         return pixelShaderData_;
-#if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
     case GS:
         return geometryShaderData_;
     case HS:
         return hullShaderData_;
     case DS:
         return domainShaderData_;
-#endif
     }
     return vertexShaderData_;
 }
@@ -344,7 +338,6 @@ bool Technique::BeginLoad(Deserializer& source)
                 newPass->SetPixelShaderDefines(globalPSDefines + passElem.GetAttribute("psdefines"));
             }
 
-#if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
             if (passElem.HasAttribute("gs"))
             {
                 newPass->SetGeometryShader(passElem.GetAttribute("gs"));
@@ -377,16 +370,13 @@ bool Technique::BeginLoad(Deserializer& source)
                 newPass->SetDomainShader(globalDS);
                 newPass->SetDomainShaderDefines(globalDSDefines + passElem.GetAttribute("dsdefines"));
             }
-#endif
 
             newPass->SetVertexShaderDefineExcludes(passElem.GetAttribute("vsexcludes"));
             newPass->SetPixelShaderDefineExcludes(passElem.GetAttribute("psexcludes"));
 
-#if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
             newPass->SetGeometryShaderDefineExcludes(passElem.GetAttribute("gsexcludes"));
             newPass->SetHullShaderDefineExcludes(passElem.GetAttribute("hsexcludes"));
             newPass->SetDomainShaderDefineExcludes(passElem.GetAttribute("dsexcludes"));
-#endif
 
             if (passElem.HasAttribute("lighting"))
             {
