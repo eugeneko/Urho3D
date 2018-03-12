@@ -82,7 +82,7 @@ uniform float2 cVSMShadowParams;
 
 // D3D11 uniforms (using constant buffers)
 
-#if defined(COMPILEVS) || defined(COMPILEGS) || defined(COMPILEDS)
+#if defined(COMPILEVS) || defined(COMPILEGS) || defined(COMPILEHS) || defined(COMPILEDS)
 
 
 // Vertex shader uniforms

@@ -1123,7 +1123,7 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps, ShaderVariat
 
         impl_->deviceContext_->HSSetShader((ID3D11HullShader*)(hs ? hs->GetGPUObject() : nullptr), nullptr, 0);
         hullShader_ = hs;
-        tessellationFailure = hs == nullptr;
+        tessellationFailure |= (hs == nullptr);
     }
 
     if (ds != domainShader_)
@@ -1147,16 +1147,15 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps, ShaderVariat
 
         impl_->deviceContext_->DSSetShader((ID3D11DomainShader*)(ds ? ds->GetGPUObject() : nullptr), nullptr, 0);
         domainShader_ = ds;
-        tessellationFailure = ds == nullptr;
+        tessellationFailure |= (ds == nullptr);
     }
 
     // If tessellation fails to compile then clear any partial state and nil the locally tracked version
+    // This is not optional! Driver can and will go down.
     if (tessellationFailure)
     {
-        if (hullShader_)
-            impl_->deviceContext_->HSSetShader(nullptr, nullptr, 0);
-        if (domainShader_)
-            impl_->deviceContext_->DSSetShader(nullptr, nullptr, 0);
+        impl_->deviceContext_->HSSetShader(nullptr, nullptr, 0);
+        impl_->deviceContext_->DSSetShader(nullptr, nullptr, 0);
         hs = ds = nullptr;
         hullShader_ = domainShader_ = nullptr;
     }
