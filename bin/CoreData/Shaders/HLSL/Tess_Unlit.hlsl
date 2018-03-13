@@ -221,7 +221,7 @@ HULL_OUTPUT DS(PatchTess input, float3 uvwCoord : SV_DomainLocation, const Outpu
         dataOut.oNormal = vertNor;
     #endif    
     #ifdef VERTEXCOLOR
-        dataOut.oColor = float4(1, 0, 0, 1);
+        dataOut.oColor = uvwCoord.x * patch[0].oColor + uvwCoord.y * patch[1].oColor + uvwCoord.z * patch[2].oColor;
     #endif
     return dataOut;
 }

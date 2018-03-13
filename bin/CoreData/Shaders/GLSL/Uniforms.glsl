@@ -1,7 +1,7 @@
 // Use of constant buffers on OpenGL 3 commented out for now as it seems to be slower in practice
 //#define USE_CBUFFERS
 
-#if !defined(GL3) || !defined(USE_CBUFFERS)
+#if !defined(GL3)
 
 // OpenGL 2 uniforms (no constant buffers)
 
