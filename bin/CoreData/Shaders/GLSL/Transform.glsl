@@ -1,11 +1,11 @@
-#if defined (COMPILEVS) || defined(COMPILEHS) || defined(COMPILEDS)
+#if defined (COMPILEVS) || defined(COMPILEHS) || defined(COMPILEDS) || defined(COMPILEGS)
 // Silence GLSL 150 deprecation warnings
 #ifdef GL3
 #define attribute in
 #define varying out
 #endif
 
-#if !defined(COMPILEGS)
+#ifndef COMPILEGS
     attribute vec4 iPos;
     attribute vec3 iNormal;
     attribute vec4 iColor;
@@ -108,11 +108,13 @@ mat3 GetFaceCameraRotation(vec3 position, vec3 direction)
     );
 }
 
+#ifndef POINTEXPAND
 vec3 GetBillboardPos(vec4 iPos, vec3 iDirection, mat4 modelMatrix)
 {
     vec3 worldPos = (iPos * modelMatrix).xyz;
     return worldPos + vec3(iTexCoord1.x, 0.0, iTexCoord1.y) * GetFaceCameraRotation(worldPos, iDirection);
 }
+#endif
 
 vec3 GetBillboardNormal(vec4 iPos, vec3 iDirection, mat4 modelMatrix)
 {
@@ -158,6 +160,7 @@ vec3 GetTrailNormal(vec4 iPos, vec3 iParentPos, vec3 iForward)
     #define iModelMatrix cModel
 #endif
 
+#ifndef COMPILEGS
 vec3 GetWorldPos(mat4 modelMatrix)
 {
     #if defined(BILLBOARD)
@@ -198,6 +201,7 @@ vec4 GetWorldTangent(mat4 modelMatrix)
         return vec4(normalize(iTangent.xyz * GetNormalMatrix(modelMatrix)), iTangent.w);
     #endif
 }
+#endif
 
 #else
 

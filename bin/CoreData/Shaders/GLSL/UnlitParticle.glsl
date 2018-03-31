@@ -1,3 +1,4 @@
+#include "Constants.glsl"
 #include "Uniforms.glsl"
 #include "Samplers.glsl"
 #include "Transform.glsl"
@@ -21,17 +22,17 @@
 
 #else
 
-#ifdef COMPILEGS
-    #define VSDATA_TAIL []
-#else
-    #define VSDATA_TAIL
-#endif
+    #ifdef COMPILEGS
+        #define VSDATA_TAIL []
+    #else
+        #define VSDATA_TAIL
+    #endif
 
-#ifdef COMPILEVS
-    out 
-#else
-    in
-#endif
+    #ifdef COMPILEVS
+        out 
+    #else
+        in
+    #endif
     VertexData
     {
         #if (defined(POINTBILLBOARD) || defined(POINTDIRBILLBOARD)) && !defined(COMPILEPS)
@@ -47,7 +48,7 @@
         #ifdef VERTEXCOLOR
             vec4 vColor;
         #endif
-        #ifdef SOFTPARTICLES
+        #if defined(SOFTPARTICLES) && (defined(COMPILEPS) || !defined(POINTEXPAND))
             vec4 vScreenPos;
         #endif
     } vs_out VSDATA_TAIL;
@@ -65,7 +66,7 @@
 
 void VS()
 {
-    #if defined(POINTBILLBOARD) || defined(POINTDIRBILLBOARD)
+    #if (defined(POINTBILLBOARD) || defined(POINTDIRBILLBOARD)) && defined(POINTEXPAND)
         mat4 modelMatrix = iModelMatrix;
         vec3 worldPos = GetWorldPos(modelMatrix);
         gl_Position = GetClipPos(worldPos);
@@ -83,7 +84,7 @@ void VS()
         vWorldPos = vec4(worldPos, GetDepth(gl_Position));
     #endif
 
-    #ifdef SOFTPARTICLES
+    #if defined(SOFTPARTICLES) && !defined(POINTEXPAND)
         vScreenPos = GetScreenPos(gl_Position);
     #endif
 
@@ -96,51 +97,35 @@ void VS()
 #endif
 
 #if defined(COMPILEGS) && (defined(POINTBILLBOARD) || defined(POINTDIRBILLBOARD))
-#line 100
     
-    out VertexData
-    {
-        vec2 vTexCoord;
-        vec4 vWorldPos;
-        #ifdef POINTDIRBILLBOARD
-            vec3 vNormal;
-        #endif
-        #ifdef VERTEXCOLOR
-            vec4 vColor;
-        #endif
-        #ifdef SOFTPARTICLES
-            vec4 vScreenPos;
-        #endif
-    } gs_out;
-    
-    #define oTexCoord gs_out.vTexCoord
-    #define oWorldPos gs_out.vWorldPos
-    #define oColor gs_out.vColor
-    #define oScreenPos gs_out.vScreenPos
+out VertexData
+{
+    vec2 vTexCoord;
+    vec4 vWorldPos;
+    #ifdef POINTDIRBILLBOARD
+        vec3 vNormal;
+    #endif
+    #ifdef VERTEXCOLOR
+        vec4 vColor;
+    #endif
+    #ifdef SOFTPARTICLES
+        vec4 vScreenPos;
+    #endif
+} gs_out;
 
+#define oTexCoord gs_out.vTexCoord
+#define oWorldPos gs_out.vWorldPos
+#define oColor gs_out.vColor
+#define oScreenPos gs_out.vScreenPos
+    
 layout(points) in;
 layout(triangle_strip, max_vertices = 4) out;
-
-mat3 GetFaceCameraRotation(vec3 position, vec3 direction)
-{
-    vec3 cameraDir = normalize(position - cCameraPos);
-    vec3 front = normalize(direction);
-    vec3 right = normalize(cross(front, cameraDir));
-    vec3 up = normalize(cross(front, right));
-
-    return mat3(
-        right.x, up.x, front.x,
-        right.y, up.y, front.y,
-        right.z, up.z, front.z
-    );
-}
 
 void GS()
 {
     vec2 minUV = vs_out[0].vTexCoord.xy;
     vec2 maxUV = vs_out[0].vTexCoord.zw;
-    vec2 minSize = vs_out[0].vSize.xy;
-    vec2 maxSize = vs_out[0].vSize.zw;
+    vec2 partSize = vs_out[0].vSize.xy;
     
     vec2 partUV[] = {
         minUV,
@@ -149,11 +134,18 @@ void GS()
         maxUV,
     };
     
+    float s = sin(vs_out[0].vSize.z * M_DEGTORAD);
+    float c = cos(vs_out[0].vSize.z * M_DEGTORAD);
+    vec3 vUpNew    = c * vec3(1, 0, 0) - s * vec3(0, 1, 0);
+    vec3 vRightNew = s * vec3(1, 0, 0) + c * vec3(0, 1, 0);
+    vUpNew *= partSize.y;
+    vRightNew *= partSize.x;
+    
     vec3 partOffset[] = {
-        vec3(minSize.x, minSize.y, 0),
-        vec3(minSize.x, maxSize.y, 0),
-        vec3(maxSize.x, minSize.y, 0),
-        vec3(maxSize.x, maxSize.y, 0),
+        -vUpNew + -vRightNew,
+        -vUpNew + vRightNew,
+        vUpNew + -vRightNew,
+        vUpNew + vRightNew,
     };
 
     vec4 wPos = vs_out[0].vWorldPos;
@@ -168,7 +160,12 @@ void GS()
         oWorldPos = vec4((wPos + vPos).xyz, 0);
         oTexCoord = partUV[i];
         oColor = vs_out[0].vColor;
-        gl_Position = vec4(oWorldPos.xyz, 1.0) * cViewProj;
+        gl_Position = GetClipPos(oWorldPos.xyz);
+        
+        #ifdef SOFTPARTICLES
+            oScreenPos = GetScreenPos(gl_Position);
+        #endif
+        
         EmitVertex();
     }
     EndPrimitive();

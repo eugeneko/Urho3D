@@ -1,3 +1,4 @@
+#include "Constants.hlsl"
 #include "Uniforms.hlsl"
 #include "Samplers.hlsl"
 #include "Transform.hlsl"
@@ -56,7 +57,7 @@ void VS(float4 iPos : POSITION,
     #if defined(POINTDIRBILLBOARD)
         out float3 oNormal : NORMAL,
     #endif
-    #ifdef SOFTPARTICLES
+    #if defined(SOFTPARTICLES) && !defined(POINTEXPAND)
         out float4 oScreenPos : TEXCOORD1,
     #endif
     out float4 oWorldPos : TEXCOORD2,
@@ -74,8 +75,7 @@ void VS(float4 iPos : POSITION,
     #endif
 
     #if defined(POINTBILLBOARD) || defined(POINTDIRBILLBOARD)
-        float4x3 modelMatrix = iModelMatrix;
-        float3 worldPos = GetWorldPos(modelMatrix);
+        float3 worldPos = iPos;
         oPos = GetClipPos(worldPos);
         oTexCoord = iTexCoord;
         oSize = iSize;
@@ -95,7 +95,7 @@ void VS(float4 iPos : POSITION,
         oClip = dot(oPos, cClipPlane);
     #endif
 
-    #ifdef SOFTPARTICLES
+    #if defined(SOFTPARTICLES) && !defined(POINTEXPAND)
         oScreenPos = GetScreenPos(oPos);
     #endif
 
@@ -113,9 +113,6 @@ struct VSOutput
     float4 iSize : TEXCOORD1;
     #ifdef POINTDIRBILLBOARD
         float3 iNormal : NORMAL;
-    #endif
-    #ifdef SOFTPARTICLES
-        float4 iScreenPos: TEXCOORD1;
     #endif
     float4 iWorldPos: TEXCOORD2;
     #ifdef VERTEXCOLOR
@@ -143,22 +140,31 @@ void GS(point in VSOutput vertexData[1], inout TriangleStream<GSOutput> triStrea
 
     float2 minUV = vertData.iTexCoord.xy;
     float2 maxUV = vertData.iTexCoord.zw;
-    float2 minSize = vertData.iSize.xy;
-    float2 maxSize = vertData.iSize.zw;
+    float2 partSize = vertData.iSize.xy;
 
     float2 partUV[] = {
-        minUV,
         float2(minUV.x, maxUV.y),
-        float2(maxUV.x, minUV.y),
+        minUV,
         maxUV,
+        float2(maxUV.x, minUV.y),
     };
     
+    float s;
+    float c;
+    sincos(vertData.iSize.z * M_DEGTORAD, s, c);
+    float3 vUpNew    = c * float3(1, 0, 0) - s * float3(0, 1, 0);
+    float3 vRightNew = s * float3(1, 0, 0) + c * float3(0, 1, 0);
+    vUpNew *= partSize.y;
+    vRightNew *= partSize.x;
+    
     float3 partOffset[] = {
-        float3(minSize.x, minSize.y, 0),
-        float3(minSize.x, maxSize.y, 0),
-        float3(maxSize.x, minSize.y, 0),
-        float3(maxSize.x, maxSize.y, 0),
+        -vUpNew + -vRightNew,
+        -vUpNew + vRightNew,
+        vUpNew + -vRightNew,
+        vUpNew + vRightNew,
     };
+    
+    float3 worldLoc = mul(vertData.iWorldPos.xyz, iModelMatrix);
     
     [unroll]
     for (int i = 0; i < 4; ++i)
@@ -167,15 +173,19 @@ void GS(point in VSOutput vertexData[1], inout TriangleStream<GSOutput> triStrea
         
         #ifdef POINTBILLBOARD       
             float3 vPos = mul(partOffset[i], cBillboardRot);
-        #elif POINTDIRBILLBOARD
-            float3 vPos = mul(float3(partOffset[i].x, 0, partOffset[i].y), GetFaceCameraRotation(vertData.iWorldPos.xyz, vertData.iNormal));
+        #endif
+        #ifdef POINTDIRBILLBOARD
+            float3 vPos = mul(partOffset[i].xzy, GetFaceCameraRotation(worldLoc, vertData.iNormal));
         #endif
         
-        outVert.oPos = float4(vertData.iWorldPos.xyz + vPos, 0);
-        outVert.iWorldPos = outVert.oPos;
-        outVert.oPos = GetClipPos(outVert.oPos);
-        outVert.iTexCoord = partUV[i];
+        outVert.iWorldPos = float4(worldLoc + vPos, 0);
+        outVert.oPos = GetClipPos(outVert.iWorldPos);
+        outVert.iTexCoord = GetTexCoord(partUV[i]);
         outVert.iColor = vertData.iColor;
+        
+        #ifdef SOFTPARTICLES
+            outVert.iScreenPos = GetScreenPos(outVert.oPos);
+        #endif
         
         triStream.Append(outVert);
     }

@@ -1,6 +1,6 @@
 #pragma warning(disable:3571)
 
-#ifdef COMPILEVS
+#if defined(COMPILEVS) || defined(COMPILEGS)
 float3 GetAmbient(float zonePos)
 {
     return cAmbientStartColor + zonePos * cAmbientEndColor;

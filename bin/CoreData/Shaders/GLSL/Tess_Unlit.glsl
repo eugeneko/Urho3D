@@ -82,7 +82,7 @@ bool EdgeCull(vec4 a, vec4 b, vec3 aN, vec3 bN)
     vec3 norm = normalize((aN + bN) * 0.5);
     vec3 midPoint = (a.xyz + b.xyz) * 0.5;
     float edgeDot = dot(normalize(cCameraPos - midPoint), norm);
-    return edgeDot < -0.1;
+    return edgeDot < -0.2;
 }
 
 out HSDataOut

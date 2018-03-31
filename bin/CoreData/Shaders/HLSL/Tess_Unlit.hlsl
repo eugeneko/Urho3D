@@ -106,8 +106,6 @@ struct PatchTess
 
 #ifdef COMPILEHS
 
-
-
 float PointLineDistance(float3 p, in float3 a, in float3 b)
 {
     float3 ab = b - a;

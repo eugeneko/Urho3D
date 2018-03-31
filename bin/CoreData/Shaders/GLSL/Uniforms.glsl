@@ -5,7 +5,7 @@
 
 // OpenGL 2 uniforms (no constant buffers)
 
-#if defined(COMPILEVS)
+#if defined(COMPILEVS) || defined(COMPILEHS) || defined(COMPILEDS) || defined(COMPILEGS)
 
 // Vertex shader uniforms
 uniform vec3 cAmbientStartColor;

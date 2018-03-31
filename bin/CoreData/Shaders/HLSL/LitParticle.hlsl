@@ -1,3 +1,4 @@
+#include "Constants.hlsl"
 #include "Uniforms.hlsl"
 #include "Samplers.hlsl"
 #include "Transform.hlsl"
@@ -18,35 +19,45 @@ cbuffer CustomPS : register(b6)
 #endif
 #endif
 
+#ifdef COMPILEVS
+
 void VS(float4 iPos : POSITION,
-    #if !defined(BILLBOARD) && !defined(TRAILFACECAM)
+    #if !defined(BILLBOARD) && !defined(TRAILFACECAM) && !defined(POINTBILLBOARD)
         float3 iNormal : NORMAL,
     #endif
     #ifndef NOUV
-        float2 iTexCoord : TEXCOORD0,
+        #ifdef POINTEXPAND
+            float4 iTexCoord : TEXCOORD0,
+        #else
+            float2 iTexCoord : TEXCOORD0,
+        #endif
     #endif
     #ifdef VERTEXCOLOR
         float4 iColor : COLOR0,
     #endif
-    #ifdef SKINNED
-        float4 iBlendWeights : BLENDWEIGHT,
-        int4 iBlendIndices : BLENDINDICES,
-    #endif
-    #ifdef INSTANCED
-        float4x3 iModelInstance : TEXCOORD4,
-    #endif
     #if defined(BILLBOARD) || defined(DIRBILLBOARD)
         float2 iSize : TEXCOORD1,
+    #endif
+    #if defined(POINTBILLBOARD) || defined(POINTDIRBILLBOARD)
+        float4 iSize : TEXCOORD1,
     #endif
     #if defined(TRAILFACECAM) || defined(TRAILBONE)
         float4 iTangent : TANGENT,
     #endif
-    out float2 oTexCoord : TEXCOORD0,
-    #ifdef SOFTPARTICLES
+    #if defined(POINTBILLBOARD) || defined(POINTDIRBILLBOARD)
+        out float4 oTexCoord : TEXCOORD0,
+        out float4 oSize : TEXCOORD1,
+        #if defined(POINTDIRBILLBOARD)
+            out float3 oNormal : NORMAL,
+        #endif
+    #else
+        out float2 oTexCoord : TEXCOORD0,
+    #endif
+    #if defined(SOFTPARTICLES) && !defined(POINTEXPAND)
         out float4 oScreenPos : TEXCOORD1,
     #endif
     out float4 oWorldPos : TEXCOORD3,
-    #if PERPIXEL
+    #if defined(PERPIXEL) && !defined(POINTEXPAND)
         #ifdef SHADOW
             out float4 oShadowPos[NUMCASCADES] : TEXCOORD4,
         #endif
@@ -56,7 +67,7 @@ void VS(float4 iPos : POSITION,
         #ifdef POINTLIGHT
             out float3 oCubeMaskVec : TEXCOORD5,
         #endif
-    #else
+    #elif !defined(POINTEXPAND)
         out float3 oVertexLight : TEXCOORD4,
     #endif
     #ifdef VERTEXCOLOR
@@ -72,17 +83,28 @@ void VS(float4 iPos : POSITION,
     float2 iTexCoord = float2(0.0, 0.0);
     #endif
     
-    float4x3 modelMatrix = iModelMatrix;
-    float3 worldPos = GetWorldPos(modelMatrix);
-    oPos = GetClipPos(worldPos);
-    oTexCoord = GetTexCoord(iTexCoord);
-    oWorldPos = float4(worldPos, GetDepth(oPos));
+    #if defined(POINTBILLBOARD) || defined(POINTDIRBILLBOARD)
+        float3 worldPos = iPos.xyz;
+        oPos = GetClipPos(worldPos);
+        oTexCoord = iTexCoord;
+        oSize = iSize;
+        oWorldPos = float4(worldPos, GetDepth(oPos));
+        #ifdef POINTDIRBILLBOARD
+            oNormal = iNormal;
+        #endif
+    #else
+        float4x3 modelMatrix = iModelMatrix;
+        float3 worldPos = GetWorldPos(modelMatrix);
+        oPos = GetClipPos(worldPos);
+        oTexCoord = GetTexCoord(iTexCoord);
+        oWorldPos = float4(worldPos, GetDepth(oPos));
+    #endif
 
     #if defined(D3D11) && defined(CLIPPLANE)
         oClip = dot(oPos, cClipPlane);
     #endif
 
-    #ifdef SOFTPARTICLES
+    #if defined(SOFTPARTICLES) && !defined(POINTEXPAND)
         oScreenPos = GetScreenPos(oPos);
     #endif
 
@@ -90,7 +112,7 @@ void VS(float4 iPos : POSITION,
         oColor = iColor;
     #endif
 
-    #ifdef PERPIXEL
+    #if defined(PERPIXEL) && !(defined(POINTBILLBOARD) || defined(POINTDIRBILLBOARD))
         // Per-pixel forward lighting
         float4 projWorldPos = float4(worldPos.xyz, 1.0);
 
@@ -107,7 +129,7 @@ void VS(float4 iPos : POSITION,
         #ifdef POINTLIGHT
             oCubeMaskVec = mul(worldPos - cLightPos.xyz, (float3x3)cLightMatrices[0]);
         #endif
-    #else
+    #elif !defined(POINTEXPAND)
         // Ambient & per-vertex lighting
         oVertexLight = GetAmbient(GetZonePos(worldPos));
 
@@ -117,6 +139,143 @@ void VS(float4 iPos : POSITION,
         #endif
     #endif
 }
+
+#endif
+
+
+#ifdef COMPILEGS
+
+struct VSOutput
+{
+    float4 iTexCoord : TEXCOORD0;
+    float4 iSize : TEXCOORD1;
+    #ifdef POINTDIRBILLBOARD
+        float3 iNormal : NORMAL;
+    #endif
+    float4 iWorldPos: TEXCOORD3;
+    #ifdef VERTEXCOLOR
+        float4 iColor : COLOR0;
+    #endif
+};
+
+struct GSOutput
+{
+    float2 oTexCoord : TEXCOORD0;
+    #ifdef SOFTPARTICLES
+        float4 oScreenPos: TEXCOORD1;
+    #endif
+    float4 oWorldPos: TEXCOORD3;
+    
+    #ifdef PERPIXEL
+        #ifdef SHADOW
+            float4 oShadowPos[NUMCASCADES] : TEXCOORD4;
+        #endif
+        #ifdef SPOTLIGHT
+            float4 oSpotPos : TEXCOORD5;
+        #endif
+        #ifdef POINTLIGHT
+            float3 oCubeMaskVec : TEXCOORD5;
+        #endif
+    #else
+        float3 oVertexLight : TEXCOORD4;
+    #endif
+    
+    #ifdef VERTEXCOLOR
+        float4 oColor : COLOR0;
+    #endif
+    
+    float4 oPos : SV_POSITION;
+};
+
+[maxvertexcount(4)]
+void GS(point in VSOutput vertexData[1], inout TriangleStream<GSOutput> triStream)
+{
+    VSOutput vertData = vertexData[0];
+
+    float2 minUV = vertData.iTexCoord.xy;
+    float2 maxUV = vertData.iTexCoord.zw;
+    float2 partSize = vertData.iSize.xy;
+
+    float2 partUV[] = {
+        float2(minUV.x, maxUV.y),
+        minUV,
+        maxUV,
+        float2(maxUV.x, minUV.y),
+    };
+
+    float s;
+    float c;
+    sincos(vertData.iSize.z * M_DEGTORAD, s, c);
+    float3 vUpNew    = c * float3(1, 0, 0) - s * float3(0, 1, 0);
+    float3 vRightNew = s * float3(1, 0, 0) + c * float3(0, 1, 0);
+    vUpNew *= partSize.y;
+    vRightNew *= partSize.x;
+    
+    float3 partOffset[] = {
+        -vUpNew + -vRightNew,
+        -vUpNew + vRightNew,
+        vUpNew + -vRightNew,
+        vUpNew + vRightNew,
+    };
+    
+    float3 worldLoc = mul(vertData.iWorldPos.xyz, iModelMatrix);
+    
+    [unroll]
+    for (int i = 0; i < 4; ++i)
+    {
+        GSOutput outVert = (GSOutput)0;
+        
+        #ifdef POINTBILLBOARD       
+            float3 vPos = mul(partOffset[i], cBillboardRot);
+        #endif
+        #ifdef POINTDIRBILLBOARD
+            float3 vPos = mul(partOffset[i].xzy, GetFaceCameraRotation(worldLoc, vertData.iNormal));
+        #endif
+        
+        outVert.oWorldPos = float4(worldLoc + vPos, 0);
+        outVert.oPos = GetClipPos(outVert.oWorldPos);
+        outVert.oTexCoord = GetTexCoord(partUV[i]);
+        outVert.oColor = vertData.iColor;
+        
+        #ifdef SOFTPARTICLES
+            outVert.oScreenPos = GetScreenPos(outVert.oPos);
+        #endif
+        
+        #ifdef PERPIXEL
+            // Per-pixel forward lighting
+            float4 projWorldPos = float4(outVert.oPos.xyz, 1.0);
+
+            #ifdef SHADOW
+                // Shadow projection: transform from world space to shadow space
+                GetShadowPos(projWorldPos, float3(0, 0, 0), outVert.oShadowPos);
+            #endif
+
+            #ifdef SPOTLIGHT
+                // Spotlight projection: transform from world space to projector texture coordinates
+                outVert.oSpotPos = mul(projWorldPos, cLightMatrices[0]);
+            #endif
+
+            #ifdef POINTLIGHT
+                outVert.oCubeMaskVec = mul(projWorldPos - cLightPos.xyz, (float3x3)cLightMatrices[0]);
+            #endif
+        #else
+            // Ambient & per-vertex lighting
+            outVert.oVertexLight = GetAmbient(GetZonePos(outVert.oWorldPos));
+
+            #ifdef NUMVERTEXLIGHTS
+                for (int i = 0; i < NUMVERTEXLIGHTS; ++i)
+                    outVert.oVertexLight += GetVertexLightVolumetric(i, outVert.oWorldPos) * cVertexLights[i * 3].rgb;
+            #endif
+        #endif
+        
+        triStream.Append(outVert);
+    }
+}
+
+
+#endif
+
+#ifdef COMPILEPS
 
 void PS(float2 iTexCoord : TEXCOORD0,
     #ifdef SOFTPARTICLES
@@ -220,3 +379,5 @@ void PS(float2 iTexCoord : TEXCOORD0,
         oColor = float4(GetFog(finalColor, fogFactor), diffColor.a);
     #endif
 }
+
+#endif
