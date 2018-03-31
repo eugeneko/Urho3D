@@ -734,7 +734,7 @@ void BillboardSet::UpdateVertexBuffer(const FrameInfo& frame)
                 // Vector4, XY = size, Z = pole rotation, W = sorting distance
                 dest[8] = size.x_;
                 dest[9] = size.y_;
-                dest[10] = billboard.rotation_;
+                dest[10] = billboard.rotation_ + 90.0f;
                 dest[11] = billboard.sortDistance_;
 
                 dest += 12;
@@ -766,7 +766,7 @@ void BillboardSet::UpdateVertexBuffer(const FrameInfo& frame)
                 // Vector4, XY = size, Z = pole rotation, W = sorting distance
                 dest[11] = size.x_;
                 dest[12] = size.y_;
-                dest[13] = billboard.rotation_;
+                dest[13] = billboard.rotation_ + 90.0f;
                 dest[14] = billboard.sortDistance_;
 
                 dest += 15;
