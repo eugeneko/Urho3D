@@ -72,8 +72,14 @@ struct RenderPathCommand
     String pass_ @ pass;
     String metadata_ @ metadata;
     String vertexShaderName_ @ vertexShaderName;
+    String hullShaderName_ @ hullShaderName;
+    String domainShaderName_ @ domainShaderName;
+    String geometryShaderName_ @ geometryShaderName;
     String pixelShaderName_ @ pixelShaderName;
     String vertexShaderDefines_ @ vertexShaderDefines;
+    String hullShaderDefines_ @ hullShaderDefines;
+    String domainShaderDefines_ @ domainShaderDefines;
+    String geometryShaderDefines_ @ geometryShaderDefines;
     String pixelShaderDefines_ @ pixelShaderDefines;
     unsigned clearFlags_ @ clearFlags;
     Color clearColor_ @ clearColor;

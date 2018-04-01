@@ -181,6 +181,9 @@ enum ShaderType
 {
     VS = 0,
     PS,
+    GS,
+    HS,
+    DS
 };
 
 // Texture unit numbering depends on graphics capability (mobile or desktop). Expose only the units we are sure of

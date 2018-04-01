@@ -11,6 +11,9 @@ class Material : public Resource
     void SetNumTechniques(unsigned num);
     void SetTechnique(unsigned index, Technique* tech, unsigned qualityLevel = 0, float lodDistance = 0.0f);
     void SetVertexShaderDefines(const String defines);
+    void SetHullShaderDefines(const String defines);
+    void SetDomainShaderDefines(const String defines);
+    void SetGeometryShaderDefines(const String defines);
     void SetPixelShaderDefines(const String defines);
     void SetShaderParameter(const String name, const Variant& value);
     void SetShaderParameterAnimation(const String name, ValueAnimation* animation, WrapMode wrapMode = WM_LOOP, float speed = 1.0f);
@@ -46,6 +49,9 @@ class Material : public Resource
     Texture* GetTexture(TextureUnit unit) const;
     
     const String GetVertexShaderDefines() const;
+    const String GetHullShaderDefines() const;
+    const String GetDomainShaderDefines() const;
+    const String GetGeometryShaderDefines() const;
     const String GetPixelShaderDefines() const;
 
     ValueAnimation* GetShaderParameterAnimation(const String name) const;
@@ -64,6 +70,9 @@ class Material : public Resource
     Scene* GetScene() const;
 
     tolua_property__get_set String vertexShaderDefines;
+    tolua_property__get_set String hullShaderDefines;
+    tolua_property__get_set String domainShaderDefines;
+    tolua_property__get_set String geometryShaderDefines;
     tolua_property__get_set String pixelShaderDefines;
     tolua_property__get_set CullMode cullMode;
     tolua_property__get_set CullMode shadowCullMode;
