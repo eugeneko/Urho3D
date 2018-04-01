@@ -388,6 +388,9 @@ static void RegisterRenderPath(asIScriptEngine* engine)
     engine->RegisterObjectProperty("RenderPathCommand", "String geometryShaderName", offsetof(RenderPathCommand, geometryShaderName_));
     engine->RegisterObjectProperty("RenderPathCommand", "String pixelShaderName", offsetof(RenderPathCommand, pixelShaderName_));
     engine->RegisterObjectProperty("RenderPathCommand", "String vertexShaderDefines", offsetof(RenderPathCommand, vertexShaderDefines_));
+    engine->RegisterObjectProperty("RenderPathCommand", "String hullShaderDefines", offsetof(RenderPathCommand, hullShaderDefines_));
+    engine->RegisterObjectProperty("RenderPathCommand", "String domainShaderDefines", offsetof(RenderPathCommand, domainShaderDefines_));
+    engine->RegisterObjectProperty("RenderPathCommand", "String geometryShaderDefines", offsetof(RenderPathCommand, geometryShaderDefines_));
     engine->RegisterObjectProperty("RenderPathCommand", "String pixelShaderDefines", offsetof(RenderPathCommand, pixelShaderDefines_));
     engine->RegisterObjectProperty("RenderPathCommand", "String eventName", offsetof(RenderPathCommand, eventName_));
 
@@ -885,46 +888,37 @@ static void RegisterMaterial(asIScriptEngine* engine)
     engine->RegisterObjectMethod("Pass", "bool get_alphaToCoverage() const", asMETHOD(Pass, GetAlphaToCoverage), asCALL_THISCALL);
     engine->RegisterObjectMethod("Pass", "void set_desktop(bool)", asMETHOD(Technique, SetIsDesktop), asCALL_THISCALL);
     engine->RegisterObjectMethod("Pass", "bool get_desktop() const", asMETHOD(Technique, IsDesktop), asCALL_THISCALL);
+
     engine->RegisterObjectMethod("Pass", "void set_vertexShader(const String&in)", asMETHOD(Pass, SetVertexShader), asCALL_THISCALL);
     engine->RegisterObjectMethod("Pass", "const String& get_vertexShader() const", asMETHOD(Pass, GetVertexShader), asCALL_THISCALL);
-
-#if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
     engine->RegisterObjectMethod("Pass", "void set_hullShader(const String&in)", asMETHOD(Pass, SetHullShader), asCALL_THISCALL);
     engine->RegisterObjectMethod("Pass", "const String& get_hullShader() const", asMETHOD(Pass, GetHullShader), asCALL_THISCALL);
     engine->RegisterObjectMethod("Pass", "void set_domainShader(const String&in)", asMETHOD(Pass, SetDomainShader), asCALL_THISCALL);
     engine->RegisterObjectMethod("Pass", "const String& get_domainShader() const", asMETHOD(Pass, GetDomainShader), asCALL_THISCALL);
     engine->RegisterObjectMethod("Pass", "void set_geometryShader(const String&in)", asMETHOD(Pass, SetGeometryShader), asCALL_THISCALL);
     engine->RegisterObjectMethod("Pass", "const String& get_geometryShader() const", asMETHOD(Pass, GetGeometryShader), asCALL_THISCALL);
-#endif
-
     engine->RegisterObjectMethod("Pass", "void set_pixelShader(const String&in)", asMETHOD(Pass, SetPixelShader), asCALL_THISCALL);
     engine->RegisterObjectMethod("Pass", "const String& get_pixelShader() const", asMETHOD(Pass, GetPixelShader), asCALL_THISCALL);
+
     engine->RegisterObjectMethod("Pass", "void set_vertexShaderDefines(const String&in)", asMETHOD(Pass, SetVertexShaderDefines), asCALL_THISCALL);
     engine->RegisterObjectMethod("Pass", "const String& get_vertexShaderDefines() const", asMETHOD(Pass, GetVertexShaderDefines), asCALL_THISCALL);
-
-#if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
     engine->RegisterObjectMethod("Pass", "void set_hullShaderDefines(const String&in)", asMETHOD(Pass, SetHullShaderDefines), asCALL_THISCALL);
     engine->RegisterObjectMethod("Pass", "const String& get_hullShaderDefines() const", asMETHOD(Pass, GetHullShaderDefines), asCALL_THISCALL);
     engine->RegisterObjectMethod("Pass", "void set_domainShaderDefines(const String&in)", asMETHOD(Pass, SetDomainShaderDefines), asCALL_THISCALL);
     engine->RegisterObjectMethod("Pass", "const String& get_domainShaderDefines() const", asMETHOD(Pass, GetDomainShaderDefines), asCALL_THISCALL);
     engine->RegisterObjectMethod("Pass", "void set_geometryShaderDefines(const String&in)", asMETHOD(Pass, SetGeometryShaderDefines), asCALL_THISCALL);
     engine->RegisterObjectMethod("Pass", "const String& get_geometryShaderDefines() const", asMETHOD(Pass, GetGeometryShaderDefines), asCALL_THISCALL);
-#endif
-
     engine->RegisterObjectMethod("Pass", "void set_pixelShaderDefines(const String&in)", asMETHOD(Pass, SetPixelShaderDefines), asCALL_THISCALL);
     engine->RegisterObjectMethod("Pass", "const String& get_pixelShaderDefines() const", asMETHOD(Pass, GetPixelShaderDefines), asCALL_THISCALL);
+    
     engine->RegisterObjectMethod("Pass", "void set_vertexShaderDefineExcludes(const String&in)", asMETHOD(Pass, SetVertexShaderDefineExcludes), asCALL_THISCALL);
     engine->RegisterObjectMethod("Pass", "const String& get_vertexShaderDefineExcludes() const", asMETHOD(Pass, GetVertexShaderDefineExcludes), asCALL_THISCALL);
-
-#if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
     engine->RegisterObjectMethod("Pass", "void set_hullShaderDefineExcludes(const String&in)", asMETHOD(Pass, SetHullShaderDefineExcludes), asCALL_THISCALL);
     engine->RegisterObjectMethod("Pass", "const String& get_hullShaderDefineExcludes() const", asMETHOD(Pass, GetHullShaderDefineExcludes), asCALL_THISCALL);
     engine->RegisterObjectMethod("Pass", "void set_domainShaderDefineExcludes(const String&in)", asMETHOD(Pass, SetDomainShaderDefineExcludes), asCALL_THISCALL);
     engine->RegisterObjectMethod("Pass", "const String& get_domainShaderDefineExcludes() const", asMETHOD(Pass, GetDomainShaderDefineExcludes), asCALL_THISCALL);
     engine->RegisterObjectMethod("Pass", "void set_geometryShaderDefineExcludes(const String&in)", asMETHOD(Pass, SetGeometryShaderDefineExcludes), asCALL_THISCALL);
     engine->RegisterObjectMethod("Pass", "const String& get_geometryShaderDefineExcludes() const", asMETHOD(Pass, GetGeometryShaderDefineExcludes), asCALL_THISCALL);
-#endif
-
     engine->RegisterObjectMethod("Pass", "void set_pixelShaderDefineExcludes(const String&in)", asMETHOD(Pass, SetPixelShaderDefineExcludes), asCALL_THISCALL);
     engine->RegisterObjectMethod("Pass", "const String& get_pixelShaderDefineExcludes() const", asMETHOD(Pass, GetPixelShaderDefineExcludes), asCALL_THISCALL);
 
@@ -938,6 +932,8 @@ static void RegisterMaterial(asIScriptEngine* engine)
     engine->RegisterObjectMethod("Technique", "bool get_supported() const", asMETHOD(Technique, IsSupported), asCALL_THISCALL);
     engine->RegisterObjectMethod("Technique", "void set_desktop(bool)", asMETHOD(Technique, SetIsDesktop), asCALL_THISCALL);
     engine->RegisterObjectMethod("Technique", "bool get_desktop() const", asMETHOD(Technique, IsDesktop), asCALL_THISCALL);
+    engine->RegisterObjectMethod("Technique", "bool get_requiresGeometryShader() const", asMETHOD(Technique, RequiresGeometryShader), asCALL_THISCALL);
+    engine->RegisterObjectMethod("Technique", "bool get_requiresTessellation() const", asMETHOD(Technique, RequiresGeometryShader), asCALL_THISCALL);
     engine->RegisterObjectMethod("Technique", "uint get_numPasses() const", asMETHOD(Technique, GetNumPasses), asCALL_THISCALL);
     engine->RegisterObjectMethod("Technique", "Array<String>@ get_passNames() const", asFUNCTION(TechniqueGetPassNames), asCALL_CDECL_OBJLAST);
     engine->RegisterObjectMethod("Technique", "Array<Pass@>@ get_passes() const", asFUNCTION(TechniqueGetPasses), asCALL_CDECL_OBJLAST);
@@ -979,20 +975,18 @@ static void RegisterMaterial(asIScriptEngine* engine)
     engine->RegisterObjectMethod("Material", "Array<String>@ get_shaderParameterNames() const", asFUNCTION(MaterialGetShaderParameterNames), asCALL_CDECL_OBJLAST);
     engine->RegisterObjectMethod("Material", "void set_textures(uint, Texture@+)", asMETHOD(Material, SetTexture), asCALL_THISCALL);
     engine->RegisterObjectMethod("Material", "Texture@+ get_textures(uint) const", asMETHOD(Material, GetTexture), asCALL_THISCALL);
+
     engine->RegisterObjectMethod("Material", "void set_vertexShaderDefines(const String&in)", asMETHOD(Material, SetVertexShaderDefines), asCALL_THISCALL);
     engine->RegisterObjectMethod("Material", "const String& get_vertexShaderDefines() const", asMETHOD(Material, GetVertexShaderDefines), asCALL_THISCALL);
-
-#if !defined(GL_ES_VERSION_2_0) && !defined(URHO3D_D3D9)
     engine->RegisterObjectMethod("Material", "void set_hullShaderDefines(const String&in)", asMETHOD(Material, SetHullShaderDefines), asCALL_THISCALL);
     engine->RegisterObjectMethod("Material", "const String& get_hullShaderDefines() const", asMETHOD(Material, GetHullShaderDefines), asCALL_THISCALL);
     engine->RegisterObjectMethod("Material", "void set_domainShaderDefines(const String&in)", asMETHOD(Material, SetDomainShaderDefines), asCALL_THISCALL);
     engine->RegisterObjectMethod("Material", "const String& get_domainShaderDefines() const", asMETHOD(Material, GetDomainShaderDefines), asCALL_THISCALL);
     engine->RegisterObjectMethod("Material", "void set_geometryShaderDefines(const String&in)", asMETHOD(Material, SetGeometryShaderDefines), asCALL_THISCALL);
     engine->RegisterObjectMethod("Material", "const String& get_geometryShaderDefines() const", asMETHOD(Material, GetGeometryShaderDefines), asCALL_THISCALL);
-#endif
-
     engine->RegisterObjectMethod("Material", "void set_pixelShaderDefines(const String&in)", asMETHOD(Material, SetPixelShaderDefines), asCALL_THISCALL);
     engine->RegisterObjectMethod("Material", "const String& get_pixelShaderDefines() const", asMETHOD(Material, GetPixelShaderDefines), asCALL_THISCALL);
+
     engine->RegisterObjectMethod("Material", "void set_occlusion(bool)", asMETHOD(Material, SetOcclusion), asCALL_THISCALL);
     engine->RegisterObjectMethod("Material", "bool get_occlusion()", asMETHOD(Material, GetOcclusion), asCALL_THISCALL);
     engine->RegisterObjectMethod("Material", "void set_cullMode(CullMode)", asMETHOD(Material, SetCullMode), asCALL_THISCALL);
