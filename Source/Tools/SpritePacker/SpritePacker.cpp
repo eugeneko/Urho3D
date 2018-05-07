@@ -63,9 +63,9 @@ public:
     int frameWidth{};
     int frameHeight{};
 
-    PackerInfo(const String& path_, const String& name_) :
-        path(path_),
-        name(name_)
+    PackerInfo(String path_, String name_) :
+        path(std::move(path_)),
+        name(std::move(name_))
     {
     }
 

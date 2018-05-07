@@ -31,25 +31,25 @@
 namespace Urho3D
 {
 
-ShaderParameter::ShaderParameter(const String& name, unsigned glType, int location) :   // NOLINT(hicpp-member-init)
-    name_{name},
+ShaderParameter::ShaderParameter(String name, unsigned glType, int location) :   // NOLINT(hicpp-member-init)
+    name_{std::move(name)},
     glType_{glType},
     location_{location}
 {
 }
 
-ShaderParameter::ShaderParameter(ShaderType type, const String& name, unsigned offset, unsigned size, unsigned buffer) :    // NOLINT(hicpp-member-init)
+ShaderParameter::ShaderParameter(ShaderType type, String name, unsigned offset, unsigned size, unsigned buffer) :    // NOLINT(hicpp-member-init)
     type_{type},
-    name_{name},
+    name_{std::move(name)},
     offset_{offset},
     size_{size},
     buffer_{buffer}
 {
 }
 
-ShaderParameter::ShaderParameter(ShaderType type, const String& name, unsigned reg, unsigned regCount) :    // NOLINT(hicpp-member-init)
+ShaderParameter::ShaderParameter(ShaderType type, String name, unsigned reg, unsigned regCount) :    // NOLINT(hicpp-member-init)
     type_{type},
-    name_{name},
+    name_{std::move(name)},
     register_{reg},
     regCount_{regCount}
 {

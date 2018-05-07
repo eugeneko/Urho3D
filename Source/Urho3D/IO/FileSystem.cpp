@@ -236,9 +236,9 @@ class AsyncSystemCommand : public AsyncExecRequest
 {
 public:
     /// Construct and run.
-    AsyncSystemCommand(unsigned requestID, const String& commandLine) :
+    AsyncSystemCommand(unsigned requestID, String commandLine) :
         AsyncExecRequest(requestID),
-        commandLine_(commandLine)
+        commandLine_(std::move(commandLine))
     {
         Run();
     }
@@ -260,10 +260,10 @@ class AsyncSystemRun : public AsyncExecRequest
 {
 public:
     /// Construct and run.
-    AsyncSystemRun(unsigned requestID, const String& fileName, const Vector<String>& arguments) :
+    AsyncSystemRun(unsigned requestID, String fileName, Vector<String> arguments) :
         AsyncExecRequest(requestID),
-        fileName_(fileName),
-        arguments_(arguments)
+        fileName_(std::move(fileName)),
+        arguments_(std::move(arguments))
     {
         Run();
     }

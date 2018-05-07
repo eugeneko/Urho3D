@@ -52,7 +52,7 @@ public:
     /// Constructor setting interpolation mode.
     explicit Spline(InterpolationMode mode);
     /// Constructor setting knots and interpolation mode.
-    explicit Spline(const Vector<Variant>& knots, InterpolationMode mode = BEZIER_CURVE);
+    explicit Spline(Vector<Variant> knots, InterpolationMode mode = BEZIER_CURVE);
     /// Copy constructor.
     Spline(const Spline& rhs) = default;
 

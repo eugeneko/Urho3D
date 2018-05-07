@@ -36,11 +36,11 @@ namespace Urho3D
 static const unsigned ERROR_BUFFER_SIZE = 256;
 static const unsigned READ_BUFFER_SIZE = 65536; // Must be a power of two
 
-HttpRequest::HttpRequest(const String& url, const String& verb, const Vector<String>& headers, const String& postData) :
+HttpRequest::HttpRequest(const String& url, const String& verb, Vector<String> headers, String postData) :
     url_(url.Trimmed()),
     verb_(!verb.Empty() ? verb : "GET"),
-    headers_(headers),
-    postData_(postData),
+    headers_(std::move(headers)),
+    postData_(std::move(postData)),
     state_(HTTP_INITIALIZING),
     httpReadBuffer_(new unsigned char[READ_BUFFER_SIZE]),
     readBuffer_(new unsigned char[READ_BUFFER_SIZE]),

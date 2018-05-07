@@ -179,10 +179,10 @@ TechniqueEntry::TechniqueEntry(Technique* tech, unsigned qualityLevel, float lod
 {
 }
 
-ShaderParameterAnimationInfo::ShaderParameterAnimationInfo(Material* material, const String& name, ValueAnimation* attributeAnimation,
+ShaderParameterAnimationInfo::ShaderParameterAnimationInfo(Material* material, String name, ValueAnimation* attributeAnimation,
     WrapMode wrapMode, float speed) :
     ValueAnimationInfo(material, attributeAnimation, wrapMode, speed),
-    name_(name)
+    name_(std::move(name))
 {
 }
 

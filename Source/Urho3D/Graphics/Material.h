@@ -78,7 +78,7 @@ class ShaderParameterAnimationInfo : public ValueAnimationInfo
 public:
     /// Construct.
     ShaderParameterAnimationInfo
-        (Material* material, const String& name, ValueAnimation* attributeAnimation, WrapMode wrapMode, float speed);
+        (Material* material, String name, ValueAnimation* attributeAnimation, WrapMode wrapMode, float speed);
     /// Copy construct.
     ShaderParameterAnimationInfo(const ShaderParameterAnimationInfo& other);
     /// Destruct.

@@ -45,7 +45,7 @@ class URHO3D_API HttpRequest : public RefCounted, public Deserializer, public Th
 {
 public:
     /// Construct with parameters.
-    HttpRequest(const String& url, const String& verb, const Vector<String>& headers, const String& postData);
+    HttpRequest(const String& url, const String& verb, Vector<String> headers, String postData);
     /// Destruct. Release the connection object.
     ~HttpRequest() override;
 

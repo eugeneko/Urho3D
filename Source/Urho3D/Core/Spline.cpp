@@ -47,9 +47,9 @@ Spline::Spline(InterpolationMode mode) :
 {
 }
 
-Spline::Spline(const Vector<Variant>& knots, InterpolationMode mode) :
+Spline::Spline(Vector<Variant> knots, InterpolationMode mode) :
     interpolationMode_(mode),
-    knots_(knots)
+    knots_(std::move(knots))
 {
 }
 
