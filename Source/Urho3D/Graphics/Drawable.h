@@ -43,6 +43,7 @@ static const int MAX_VERTEX_LIGHTS = 4;
 static const float ANIMATION_LOD_BASESCALE = 2500.0f;
 
 class Camera;
+class DefaultDrawableProcessor;
 class File;
 class Geometry;
 class Light;
@@ -104,6 +105,13 @@ struct URHO3D_API SourceBatch
     GeometryType geometryType_{GEOM_STATIC};
 };
 
+struct DrawableIndex
+{
+    DefaultDrawableProcessor* processor_ = nullptr;
+    unsigned index_ = M_MAX_UNSIGNED;
+    operator bool() const { return !!processor_; }
+};
+
 /// Base class for visible components.
 class URHO3D_API Drawable : public Component
 {
@@ -120,6 +128,12 @@ public:
     ~Drawable() override;
     /// Register object attributes. Drawable must be registered first.
     static void RegisterObject(Context* context);
+
+    void SetDrawableIndex(const DrawableIndex& drawableIndex)
+    {
+        drawableIndex_ = drawableIndex;
+    }
+    const DrawableIndex& GetDrawableIndex() const { return drawableIndex_; }
 
     /// Handle enabled/disabled state change.
     void OnSetEnabled() override;
@@ -320,9 +334,14 @@ protected:
     /// Remove from octree.
     void RemoveFromOctree();
 
+    void UpdateViewMask();
+    void UpdateOccluder();
+
     /// Move into another octree octant.
     void SetOctant(Octant* octant) { octant_ = octant; }
 
+    /// Drawable index.
+    DrawableIndex drawableIndex_;
     /// World-space bounding box.
     BoundingBox worldBoundingBox_;
     /// Local-space bounding box.

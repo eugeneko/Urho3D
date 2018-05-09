@@ -35,6 +35,7 @@ namespace Urho3D
 
 class Camera;
 class DebugRenderer;
+class DrawableProcessor;
 class Light;
 class Drawable;
 class Graphics;
@@ -316,6 +317,8 @@ private:
     Scene* scene_{};
     /// Octree to use.
     Octree* octree_{};
+    /// Drawable processor.
+    DrawableProcessor* drawableProcessor_{};
     /// Viewport (rendering) camera.
     Camera* camera_{};
     /// Culling camera. Usually same as the viewport camera.

@@ -27,6 +27,7 @@
 #include "../Graphics/Camera.h"
 #include "../Graphics/DebugRenderer.h"
 #include "../IO/File.h"
+#include "../Graphics/DrawableProcessor.h"
 #include "../Graphics/Geometry.h"
 #include "../Graphics/Material.h"
 #include "../Graphics/Octree.h"
@@ -99,7 +100,7 @@ Drawable::~Drawable()
 void Drawable::RegisterObject(Context* context)
 {
     URHO3D_ATTRIBUTE("Max Lights", int, maxLights_, 0, AM_DEFAULT);
-    URHO3D_ATTRIBUTE("View Mask", int, viewMask_, DEFAULT_VIEWMASK, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("View Mask", int, viewMask_, UpdateViewMask, DEFAULT_VIEWMASK, AM_DEFAULT);
     URHO3D_ATTRIBUTE("Light Mask", int, lightMask_, DEFAULT_LIGHTMASK, AM_DEFAULT);
     URHO3D_ATTRIBUTE("Shadow Mask", int, shadowMask_, DEFAULT_SHADOWMASK, AM_DEFAULT);
     URHO3D_ACCESSOR_ATTRIBUTE("Zone Mask", GetZoneMask, SetZoneMask, unsigned, DEFAULT_ZONEMASK, AM_DEFAULT);
@@ -191,6 +192,9 @@ void Drawable::SetLodBias(float bias)
 void Drawable::SetViewMask(unsigned mask)
 {
     viewMask_ = mask;
+    // TODO Update attributes
+    if (drawableIndex_)
+        drawableIndex_.processor_->SetViewMask(drawableIndex_.index_, viewMask_);
     MarkNetworkUpdate();
 }
 
@@ -229,6 +233,7 @@ void Drawable::SetCastShadows(bool enable)
 void Drawable::SetOccluder(bool enable)
 {
     occluder_ = enable;
+    UpdateOccluder();
     MarkNetworkUpdate();
 }
 
@@ -373,6 +378,9 @@ void Drawable::OnSceneSet(Scene* scene)
 
 void Drawable::OnMarkedDirty(Node* node)
 {
+    if (drawableIndex_)
+        drawableIndex_.processor_->MarkTransformDirty(drawableIndex_.index_);
+
     worldBoundingBoxDirty_ = true;
     if (!updateQueued_ && octant_)
         octant_->GetRoot()->QueueUpdate(this);
@@ -393,7 +401,7 @@ void Drawable::AddToOctree()
     {
         auto* octree = scene->GetComponent<Octree>();
         if (octree)
-            octree->InsertDrawable(this);
+            octree->AddDrawable(this);
         else
             URHO3D_LOGERROR("No Octree component in scene, drawable will not render");
     }
@@ -417,6 +425,18 @@ void Drawable::RemoveFromOctree()
 
         octant_->RemoveDrawable(this);
     }
+}
+
+void Drawable::UpdateViewMask()
+{
+    if (drawableIndex_)
+        drawableIndex_.processor_->SetViewMask(drawableIndex_.index_, viewMask_);
+}
+
+void Drawable::UpdateOccluder()
+{
+    if (drawableIndex_)
+        drawableIndex_.processor_->SetOccluder(drawableIndex_.index_, occluder_);
 }
 
 bool WriteDrawablesToOBJ(PODVector<Drawable*> drawables, File* outputFile, bool asZUp, bool asRightHanded, bool writeLightmapUV)

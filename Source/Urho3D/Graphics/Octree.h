@@ -30,6 +30,7 @@
 namespace Urho3D
 {
 
+class DrawableProcessor;
 class Octree;
 
 static const int NUM_OCTANTS = 8;
@@ -157,11 +158,13 @@ protected:
 };
 
 /// %Octree component. Should be added only to the root scene node
-class URHO3D_API Octree : public Component, public Octant
+class URHO3D_API Octree : public Component, private Octant
 {
     URHO3D_OBJECT(Octree, Component);
 
 public:
+    UniquePtr<DrawableProcessor> drawableProcessor_;
+
     /// Construct.
     explicit Octree(Context* context);
     /// Destruct.
@@ -180,6 +183,14 @@ public:
     void AddManualDrawable(Drawable* drawable);
     /// Remove a manually added drawable.
     void RemoveManualDrawable(Drawable* drawable);
+    /// Add a drawable object to this octant.
+    void AddDrawable(Drawable* drawable);
+    /// Remove a drawable object from this octant.
+    void RemoveDrawable(Drawable* drawable);
+    /// Return world-space bounding box.
+    const BoundingBox& GetWorldBoundingBox() const { return Octant::GetWorldBoundingBox(); }
+    /// Get root octant.
+    Octant* GetRootOctant() { return this; }
 
     /// Return drawable objects by a query.
     void GetDrawables(OctreeQuery& query) const;

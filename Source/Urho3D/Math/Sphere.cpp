@@ -41,18 +41,9 @@ void Sphere::Define(const Vector3* vertices, unsigned count)
 
 void Sphere::Define(const BoundingBox& box)
 {
-    const Vector3& min = box.min_;
-    const Vector3& max = box.max_;
-
     Clear();
-    Merge(min);
-    Merge(Vector3(max.x_, min.y_, min.z_));
-    Merge(Vector3(min.x_, max.y_, min.z_));
-    Merge(Vector3(max.x_, max.y_, min.z_));
-    Merge(Vector3(min.x_, min.y_, max.z_));
-    Merge(Vector3(max.x_, min.y_, max.z_));
-    Merge(Vector3(min.x_, max.y_, max.z_));
-    Merge(max);
+    center_ = box.Center();
+    radius_ = (center_ - box.min_).Length();
 }
 
 void Sphere::Define(const Frustum& frustum)

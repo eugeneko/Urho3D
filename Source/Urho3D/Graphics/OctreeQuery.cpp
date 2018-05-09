@@ -117,7 +117,6 @@ void FrustumOctreeQuery::TestDrawables(Drawable** start, Drawable** end, bool in
     }
 }
 
-
 Intersection AllContentOctreeQuery::TestOctant(const BoundingBox& box, bool inside)
 {
     return INSIDE;

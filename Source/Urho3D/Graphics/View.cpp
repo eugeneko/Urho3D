@@ -26,6 +26,7 @@
 #include "../Core/WorkQueue.h"
 #include "../Graphics/Camera.h"
 #include "../Graphics/DebugRenderer.h"
+#include "../Graphics/DrawableProcessor.h"
 #include "../Graphics/Geometry.h"
 #include "../Graphics/Graphics.h"
 #include "../Graphics/GraphicsEvents.h"
@@ -512,6 +513,8 @@ bool View::Define(RenderSurface* renderTarget, Viewport* viewport)
     if (viewSize_.y_ > viewSize_.x_ * 4)
         maxOccluderTriangles_ = 0;
 
+    // Initialize drawable processor
+    drawableProcessor_ = octree_->drawableProcessor_.Get();
     return true;
 }
 
@@ -553,8 +556,43 @@ void View::Update(const FrameInfo& frame)
     if (cullCamera_ && cullCamera_->GetAutoAspectRatio())
         cullCamera_->SetAspectRatioInternal((float)frame_.viewSize_.x_ / (float)frame_.viewSize_.y_);
 
-    GetDrawables();
-    GetBatches();
+    if (false)
+    {
+        drawableProcessor_->UpdateDirtyDrawables();
+
+        const Vector<Drawable*>& drawables = drawableProcessor_->staticModelProcessor_.GetData().drawable_;
+        Material* defaultMaterial = renderer_->GetDefaultMaterial();
+        Technique* defaultTechnique = defaultMaterial->GetTechnique(0);
+
+        BatchQueue& queue = batchQueues_[basePassIndex_];
+        Batch destBatch;
+        destBatch.distance_ = 0.0f;
+        destBatch.renderOrder_ = DEFAULT_RENDER_ORDER;
+        destBatch.isBase_ = false;
+        destBatch.geometry_ = drawables[0]->GetLodGeometry(0, 0);
+        destBatch.material_ = defaultMaterial;
+        destBatch.numWorldTransforms_ = 1;
+        destBatch.instancingData_ = nullptr;
+        destBatch.lightQueue_ = nullptr;
+        destBatch.geometryType_ = GEOM_STATIC;
+        destBatch.pass_ = defaultTechnique->GetPass(basePassIndex_);
+        destBatch.zone_ = cameraZone_;
+        destBatch.isBase_ = true;
+        destBatch.lightMask_ = 0xffffffff;
+
+        for (unsigned i = 0; i < drawables.Size(); ++i)
+        {
+//             drawables[i]->UpdateBatches(frame);
+            destBatch.worldTransform_ = &drawableProcessor_->staticModelProcessor_.GetData().transform_[i];
+            AddBatchToQueue(queue, destBatch, defaultTechnique, true);
+        }
+    }
+    else
+    {
+        octree_->drawableProcessor_->UpdateDirtyDrawables();
+        GetDrawables();
+        GetBatches();
+    }
     renderer_->StorePreparedView(this, cullCamera_);
 
     SendViewEvent(E_ENDVIEWUPDATE);
@@ -793,9 +831,8 @@ void View::GetDrawables()
 
     // Get zones and occluders first
     {
-        ZoneOccluderOctreeQuery
-            query(tempDrawables, cullCamera_->GetFrustum(), DRAWABLE_GEOMETRY | DRAWABLE_ZONE, cullCamera_->GetViewMask());
-        octree_->GetDrawables(query);
+        tempDrawables.Clear();
+        drawableProcessor_->GetZonesAndOccluders(tempDrawables, cullCamera_->GetViewMask(), cullCamera_->GetFrustum());
     }
 
     highestZonePriority_ = M_MIN_INT;
@@ -870,8 +907,10 @@ void View::GetDrawables()
     }
     else
     {
-        FrustumOctreeQuery query(tempDrawables, cullCamera_->GetFrustum(), DRAWABLE_GEOMETRY | DRAWABLE_LIGHT, cullCamera_->GetViewMask());
-        octree_->GetDrawables(query);
+//         FrustumOctreeQuery query(tempDrawables, cullCamera_->GetFrustum(), DRAWABLE_GEOMETRY | DRAWABLE_LIGHT, cullCamera_->GetViewMask());
+//         octree_->GetDrawables(query);
+        tempDrawables.Clear();
+        drawableProcessor_->GetDrawables(tempDrawables, DRAWABLE_GEOMETRY | DRAWABLE_LIGHT, cullCamera_->GetViewMask(), cullCamera_->GetFrustum());
     }
 
     // Check drawable occlusion, find zones for moved drawables and collect geometries & lights in worker threads
