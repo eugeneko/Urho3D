@@ -403,7 +403,11 @@ void Drawable::AddToOctree()
     {
         auto* octree = scene->GetComponent<Octree>();
         if (octree)
+        {
             octree->AddDrawable(this);
+            // TODO(eugeneko): Refactor injection
+            octree->drawableProcessor_->AddDrawable(this);
+        }
         else
             URHO3D_LOGERROR("No Octree component in scene, drawable will not render");
     }
@@ -416,6 +420,13 @@ void Drawable::AddToOctree()
 
 void Drawable::RemoveFromOctree()
 {
+    // TODO(eugeneko): Refactor injection
+    if (drawableIndex_)
+    {
+        Octree* octree = octant_->GetRoot();
+        octree->drawableProcessor_->RemoveDrawable(this);
+    }
+
     if (octant_)
     {
         Octree* octree = octant_->GetRoot();

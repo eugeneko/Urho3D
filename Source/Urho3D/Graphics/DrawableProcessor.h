@@ -289,6 +289,8 @@ public:
 
     virtual void AddDrawable(Drawable* drawable)
     {
+        assert(!drawable->GetDrawableIndex());
+
         DrawableIndex index;
         index.processor_ = this;
         index.index_ = data_.Size();

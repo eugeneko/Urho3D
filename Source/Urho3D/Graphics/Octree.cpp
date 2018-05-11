@@ -85,8 +85,8 @@ Octant::~Octant()
         // Remove the drawables (if any) from this octant to the root octant
         for (PODVector<Drawable*>::Iterator i = drawables_.Begin(); i != drawables_.End(); ++i)
         {
-            (*i)->SetOctant(root_->GetRootOctant());
-            root_->GetRootOctant()->drawables_.Push(*i);
+            (*i)->SetOctant(root_);
+            root_->drawables_.Push(*i);
             root_->QueueUpdate(*i);
         }
         drawables_.Clear();
@@ -139,7 +139,7 @@ void Octant::InsertDrawable(Drawable* drawable)
     // If root octant, insert all non-occludees here, so that octant occlusion does not hide the drawable.
     // Also if drawable is outside the root octant bounds, insert to root
     bool insertHere;
-    if (this == root_->GetRootOctant())
+    if (this == root_)
         insertHere = !drawable->IsOccludee() || cullingBox_.IsInside(box) != INSIDE || CheckDrawableFit(box);
     else
         insertHere = CheckDrawableFit(box);
@@ -229,7 +229,7 @@ void Octant::Initialize(const BoundingBox& box)
 
 void Octant::GetDrawablesInternal(OctreeQuery& query, bool inside) const
 {
-    if (this != root_->GetRootOctant())
+    if (this != root_)
     {
         Intersection res = query.TestOctant(cullingBox_, inside);
         if (res == INSIDE)
@@ -482,6 +482,8 @@ void Octree::AddManualDrawable(Drawable* drawable)
         return;
 
     AddDrawable(drawable);
+    // TODO(eugeneko): Refactor injection
+    drawableProcessor_->AddDrawable(drawable);
 }
 
 void Octree::RemoveManualDrawable(Drawable* drawable)
@@ -492,18 +494,6 @@ void Octree::RemoveManualDrawable(Drawable* drawable)
     Octant* octant = drawable->GetOctant();
     if (octant && octant->GetRoot() == this)
         octant->RemoveDrawable(drawable);
-}
-
-void Octree::AddDrawable(Drawable* drawable)
-{
-    drawableProcessor_->AddDrawable(drawable);
-    Octant::InsertDrawable(drawable);
-}
-
-void Octree::RemoveDrawable(Drawable* drawable)
-{
-    drawableProcessor_->RemoveDrawable(drawable);
-    Octant::RemoveDrawable(drawable);
 }
 
 void Octree::GetDrawables(OctreeQuery& query) const
