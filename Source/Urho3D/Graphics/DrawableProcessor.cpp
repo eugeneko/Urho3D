@@ -29,7 +29,7 @@
 // #include "../Core/WorkQueue.h"
 // #include "../Graphics/DebugRenderer.h"
 // #include "../Graphics/Graphics.h"
-// #include "../Graphics/Octree.h"
+#include "../Graphics/DrawableProcessor.h"
 // #include "../IO/Log.h"
 // #include "../Scene/Scene.h"
 // #include "../Scene/SceneEvents.h"

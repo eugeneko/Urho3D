@@ -976,11 +976,11 @@ void View::GetDrawables()
     // Update batches
 //     drawableProcessor_->UpdateBatches(this);
 
-    SceneDrawablesBucket& bucket = drawableProcessor_->GetCullCameraBucket();
-    Swap(geometries_, bucket.geometries_);
-    Swap(lights_, bucket.lights_);
-    minZ_ = bucket.minZ_;
-    maxZ_ = bucket.maxZ_;
+//     SceneDrawablesBucket& bucket = drawableProcessor_->GetCullCameraBucket();
+//     Swap(geometries_, bucket.geometries_);
+//     Swap(lights_, bucket.lights_);
+//     minZ_ = bucket.minZ_;
+//     maxZ_ = bucket.maxZ_;
 
     // Combine lights, geometries & scene Z range from the threads
     geometries_.Clear();

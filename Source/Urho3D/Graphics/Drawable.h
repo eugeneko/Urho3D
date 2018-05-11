@@ -43,7 +43,7 @@ static const int MAX_VERTEX_LIGHTS = 4;
 static const float ANIMATION_LOD_BASESCALE = 2500.0f;
 
 class Camera;
-class DefaultDrawableProcessor;
+class BasicDrawableProcessor;
 class File;
 class Geometry;
 class Light;
@@ -107,7 +107,7 @@ struct URHO3D_API SourceBatch
 
 struct DrawableIndex
 {
-    DefaultDrawableProcessor* processor_ = nullptr;
+    BasicDrawableProcessor* processor_ = nullptr;
     unsigned index_ = M_MAX_UNSIGNED;
     operator bool() const { return !!processor_; }
 };
