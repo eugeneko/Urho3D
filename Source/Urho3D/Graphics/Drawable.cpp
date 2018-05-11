@@ -242,6 +242,8 @@ void Drawable::SetOccludee(bool enable)
     if (enable != occludee_)
     {
         occludee_ = enable;
+        if (drawableIndex_)
+            drawableIndex_.processor_->SetOccludee(drawableIndex_.index_, occludee_);
         // Reinsert to octree to make sure octant occlusion does not erroneously hide this drawable
         if (octant_ && !updateQueued_)
             octant_->GetRoot()->QueueUpdate(this);

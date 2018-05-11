@@ -105,12 +105,20 @@ void WorkQueue::CreateThreads(unsigned numThreads)
 #endif
 }
 
+void WorkQueue::ScheduleWork(WorkFunction function)
+{
+    SharedPtr<WorkItem> item = GetFreeItem();
+    item->function_ = std::move(function);
+    AddWorkItem(item);
+}
+
 SharedPtr<WorkItem> WorkQueue::GetFreeItem()
 {
     if (poolItems_.Size() > 0)
     {
         SharedPtr<WorkItem> item = poolItems_.Front();
         poolItems_.PopFront();
+        item->function_ = nullptr;
         return item;
     }
     else
@@ -258,7 +266,10 @@ void WorkQueue::Complete(unsigned priority)
                 WorkItem* item = queue_.Front();
                 queue_.PopFront();
                 queueMutex_.Release();
-                item->workFunction_(item, 0);
+                if (item->function_)
+                    item->function_(0);
+                else
+                    item->workFunction_(item, 0);
                 item->completed_ = true;
             }
             else
@@ -284,7 +295,10 @@ void WorkQueue::Complete(unsigned priority)
         {
             WorkItem* item = queue_.Front();
             queue_.PopFront();
-            item->workFunction_(item, 0);
+            if (item->function_)
+                item->function_(0);
+            else
+                item->workFunction_(item, 0);
             item->completed_ = true;
         }
     }
@@ -325,7 +339,10 @@ void WorkQueue::ProcessItems(unsigned threadIndex)
                 WorkItem* item = queue_.Front();
                 queue_.PopFront();
                 queueMutex_.Release();
-                item->workFunction_(item, threadIndex);
+                if (item->function_)
+                    item->function_(threadIndex);
+                else
+                    item->workFunction_(item, threadIndex);
                 item->completed_ = true;
             }
             else
@@ -411,7 +428,10 @@ void WorkQueue::HandleBeginFrame(StringHash eventType, VariantMap& eventData)
         {
             WorkItem* item = queue_.Front();
             queue_.PopFront();
-            item->workFunction_(item, 0);
+            if (item->function_)
+                item->function_(0);
+            else
+                item->workFunction_(item, 0);
             item->completed_ = true;
         }
     }

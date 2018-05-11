@@ -26,6 +26,8 @@
 #include "../Core/Mutex.h"
 #include "../Core/Object.h"
 
+#include <functional>
+
 namespace Urho3D
 {
 
@@ -37,13 +39,19 @@ URHO3D_EVENT(E_WORKITEMCOMPLETED, WorkItemCompleted)
 
 class WorkerThread;
 
+/// Work function.
+using WorkFunction = std::function<void(unsigned threadIndex)>;
+
 /// Work queue item.
 struct WorkItem : public RefCounted
 {
     friend class WorkQueue;
 
 public:
+    /// Work function.
+    WorkFunction function_;
     /// Work function. Called with the work item and thread index (0 = main thread) as parameters.
+    // TODO Remove me
     void (* workFunction_)(const WorkItem*, unsigned){};
     /// Data start pointer.
     void* start_{};
@@ -77,6 +85,8 @@ public:
 
     /// Create worker threads. Can only be called once.
     void CreateThreads(unsigned numThreads);
+    /// Schedule work.
+    void ScheduleWork(WorkFunction function);
     /// Get pointer to an usable WorkItem from the item pool. Allocate one if no more free items.
     SharedPtr<WorkItem> GetFreeItem();
     /// Add a work item and resume worker threads.
