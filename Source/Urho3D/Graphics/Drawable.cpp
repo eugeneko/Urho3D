@@ -381,7 +381,7 @@ void Drawable::OnSceneSet(Scene* scene)
 void Drawable::OnMarkedDirty(Node* node)
 {
     if (drawableIndex_)
-        drawableIndex_.processor_->MarkTransformDirty(drawableIndex_.index_);
+        drawableIndex_.processor_->MarkDirty(drawableIndex_.index_);
 
     worldBoundingBoxDirty_ = true;
     if (!updateQueued_ && octant_)
@@ -406,7 +406,7 @@ void Drawable::AddToOctree()
         {
             octree->AddDrawable(this);
             // TODO(eugeneko): Refactor injection
-            octree->drawableProcessor_->AddDrawable(this);
+            octree->drawableProcessor_->sceneProcessor_->AddDrawable(this);
         }
         else
             URHO3D_LOGERROR("No Octree component in scene, drawable will not render");
@@ -424,7 +424,7 @@ void Drawable::RemoveFromOctree()
     if (drawableIndex_)
     {
         Octree* octree = octant_->GetRoot();
-        octree->drawableProcessor_->RemoveDrawable(this);
+        octree->drawableProcessor_->sceneProcessor_->RemoveDrawable(this);
     }
 
     if (octant_)

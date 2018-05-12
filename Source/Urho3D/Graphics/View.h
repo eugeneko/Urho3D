@@ -33,9 +33,12 @@
 namespace Urho3D
 {
 
+class DrawableProcessor;
+class ZoneProcessor;
+class LightProcessor;
+
 class Camera;
 class DebugRenderer;
-class DrawableProcessor;
 class Light;
 class Drawable;
 class Graphics;
@@ -98,7 +101,7 @@ struct PerThreadSceneResult
     /// Geometry objects.
     PODVector<Drawable*> geometries_;
     /// Lights.
-    PODVector<Light*> lights_;
+//     PODVector<Light*> lights_;
     /// Scene minimum Z value.
     float minZ_;
     /// Scene maximum Z value.
@@ -120,7 +123,7 @@ public:
     /// Construct.
     explicit View(Context* context);
     /// Destruct.
-    ~View() override = default;
+    ~View() override;
 
     /// Define with rendertarget and viewport. Return true if successful.
     bool Define(RenderSurface* renderTarget, Viewport* viewport);
@@ -281,13 +284,7 @@ private:
     void SendViewEvent(StringHash eventType);
 
     /// Return the drawable's zone, or camera zone if it has override mode enabled.
-    Zone* GetZone(Drawable* drawable)
-    {
-        if (cameraZoneOverride_)
-            return cameraZone_;
-        Zone* drawableZone = drawable->GetZone();
-        return drawableZone ? drawableZone : cameraZone_;
-    }
+    Zone* GetZone(Drawable* drawable);
 
     /// Return the drawable's light mask, considering also its zone.
     unsigned GetLightMask(Drawable* drawable)
@@ -318,18 +315,20 @@ private:
     Scene* scene_{};
     /// Octree to use.
     Octree* octree_{};
+
     /// Drawable processor.
     DrawableProcessor* drawableProcessor_{};
+    /// Zone processor.
+    UniquePtr<ZoneProcessor> zoneProcessor_{};
+    /// Light processor.
+    UniquePtr<LightProcessor> lightProcessor_{};
+
     /// Viewport (rendering) camera.
     Camera* camera_{};
     /// Culling camera. Usually same as the viewport camera.
     Camera* cullCamera_{};
     /// Shared source view. Null if this view is using its own culling.
     WeakPtr<View> sourceView_;
-    /// Zone the camera is inside, or default zone if not assigned.
-    Zone* cameraZone_{};
-    /// Zone at far clip plane.
-    Zone* farClipZone_{};
     /// Occlusion buffer for the main camera.
     OcclusionBuffer* occlusionBuffer_{};
     /// Destination color rendertarget.
@@ -366,12 +365,8 @@ private:
     int maxOccluderTriangles_{};
     /// Minimum number of instances required in a batch group to render as instanced.
     int minInstances_{};
-    /// Highest zone priority currently visible.
-    int highestZonePriority_{};
     /// Geometries updated flag.
     bool geometriesUpdated_{};
-    /// Camera zone's override flag.
-    bool cameraZoneOverride_{};
     /// Draw shadows flag.
     bool drawShadows_{};
     /// Deferred flag. Inferred from the existence of a light volume command in the renderpath.

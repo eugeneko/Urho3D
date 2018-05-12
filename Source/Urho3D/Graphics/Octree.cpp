@@ -483,7 +483,7 @@ void Octree::AddManualDrawable(Drawable* drawable)
 
     AddDrawable(drawable);
     // TODO(eugeneko): Refactor injection
-    drawableProcessor_->AddDrawable(drawable);
+    drawableProcessor_->sceneProcessor_->AddDrawable(drawable);
 }
 
 void Octree::RemoveManualDrawable(Drawable* drawable)

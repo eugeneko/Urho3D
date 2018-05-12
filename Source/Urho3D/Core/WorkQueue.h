@@ -87,6 +87,31 @@ public:
     void CreateThreads(unsigned numThreads);
     /// Schedule work.
     void ScheduleWork(WorkFunction function);
+    /// Schedule work split into buckets.
+    template <class T> void ScheduleWork(unsigned threshold, unsigned count, unsigned numBuckets, const T& work)
+    {
+        if (count > 0 && threshold != 0 && count <= threshold)
+        {
+            work(0, count, 0);
+        }
+        else
+        {
+            const unsigned bucketSize = (count - 1) / numBuckets + 1;
+            for (unsigned i = 0; i < numBuckets; ++i)
+            {
+                const unsigned firstElementInBucket = i * bucketSize;
+                const unsigned remainingElements = count - firstElementInBucket;
+                const unsigned numElementsInBucket = Min(bucketSize, remainingElements);
+                if (numElementsInBucket > 0)
+                {
+                    ScheduleWork([=](unsigned threadIndex)
+                    {
+                        work(firstElementInBucket, firstElementInBucket + numElementsInBucket, threadIndex);
+                    });
+                }
+            }
+        }
+    }
     /// Get pointer to an usable WorkItem from the item pool. Allocate one if no more free items.
     SharedPtr<WorkItem> GetFreeItem();
     /// Add a work item and resume worker threads.

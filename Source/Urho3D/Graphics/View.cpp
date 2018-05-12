@@ -168,7 +168,7 @@ void CheckVisibilityWork(const WorkItem* item, unsigned threadIndex)
     Vector3 viewZ = Vector3(viewMatrix.m20_, viewMatrix.m21_, viewMatrix.m22_);
     Vector3 absViewZ = viewZ.Abs();
     unsigned cameraViewMask = view->cullCamera_->GetViewMask();
-    bool cameraZoneOverride = view->cameraZoneOverride_;
+    bool cameraZoneOverride = view->zoneProcessor_->cameraZoneOverride_;
     PerThreadSceneResult& result = view->sceneResults_[threadIndex];
 
     while (start != end)
@@ -177,6 +177,9 @@ void CheckVisibilityWork(const WorkItem* item, unsigned threadIndex)
 
         if (!buffer || !drawable->IsOccludee() || buffer->IsVisible(drawable->GetWorldBoundingBox()))
         {
+            if (!(drawable->GetDrawableFlags() & DRAWABLE_GEOMETRY))
+                continue;
+
             drawable->UpdateBatches(view->frame_);
             // If draw distance non-zero, update and check it
             float maxDistance = drawable->GetDrawDistance();
@@ -189,7 +192,7 @@ void CheckVisibilityWork(const WorkItem* item, unsigned threadIndex)
             drawable->MarkInView(view->frame_);
 
             // For geometries, find zone, clear lights and calculate view space Z range
-            if (drawable->GetDrawableFlags() & DRAWABLE_GEOMETRY)
+//             if (drawable->GetDrawableFlags() & DRAWABLE_GEOMETRY)
             {
                 Zone* drawableZone = drawable->GetZone();
                 if (!cameraZoneOverride &&
@@ -216,13 +219,13 @@ void CheckVisibilityWork(const WorkItem* item, unsigned threadIndex)
 
                 result.geometries_.Push(drawable);
             }
-            else if (drawable->GetDrawableFlags() & DRAWABLE_LIGHT)
-            {
-                auto* light = static_cast<Light*>(drawable);
-                // Skip lights with zero brightness or black color
-                if (!light->GetEffectiveColor().Equals(Color::BLACK))
-                    result.lights_.Push(light);
-            }
+//             else if (drawable->GetDrawableFlags() & DRAWABLE_LIGHT)
+//             {
+//                 auto* light = static_cast<Light*>(drawable);
+//                 // Skip lights with zero brightness or black color
+//                 if (!light->GetEffectiveColor().Equals(Color::BLACK))
+//                     result.lights_.Push(light);
+//             }
         }
     }
 }
@@ -289,6 +292,10 @@ View::View(Context* context) :
     unsigned numThreads = GetSubsystem<WorkQueue>()->GetNumThreads() + 1; // Worker threads + main thread
     tempDrawables_.Resize(numThreads);
     sceneResults_.Resize(numThreads);
+}
+
+View::~View()
+{
 }
 
 bool View::Define(RenderSurface* renderTarget, Viewport* viewport)
@@ -447,8 +454,6 @@ bool View::Define(RenderSurface* renderTarget, Viewport* viewport)
 
     octree_ = nullptr;
     // Get default zone first in case we do not have zones defined
-    cameraZone_ = farClipZone_ = renderer_->GetDefaultZone();
-
     if (hasScenePasses_)
     {
         if (!scene_ || !cullCamera_ || !cullCamera_->IsEnabledEffective())
@@ -515,6 +520,8 @@ bool View::Define(RenderSurface* renderTarget, Viewport* viewport)
 
     // Initialize drawable processor
     drawableProcessor_ = octree_->drawableProcessor_.Get();
+    zoneProcessor_ = MakeUnique<ZoneProcessor>(renderer_->GetDefaultZone());
+    lightProcessor_ = MakeUnique<LightProcessor>();
     return true;
 }
 
@@ -556,41 +563,12 @@ void View::Update(const FrameInfo& frame)
     if (cullCamera_ && cullCamera_->GetAutoAspectRatio())
         cullCamera_->SetAspectRatioInternal((float)frame_.viewSize_.x_ / (float)frame_.viewSize_.y_);
 
-#if 0
-    drawableProcessor_->UpdateDirtyDrawables();
+    drawableProcessor_->Update(GetSubsystem<WorkQueue>(), this);
 
-    const Vector<Drawable*>& drawables = drawableProcessor_->staticModelProcessor_.GetData().drawable_;
-    Material* defaultMaterial = renderer_->GetDefaultMaterial();
-    Technique* defaultTechnique = defaultMaterial->GetTechnique(0);
-
-    BatchQueue& queue = batchQueues_[basePassIndex_];
-    Batch destBatch;
-    destBatch.distance_ = 0.0f;
-    destBatch.renderOrder_ = DEFAULT_RENDER_ORDER;
-    destBatch.isBase_ = false;
-    destBatch.geometry_ = drawables[0]->GetLodGeometry(0, 0);
-    destBatch.material_ = defaultMaterial;
-    destBatch.numWorldTransforms_ = 1;
-    destBatch.instancingData_ = nullptr;
-    destBatch.lightQueue_ = nullptr;
-    destBatch.geometryType_ = GEOM_STATIC;
-    destBatch.pass_ = defaultTechnique->GetPass(basePassIndex_);
-    destBatch.zone_ = cameraZone_;
-    destBatch.isBase_ = true;
-    destBatch.lightMask_ = 0xffffffff;
-
-    for (unsigned i = 0; i < drawables.Size(); ++i)
-    {
-//             drawables[i]->UpdateBatches(frame);
-        destBatch.worldTransform_ = &drawableProcessor_->staticModelProcessor_.GetData().transform_[i];
-        AddBatchToQueue(queue, destBatch, defaultTechnique, true);
-    }
-#else
-    drawableProcessor_->PrepareForThreading(GetSubsystem<WorkQueue>());
-    drawableProcessor_->UpdateDirtyDrawables();
+//     drawableProcessor_->PrepareForThreading(GetSubsystem<WorkQueue>());
+//     drawableProcessor_->UpdateDirtyDrawables();
     GetDrawables();
     GetBatches();
-#endif
 
     renderer_->StorePreparedView(this, cullCamera_);
 
@@ -825,153 +803,146 @@ void View::GetDrawables()
 
     URHO3D_PROFILE(GetDrawables);
 
-    auto* queue = GetSubsystem<WorkQueue>();
-    PODVector<Drawable*>& tempDrawables = tempDrawables_[0];
-
-    // Get zones and occluders first
-    drawableProcessor_->QueryZonesInFrustum(cullCamera_->GetViewMask(), cullCamera_->GetFrustum());
-    drawableProcessor_->QueryGeometryOccludersInFrustum(cullCamera_->GetViewMask(), cullCamera_->GetFrustum());
-    drawableProcessor_->QueryLightsInFrustum(cullCamera_->GetViewMask(), cullCamera_->GetFrustum());
-
-    highestZonePriority_ = M_MIN_INT;
-    int bestPriority = M_MIN_INT;
-    Node* cameraNode = cullCamera_->GetNode();
-    Vector3 cameraPos = cameraNode->GetWorldPosition();
-
-    for (Zone* zone : drawableProcessor_->GetZonesInFrustum().zones_)
-    {
-        zones_.Push(zone);
-        int priority = zone->GetPriority();
-        if (priority > highestZonePriority_)
-            highestZonePriority_ = priority;
-        if (priority > bestPriority && zone->IsInside(cameraPos))
-        {
-            cameraZone_ = zone;
-            bestPriority = priority;
-        }
-    }
-
-    for (Drawable* occluder : drawableProcessor_->GetGeometryOccludersInFrustum().occluders_)
-        occluders_.Push(occluder);
-
-//     for (PODVector<Drawable*>::ConstIterator i = tempDrawables.Begin(); i != tempDrawables.End(); ++i)
-//     {
-//         Drawable* drawable = *i;
-//         unsigned char flags = drawable->GetDrawableFlags();
+//     auto* queue = GetSubsystem<WorkQueue>();
+//     PODVector<Drawable*>& tempDrawables = tempDrawables_[0];
 //
-//         if (flags & DRAWABLE_ZONE)
-//         {
-//             auto* zone = static_cast<Zone*>(drawable);
-//             zones_.Push(zone);
-//             int priority = zone->GetPriority();
-//             if (priority > highestZonePriority_)
-//                 highestZonePriority_ = priority;
-//             if (priority > bestPriority && zone->IsInside(cameraPos))
-//             {
-//                 cameraZone_ = zone;
-//                 bestPriority = priority;
-//             }
-//         }
-//         else
-//             occluders_.Push(drawable);
-//     }
+//     // Get zones and occluders first
+//     drawableProcessor_->QueryZonesInFrustum(cullCamera_->GetViewMask(), cullCamera_->GetFrustum());
+//     drawableProcessor_->QueryGeometryOccludersInFrustum(cullCamera_->GetViewMask(), cullCamera_->GetFrustum());
+//     drawableProcessor_->QueryLightsInFrustum(cullCamera_->GetViewMask(), cullCamera_->GetFrustum());
+//
+//     zoneProcessor_->ProcessQueryResult(drawableProcessor_->GetZonesInFrustum(), cullCamera_);
+//
+//     occluders_.Clear();
+//     for (Drawable* occluder : drawableProcessor_->GetGeometryOccludersInFrustum().occluders_)
+//         occluders_.Push(occluder);
+//
+// //     for (PODVector<Drawable*>::ConstIterator i = tempDrawables.Begin(); i != tempDrawables.End(); ++i)
+// //     {
+// //         Drawable* drawable = *i;
+// //         unsigned char flags = drawable->GetDrawableFlags();
+// //
+// //         if (flags & DRAWABLE_ZONE)
+// //         {
+// //             auto* zone = static_cast<Zone*>(drawable);
+// //             zones_.Push(zone);
+// //             int priority = zone->GetPriority();
+// //             if (priority > highestZonePriority_)
+// //                 highestZonePriority_ = priority;
+// //             if (priority > bestPriority && zone->IsInside(cameraPos))
+// //             {
+// //                 cameraZone_ = zone;
+// //                 bestPriority = priority;
+// //             }
+// //         }
+// //         else
+// //             occluders_.Push(drawable);
+// //     }
+//
+//     // Determine the zone at far clip distance. If not found, or camera zone has override mode, use camera zone
+// //     cameraZoneOverride_ = cameraZone_->GetOverride();
+// //     if (!cameraZoneOverride_)
+// //     {
+// //         Vector3 farClipPos = cameraPos + cameraNode->GetWorldDirection() * Vector3(0.0f, 0.0f, cullCamera_->GetFarClip());
+// //         bestPriority = M_MIN_INT;
+// //
+// //         for (PODVector<Zone*>::Iterator i = zones_.Begin(); i != zones_.End(); ++i)
+// //         {
+// //             int priority = (*i)->GetPriority();
+// //             if (priority > bestPriority && (*i)->IsInside(farClipPos))
+// //             {
+// //                 farClipZone_ = *i;
+// //                 bestPriority = priority;
+// //             }
+// //         }
+// //     }
+// //     if (farClipZone_ == renderer_->GetDefaultZone())
+// //         farClipZone_ = cameraZone_;
 
-    // Determine the zone at far clip distance. If not found, or camera zone has override mode, use camera zone
-    cameraZoneOverride_ = cameraZone_->GetOverride();
-    if (!cameraZoneOverride_)
-    {
-        Vector3 farClipPos = cameraPos + cameraNode->GetWorldDirection() * Vector3(0.0f, 0.0f, cullCamera_->GetFarClip());
-        bestPriority = M_MIN_INT;
-
-        for (PODVector<Zone*>::Iterator i = zones_.Begin(); i != zones_.End(); ++i)
-        {
-            int priority = (*i)->GetPriority();
-            if (priority > bestPriority && (*i)->IsInside(farClipPos))
-            {
-                farClipZone_ = *i;
-                bestPriority = priority;
-            }
-        }
-    }
-    if (farClipZone_ == renderer_->GetDefaultZone())
-        farClipZone_ = cameraZone_;
-
-    // If occlusion in use, get & render the occluders
-    occlusionBuffer_ = nullptr;
-    if (maxOccluderTriangles_ > 0)
-    {
-        UpdateOccluders(occluders_, cullCamera_);
-        if (occluders_.Size())
-        {
-            URHO3D_PROFILE(DrawOcclusion);
-
-            occlusionBuffer_ = renderer_->GetOcclusionBuffer(cullCamera_);
-            DrawOccluders(occlusionBuffer_, occluders_);
-        }
-    }
-    else
-        occluders_.Clear();
-
-    // Get lights and geometries. Coarse occlusion for octants is used at this point
-//     if (occlusionBuffer_)
+//     // If occlusion in use, get & render the occluders
+//     occlusionBuffer_ = nullptr;
+//     if (maxOccluderTriangles_ > 0)
 //     {
-//         assert(0);
-//         OccludedFrustumOctreeQuery query
-//             (tempDrawables, cullCamera_->GetFrustum(), occlusionBuffer_, DRAWABLE_GEOMETRY | DRAWABLE_LIGHT, cullCamera_->GetViewMask());
-//         octree_->GetDrawables(query);
+//         UpdateOccluders(occluders_, cullCamera_);
+//         if (occluders_.Size())
+//         {
+//             URHO3D_PROFILE(DrawOcclusion);
+//
+//             occlusionBuffer_ = renderer_->GetOcclusionBuffer(cullCamera_);
+//             DrawOccluders(occlusionBuffer_, occluders_);
+//         }
 //     }
 //     else
+//         occluders_.Clear();
+//
+//     // Get lights and geometries. Coarse occlusion for octants is used at this point
+// //     if (occlusionBuffer_)
+// //     {
+// //         assert(0);
+// //         OccludedFrustumOctreeQuery query
+// //             (tempDrawables, cullCamera_->GetFrustum(), occlusionBuffer_, DRAWABLE_GEOMETRY | DRAWABLE_LIGHT, cullCamera_->GetViewMask());
+// //         octree_->GetDrawables(query);
+// //     }
+// //     else
+// //     {
+// //         drawableProcessor_->QueryGeometriesInFrustum(cullCamera_->GetViewMask(), cullCamera_->GetFrustum());
+// //         FrustumOctreeQuery query(tempDrawables, cullCamera_->GetFrustum(), DRAWABLE_GEOMETRY | DRAWABLE_LIGHT, cullCamera_->GetViewMask());
+// //         octree_->GetDrawables(query);
+// //         tempDrawables.Clear();
+// //         drawableProcessor_->GetDrawables(tempDrawables, DRAWABLE_GEOMETRY | DRAWABLE_LIGHT, cullCamera_->GetViewMask(), cullCamera_->GetFrustum());
+// //     }
+//
+//     drawableProcessor_->QueryGeometriesInFrustum(cullCamera_->GetViewMask(), cullCamera_->GetFrustum());
+//     lightProcessor_->ProcessQueryResult(drawableProcessor_->GetLightsInFrustum(), frame_, occlusionBuffer_, cullCamera_);
+//     lightProcessor_->QueryLitGeometries(drawableProcessor_->GetGeometriesInFrustum(), queue);
+//
+//     lights_.Clear();
+//     for (Light* light : lightProcessor_->GetLights())
+//         lights_.Push(light);
+//
+//     // Check drawable occlusion, find zones for moved drawables and collect geometries & lights in worker threads
 //     {
-        drawableProcessor_->QueryGeometriesInFrustum(cullCamera_->GetViewMask(), cullCamera_->GetFrustum());
-//         FrustumOctreeQuery query(tempDrawables, cullCamera_->GetFrustum(), DRAWABLE_GEOMETRY | DRAWABLE_LIGHT, cullCamera_->GetViewMask());
-//         octree_->GetDrawables(query);
 //         tempDrawables.Clear();
-//         drawableProcessor_->GetDrawables(tempDrawables, DRAWABLE_GEOMETRY | DRAWABLE_LIGHT, cullCamera_->GetViewMask(), cullCamera_->GetFrustum());
+//         for (Drawable* geometry : drawableProcessor_->GetGeometriesInFrustum().geometries_)
+//             tempDrawables.Push(geometry);
+// //         for (Light* light : drawableProcessor_->GetLightsInFrustum().lights_)
+// //             tempDrawables.Push(light);
+//
+//         for (unsigned i = 0; i < sceneResults_.Size(); ++i)
+//         {
+//             PerThreadSceneResult& result = sceneResults_[i];
+//
+//             result.geometries_.Clear();
+// //             result.lights_.Clear();
+//             result.minZ_ = M_INFINITY;
+//             result.maxZ_ = 0.0f;
+//         }
+//
+//         int numWorkItems = queue->GetNumThreads() + 1; // Worker threads + main thread
+//         int drawablesPerItem = tempDrawables.Size() / numWorkItems;
+//
+//         PODVector<Drawable*>::Iterator start = tempDrawables.Begin();
+//         // Create a work item for each thread
+//         for (int i = 0; i < numWorkItems; ++i)
+//         {
+//             SharedPtr<WorkItem> item = queue->GetFreeItem();
+//             item->priority_ = M_MAX_UNSIGNED;
+//             item->workFunction_ = CheckVisibilityWork;
+//             item->aux_ = this;
+//
+//             PODVector<Drawable*>::Iterator end = tempDrawables.End();
+//             if (i < numWorkItems - 1 && end - start > drawablesPerItem)
+//                 end = start + drawablesPerItem;
+//
+//             item->start_ = &(*start);
+//             item->end_ = &(*end);
+//             queue->AddWorkItem(item);
+//
+//             start = end;
+//         }
+//
+//         queue->Complete(M_MAX_UNSIGNED);
 //     }
-
-    // Check drawable occlusion, find zones for moved drawables and collect geometries & lights in worker threads
-    {
-        tempDrawables.Clear();
-        for (Drawable* geometry : drawableProcessor_->GetGeometriesInFrustum().geometries_)
-            tempDrawables.Push(geometry);
-        for (Light* light : drawableProcessor_->GetLightsInFrustum().lights_)
-            tempDrawables.Push(light);
-
-        for (unsigned i = 0; i < sceneResults_.Size(); ++i)
-        {
-            PerThreadSceneResult& result = sceneResults_[i];
-
-            result.geometries_.Clear();
-            result.lights_.Clear();
-            result.minZ_ = M_INFINITY;
-            result.maxZ_ = 0.0f;
-        }
-
-        int numWorkItems = queue->GetNumThreads() + 1; // Worker threads + main thread
-        int drawablesPerItem = tempDrawables.Size() / numWorkItems;
-
-        PODVector<Drawable*>::Iterator start = tempDrawables.Begin();
-        // Create a work item for each thread
-        for (int i = 0; i < numWorkItems; ++i)
-        {
-            SharedPtr<WorkItem> item = queue->GetFreeItem();
-            item->priority_ = M_MAX_UNSIGNED;
-            item->workFunction_ = CheckVisibilityWork;
-            item->aux_ = this;
-
-            PODVector<Drawable*>::Iterator end = tempDrawables.End();
-            if (i < numWorkItems - 1 && end - start > drawablesPerItem)
-                end = start + drawablesPerItem;
-
-            item->start_ = &(*start);
-            item->end_ = &(*end);
-            queue->AddWorkItem(item);
-
-            start = end;
-        }
-
-        queue->Complete(M_MAX_UNSIGNED);
-    }
 
     // Update batches
 //     drawableProcessor_->UpdateBatches(this);
@@ -981,33 +952,50 @@ void View::GetDrawables()
 //     Swap(lights_, bucket.lights_);
 //     minZ_ = bucket.minZ_;
 //     maxZ_ = bucket.maxZ_;
+//
+//     // Combine lights, geometries & scene Z range from the threads
+//     geometries_.Clear();
+// //     lights_.Clear();
+//     minZ_ = M_INFINITY;
+//     maxZ_ = 0.0f;
+//
+//     if (sceneResults_.Size() > 1)
+//     {
+//         for (unsigned i = 0; i < sceneResults_.Size(); ++i)
+//         {
+//             PerThreadSceneResult& result = sceneResults_[i];
+//             geometries_.Push(result.geometries_);
+// //             lights_.Push(result.lights_);
+//             minZ_ = Min(minZ_, result.minZ_);
+//             maxZ_ = Max(maxZ_, result.maxZ_);
+//         }
+//     }
+//     else
+//     {
+//         // If just 1 thread, copy the results directly
+//         PerThreadSceneResult& result = sceneResults_[0];
+//         minZ_ = result.minZ_;
+//         maxZ_ = result.maxZ_;
+//         Swap(geometries_, result.geometries_);
+// //         Swap(lights_, result.lights_);
+//     }
 
-    // Combine lights, geometries & scene Z range from the threads
+    // Copy things
+    zones_.Clear();
+    occluders_.Clear();
     geometries_.Clear();
     lights_.Clear();
-    minZ_ = M_INFINITY;
-    maxZ_ = 0.0f;
+    for (Light* light : drawableProcessor_->viewProcessor_->GetSpirits().lights_)
+        lights_.Push(light);
+    for (Drawable* occluder : drawableProcessor_->viewProcessor_->GetSpirits().occluders_)
+        occluders_.Push(occluder);
+    for (Zone* zone : drawableProcessor_->viewProcessor_->GetSpirits().zones_)
+        zones_.Push(zone);
+    for (Drawable* geometry : drawableProcessor_->viewProcessor_->GetGeometries().geometries_)
+        geometries_.Push(geometry);
 
-    if (sceneResults_.Size() > 1)
-    {
-        for (unsigned i = 0; i < sceneResults_.Size(); ++i)
-        {
-            PerThreadSceneResult& result = sceneResults_[i];
-            geometries_.Push(result.geometries_);
-            lights_.Push(result.lights_);
-            minZ_ = Min(minZ_, result.minZ_);
-            maxZ_ = Max(maxZ_, result.maxZ_);
-        }
-    }
-    else
-    {
-        // If just 1 thread, copy the results directly
-        PerThreadSceneResult& result = sceneResults_[0];
-        minZ_ = result.minZ_;
-        maxZ_ = result.maxZ_;
-        Swap(geometries_, result.geometries_);
-        Swap(lights_, result.lights_);
-    }
+    minZ_ = drawableProcessor_->viewProcessor_->GetGeometries().minZ_;
+    minZ_ = drawableProcessor_->viewProcessor_->GetGeometries().maxZ_;
 
     // Sort the lights to brightest/closest first, and per-vertex lights first so that per-vertex base pass can be evaluated first
     for (unsigned i = 0; i < lights_.Size(); ++i)
@@ -1627,8 +1615,8 @@ void View::ExecuteRenderPathCommands()
                     URHO3D_PROFILE(ClearRenderTarget);
 
                     Color clearColor = command.clearColor_;
-                    if (command.useFogColor_)
-                        clearColor = actualView->farClipZone_->GetFogColor();
+                    if (command.useFogColor_ && zoneProcessor_)
+                        clearColor = zoneProcessor_->farClipZone_->GetFogColor();
 
                     SetRenderTargets(command);
                     graphics_->Clear(command.clearFlags_, clearColor, command.clearDepth_, command.clearStencil_);
@@ -2378,7 +2366,8 @@ void View::ProcessLight(LightQueryResult& query, unsigned threadIndex)
 
     case LIGHT_POINT:
         {
-            SphereOctreeQuery octreeQuery(tempDrawables, Sphere(light->GetNode()->GetWorldPosition(), light->GetRange()),
+            Sphere lightSphere(light->GetNode()->GetWorldPosition(), light->GetRange());
+            SphereOctreeQuery octreeQuery(tempDrawables, lightSphere,
                 DRAWABLE_GEOMETRY, cullCamera_->GetViewMask());
             octree_->GetDrawables(octreeQuery);
             for (unsigned i = 0; i < tempDrawables.Size(); ++i)
@@ -2386,6 +2375,14 @@ void View::ProcessLight(LightQueryResult& query, unsigned threadIndex)
                 if (tempDrawables[i]->IsInView(frame_) && (GetLightMask(tempDrawables[i]) & lightMask))
                     query.litGeometries_.Push(tempDrawables[i]);
             }
+//
+//             auto& geomsInFrustum = drawableProcessor_->GetGeometriesInFrustum();
+//             unsigned numGeometries = geomsInFrustum.geometries_.Size();
+//             for (unsigned i = 0; i < numGeometries; ++i)
+//             {
+//                 if (lightSphere.IsInside(geomsInFrustum.boundingSpheres_[i]))
+//                     query.litGeometries_.Push(geomsInFrustum.geometries_[i]);
+//             }
         }
         break;
     }
@@ -2849,7 +2846,7 @@ void View::FindZone(Drawable* drawable)
     // First check if the current zone remains a conclusive result
     Zone* lastZone = drawable->GetZone();
 
-    if (lastZone && (lastZone->GetViewMask() & cullCamera_->GetViewMask()) && lastZone->GetPriority() >= highestZonePriority_ &&
+    if (lastZone && (lastZone->GetViewMask() & cullCamera_->GetViewMask()) && lastZone->GetPriority() >= zoneProcessor_->highestZonePriority_ &&
         (drawable->GetZoneMask() & lastZone->GetZoneMask()) && lastZone->IsInside(center))
         newZone = lastZone;
     else
@@ -3237,6 +3234,14 @@ void View::SendViewEvent(StringHash eventType)
     eventData[P_CAMERA] = cullCamera_;
 
     renderer_->SendEvent(eventType, eventData);
+}
+
+Zone* View::GetZone(Drawable* drawable)
+{
+    if (zoneProcessor_->cameraZoneOverride_)
+        return zoneProcessor_->cameraZone_;
+    Zone* drawableZone = drawable->GetZone();
+    return drawableZone ? drawableZone : zoneProcessor_->cameraZone_;
 }
 
 Texture* View::FindNamedTexture(const String& name, bool isRenderTarget, bool isVolumeMap)
