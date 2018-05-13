@@ -681,7 +681,7 @@ void View::GetDrawables()
         zones_.Push(zone);
     for (Light* light : drawableProcessor_->viewProcessor_->GetGeometriesAndLights().lights_)
         lights_.Push(light);
-    for (Drawable* geometry : drawableProcessor_->viewProcessor_->GetGeometriesAndLights().geometries_.drawables_)
+    for (Drawable* geometry : drawableProcessor_->viewProcessor_->GetGeometriesAndLights().geometries_)
         geometries_.Push(geometry);
 
     minZ_ = drawableProcessor_->viewProcessor_->GetGeometriesAndLights().minZ_;

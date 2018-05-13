@@ -348,85 +348,57 @@ struct SceneQueryZonesAndOccludersResult
     }
 };
 
-struct SceneQueryGeometriesSoA
+struct SceneQueryGeometriesResult
 {
-    Vector<Drawable*> drawables_;
+    Vector<Light*> lights_;
+
+    Vector<Drawable*> geometries_;
     Vector<Zone*> zones_;
     Vector<unsigned> zoneLightMasks_;
     Vector<unsigned> zoneShadowMasks_;
     Vector<float> distances_;
     Vector<Vector2> minmaxZ_;
 
-    unsigned Size() const { return drawables_.Size(); }
+    float minZ_{};
+    float maxZ_{};
     bool IsValid() const
     {
-        return drawables_.Size() == zones_.Size()
-            && drawables_.Size() == zoneLightMasks_.Size()
-            && drawables_.Size() == zoneShadowMasks_.Size()
-            && drawables_.Size() == distances_.Size()
-            && drawables_.Size() == minmaxZ_.Size();
+        return geometries_.Size() == zones_.Size()
+            && geometries_.Size() == zoneLightMasks_.Size()
+            && geometries_.Size() == zoneShadowMasks_.Size()
+            && geometries_.Size() == distances_.Size()
+            && geometries_.Size() == minmaxZ_.Size();
     }
     void Clear()
     {
-        drawables_.Clear();
+        lights_.Clear();
+
+        geometries_.Clear();
         zones_.Clear();
         zoneLightMasks_.Clear();
         zoneShadowMasks_.Clear();
         distances_.Clear();
         minmaxZ_.Clear();
-
-        assert(IsValid());
-    }
-    void Append(const SceneQueryGeometriesSoA& rhs)
-    {
-        drawables_.Push(rhs.drawables_);
-        zones_.Push(rhs.zones_);
-        zoneLightMasks_.Push(rhs.zoneLightMasks_);
-        zoneShadowMasks_.Push(rhs.zoneShadowMasks_);
-        distances_.Push(rhs.distances_);
-        minmaxZ_.Push(rhs.minmaxZ_);
-    }
-};
-
-inline void Swap(SceneQueryGeometriesSoA& lhs, SceneQueryGeometriesSoA& rhs)
-{
-    Swap(lhs.drawables_, rhs.drawables_);
-    Swap(lhs.zones_, rhs.zones_);
-    Swap(lhs.zoneLightMasks_, rhs.zoneLightMasks_);
-    Swap(lhs.zoneShadowMasks_, rhs.zoneShadowMasks_);
-    Swap(lhs.distances_, rhs.distances_);
-    Swap(lhs.minmaxZ_, rhs.minmaxZ_);
-}
-
-struct SceneQueryGeometriesAndLightsResult
-{
-    Vector<Light*> lights_;
-    SceneQueryGeometriesSoA geometries_;
-
-    float minZ_{};
-    float maxZ_{};
-    bool IsValid() const
-    {
-        return geometries_.IsValid();
-    }
-    void Clear()
-    {
-        lights_.Clear();
-        geometries_.Clear();
         minZ_ = M_INFINITY;
         maxZ_ = 0.0f;
 
         assert(IsValid());
     }
-    void Merge(Vector<SceneQueryGeometriesAndLightsResult>& array)
+    void Merge(Vector<SceneQueryGeometriesResult>& array)
     {
         Clear();
         if (array.Size() > 1)
         {
-            for (SceneQueryGeometriesAndLightsResult& result : array)
+            for (SceneQueryGeometriesResult& result : array)
             {
                 lights_.Push(result.lights_);
-                geometries_.Append(result.geometries_);
+
+                geometries_.Push(result.geometries_);
+                zones_.Push(result.zones_);
+                zoneLightMasks_.Push(result.zoneLightMasks_);
+                zoneShadowMasks_.Push(result.zoneShadowMasks_);
+                distances_.Push(result.distances_);
+                minmaxZ_.Push(result.minmaxZ_);
                 minZ_ = Min(minZ_, result.minZ_);
                 maxZ_ = Max(maxZ_, result.maxZ_);
             }
@@ -434,7 +406,13 @@ struct SceneQueryGeometriesAndLightsResult
         else
         {
             Swap(lights_, array[0].lights_);
+
             Swap(geometries_, array[0].geometries_);
+            Swap(zones_, array[0].zones_);
+            Swap(zoneLightMasks_, array[0].zoneLightMasks_);
+            Swap(zoneShadowMasks_, array[0].zoneShadowMasks_);
+            Swap(distances_, array[0].distances_);
+            Swap(minmaxZ_, array[0].minmaxZ_);
             minZ_ = array[0].minZ_;
             maxZ_ = array[0].maxZ_;
         }
@@ -537,14 +515,14 @@ public:
 
         const unsigned numThreads = workQueue->GetNumThreads() + 1;
         sceneGeometriesAndLightsQueryThreadResults_.Resize(numThreads);
-        for (SceneQueryGeometriesAndLightsResult& result : sceneGeometriesAndLightsQueryThreadResults_)
+        for (SceneQueryGeometriesResult& result : sceneGeometriesAndLightsQueryThreadResults_)
             result.Clear();
 
         workQueue->ScheduleWork(GetSceneQueryThreshold(), sceneData.size_, numThreads,
             [=, &sceneData](unsigned beginIndex, unsigned endIndex, unsigned threadIndex)
         {
             // TODO(eugeneko) Process lights here
-            SceneQueryGeometriesAndLightsResult& result = sceneGeometriesAndLightsQueryThreadResults_[threadIndex];
+            SceneQueryGeometriesResult& result = sceneGeometriesAndLightsQueryThreadResults_[threadIndex];
             for (unsigned index = beginIndex; index < endIndex; ++index)
             {
                 // Discard drawables from other views
@@ -602,12 +580,12 @@ public:
                     }
 
                     // Push results
-                    result.geometries_.drawables_.Push(drawable);
-                    result.geometries_.zones_.Push(sceneData.cachedZone_[index]);
-                    result.geometries_.zoneLightMasks_.Push(sceneData.cachedZoneLightMask_[index]);
-                    result.geometries_.zoneShadowMasks_.Push(sceneData.cachedZoneShadowMask_[index]);
-                    result.geometries_.distances_.Push(distance);
-                    result.geometries_.minmaxZ_.Push(Vector2(minZ, maxZ));
+                    result.geometries_.Push(drawable);
+                    result.zones_.Push(sceneData.cachedZone_[index]);
+                    result.zoneLightMasks_.Push(sceneData.cachedZoneLightMask_[index]);
+                    result.zoneShadowMasks_.Push(sceneData.cachedZoneShadowMask_[index]);
+                    result.distances_.Push(distance);
+                    result.minmaxZ_.Push(Vector2(minZ, maxZ));
                 }
                 else //if (isLight)
                 {
@@ -624,29 +602,27 @@ public:
     {
         const unsigned numThreads = workQueue->GetNumThreads() + 1;
 
-        SceneQueryGeometriesSoA& geometries = sceneGeometriesAndLightsQueryResult_.geometries_;
-        workQueue->ScheduleWork(GetSceneQueryThreshold(), geometries.Size(), numThreads,
-            [this, &frame, &geometries](unsigned beginIndex, unsigned endIndex, unsigned threadIndex)
+        workQueue->ScheduleWork(GetSceneQueryThreshold(), sceneGeometriesAndLightsQueryResult_.geometries_.Size(), numThreads,
+            [this, &frame](unsigned beginIndex, unsigned endIndex, unsigned threadIndex)
         {
             for (unsigned index = beginIndex; index < endIndex; ++index)
             {
                 // TODO(eugeneko) REMOVE!!
-                Drawable* drawable = geometries.drawables_[index];
+                Drawable* drawable = sceneGeometriesAndLightsQueryResult_.geometries_[index];
                 drawable->UpdateBatches(frame);
-                drawable->SetZone(geometries.zones_[index]);
+                drawable->SetZone(sceneGeometriesAndLightsQueryResult_.zones_[index]);
                 drawable->MarkInView(frame);
-                drawable->SetMinMaxZ(geometries.minmaxZ_[index].x_, geometries.minmaxZ_[index].y_);
+                drawable->SetMinMaxZ(sceneGeometriesAndLightsQueryResult_.minmaxZ_[index].x_, sceneGeometriesAndLightsQueryResult_.minmaxZ_[index].y_);
             }
         });
 
-        Vector<Light*>& lights = sceneGeometriesAndLightsQueryResult_.lights_;
-        workQueue->ScheduleWork(GetSceneQueryThreshold(), lights.Size(), numThreads,
-            [this, &frame, &lights](unsigned beginIndex, unsigned endIndex, unsigned threadIndex)
+        workQueue->ScheduleWork(GetSceneQueryThreshold(), sceneGeometriesAndLightsQueryResult_.lights_.Size(), numThreads,
+            [this, &frame](unsigned beginIndex, unsigned endIndex, unsigned threadIndex)
         {
             for (unsigned index = beginIndex; index < endIndex; ++index)
             {
                 // TODO(eugeneko) REMOVE!!
-                Drawable* drawable = lights[index];
+                Drawable* drawable = sceneGeometriesAndLightsQueryResult_.lights_[index];
                 drawable->UpdateBatches(frame);
                 drawable->MarkInView(frame);
             }
@@ -669,7 +645,7 @@ public:
     }
 
     const SceneQueryZonesAndOccludersResult& GetZonesAndOccluders() const { return sceneZonesAndOccludersQueryResult_; }
-    const SceneQueryGeometriesAndLightsResult& GetGeometriesAndLights() const { return sceneGeometriesAndLightsQueryResult_; }
+    const SceneQueryGeometriesResult& GetGeometriesAndLights() const { return sceneGeometriesAndLightsQueryResult_; }
     const ViewCookedZonesData& GetCookedZonesInfo() const { return zones_; }
     const Vector<Zone*>& GetZones() const { return sceneZonesAndOccludersQueryResult_.zones_; }
 
@@ -728,8 +704,8 @@ private:
 
     ViewCookedZonesData zones_;
 
-    Vector<SceneQueryGeometriesAndLightsResult> sceneGeometriesAndLightsQueryThreadResults_;
-    SceneQueryGeometriesAndLightsResult sceneGeometriesAndLightsQueryResult_;
+    Vector<SceneQueryGeometriesResult> sceneGeometriesAndLightsQueryThreadResults_;
+    SceneQueryGeometriesResult sceneGeometriesAndLightsQueryResult_;
 
 
 };
