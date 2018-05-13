@@ -208,7 +208,7 @@ struct SceneProcessorDrawableSoA
     bool IsLight(unsigned index) const { return !!(drawableFlag_[index] & DRAWABLE_LIGHT); }
     bool IsGeometry(unsigned index) const { return !!(drawableFlag_[index] & DRAWABLE_GEOMETRY); }
     Intersection IntersectSphereFrustum(unsigned index, const Frustum& frustum) const { return frustum.IsInside(worldBoundingSphere_[index]); }
-    Intersection IntersectBoxFrustum(unsigned index, const Frustum& frustum) const { return frustum.IsInsideFast(worldBoundingBox_[index]); }
+    Intersection IntersectBoxFrustum(unsigned index, const Frustum& frustum) const { return frustum.IsInside(worldBoundingBox_[index]); }
     bool IsInFrustum(unsigned index, const Frustum& frustum) const
     {
         const Intersection sphereIntersection = IntersectSphereFrustum(index, frustum);
@@ -216,6 +216,11 @@ struct SceneProcessorDrawableSoA
             && (sphereIntersection == INSIDE || IntersectBoxFrustum(index, frustum) != OUTSIDE);
     }
     bool IsCenterInFrustum(unsigned index, const Frustum& frustum) const { return frustum.IsInside(worldBoundingSphere_[index].center_) != OUTSIDE; }
+    bool IsOccludedByBuffer(unsigned index, OcclusionBuffer* buffer) const
+    {
+        return buffer && occludee_[index] && !buffer->IsVisible(worldBoundingBox_[index]);
+
+    }
 
 };
 
@@ -315,95 +320,121 @@ private:
     bool dirtyZoneCache_ = false;
 };
 
-struct SceneQuerySpiritsResult
+struct SceneQueryZonesAndOccludersResult
 {
-    Vector<Light*> lights_;
     Vector<Drawable*> occluders_;
     Vector<Zone*> zones_;
     void Clear()
     {
-        lights_.Clear();
         occluders_.Clear();
         zones_.Clear();
     }
-    void Merge(Vector<SceneQuerySpiritsResult>& array)
+    void Merge(Vector<SceneQueryZonesAndOccludersResult>& array)
     {
         Clear();
         if (array.Size() > 1)
         {
-            for (SceneQuerySpiritsResult& result : array)
+            for (SceneQueryZonesAndOccludersResult& result : array)
             {
-                lights_.Push(result.lights_);
                 occluders_.Push(result.occluders_);
                 zones_.Push(result.zones_);
             }
         }
         else
         {
-            Swap(lights_, array[0].lights_);
             Swap(occluders_, array[0].occluders_);
             Swap(zones_, array[0].zones_);
         }
     }
 };
 
-struct SceneQueryGeometriesResult
+struct SceneQueryGeometriesSoA
 {
-    Vector<Drawable*> geometries_;
+    Vector<Drawable*> drawables_;
     Vector<Zone*> zones_;
     Vector<unsigned> zoneLightMasks_;
     Vector<unsigned> zoneShadowMasks_;
     Vector<float> distances_;
     Vector<Vector2> minmaxZ_;
 
-    float minZ_{};
-    float maxZ_{};
+    unsigned Size() const { return drawables_.Size(); }
     bool IsValid() const
     {
-        return geometries_.Size() == zones_.Size()
-            && geometries_.Size() == zoneLightMasks_.Size()
-            && geometries_.Size() == zoneShadowMasks_.Size()
-            && geometries_.Size() == distances_.Size()
-            && geometries_.Size() == minmaxZ_.Size();
+        return drawables_.Size() == zones_.Size()
+            && drawables_.Size() == zoneLightMasks_.Size()
+            && drawables_.Size() == zoneShadowMasks_.Size()
+            && drawables_.Size() == distances_.Size()
+            && drawables_.Size() == minmaxZ_.Size();
     }
     void Clear()
     {
-        geometries_.Clear();
+        drawables_.Clear();
         zones_.Clear();
         zoneLightMasks_.Clear();
         zoneShadowMasks_.Clear();
         distances_.Clear();
         minmaxZ_.Clear();
+
+        assert(IsValid());
+    }
+    void Append(const SceneQueryGeometriesSoA& rhs)
+    {
+        drawables_.Push(rhs.drawables_);
+        zones_.Push(rhs.zones_);
+        zoneLightMasks_.Push(rhs.zoneLightMasks_);
+        zoneShadowMasks_.Push(rhs.zoneShadowMasks_);
+        distances_.Push(rhs.distances_);
+        minmaxZ_.Push(rhs.minmaxZ_);
+    }
+};
+
+inline void Swap(SceneQueryGeometriesSoA& lhs, SceneQueryGeometriesSoA& rhs)
+{
+    Swap(lhs.drawables_, rhs.drawables_);
+    Swap(lhs.zones_, rhs.zones_);
+    Swap(lhs.zoneLightMasks_, rhs.zoneLightMasks_);
+    Swap(lhs.zoneShadowMasks_, rhs.zoneShadowMasks_);
+    Swap(lhs.distances_, rhs.distances_);
+    Swap(lhs.minmaxZ_, rhs.minmaxZ_);
+}
+
+struct SceneQueryGeometriesAndLightsResult
+{
+    Vector<Light*> lights_;
+    SceneQueryGeometriesSoA geometries_;
+
+    float minZ_{};
+    float maxZ_{};
+    bool IsValid() const
+    {
+        return geometries_.IsValid();
+    }
+    void Clear()
+    {
+        lights_.Clear();
+        geometries_.Clear();
         minZ_ = M_INFINITY;
         maxZ_ = 0.0f;
 
         assert(IsValid());
     }
-    void Merge(Vector<SceneQueryGeometriesResult>& array)
+    void Merge(Vector<SceneQueryGeometriesAndLightsResult>& array)
     {
         Clear();
         if (array.Size() > 1)
         {
-            for (SceneQueryGeometriesResult& result : array)
+            for (SceneQueryGeometriesAndLightsResult& result : array)
             {
-                geometries_.Push(result.geometries_);
-                zones_.Push(result.zones_);
-                zoneLightMasks_.Push(result.zoneLightMasks_);
-                zoneShadowMasks_.Push(result.zoneShadowMasks_);
-                distances_.Push(result.distances_);
-                minmaxZ_.Push(result.minmaxZ_);
+                lights_.Push(result.lights_);
+                geometries_.Append(result.geometries_);
                 minZ_ = Min(minZ_, result.minZ_);
                 maxZ_ = Max(maxZ_, result.maxZ_);
             }
         }
         else
         {
+            Swap(lights_, array[0].lights_);
             Swap(geometries_, array[0].geometries_);
-            Swap(zones_, array[0].zones_);
-            Swap(zoneLightMasks_, array[0].zoneLightMasks_);
-            Swap(zoneShadowMasks_, array[0].zoneShadowMasks_);
-            Swap(distances_, array[0].distances_);
-            Swap(minmaxZ_, array[0].minmaxZ_);
             minZ_ = array[0].minZ_;
             maxZ_ = array[0].maxZ_;
         }
@@ -417,7 +448,6 @@ struct SceneQueryGeometriesResult
 struct ViewCookedZonesData
 {
     bool cameraZoneOverride_{};
-    Vector<Zone*> zones_;
     Zone* cameraZone_{};
     Zone* farClipZone_{};
 };
@@ -427,19 +457,19 @@ class ViewProcessor
 {
 public:
     virtual unsigned GetSceneQueryThreshold() { return 64; }
-    /// Query zones, lights and occluders.
-    virtual void QuerySceneSpirits(WorkQueue* workQueue, const SceneProcessorDrawableSoA& sceneData,
+    /// Query zones and occluders.
+    virtual void QuerySceneZonesAndOccluders(WorkQueue* workQueue, const SceneProcessorDrawableSoA& sceneData,
         unsigned viewMask, const Frustum& frustum)
     {
         const unsigned numThreads = workQueue->GetNumThreads() + 1;
-        sceneSpiritsQueryThreadResults_.Resize(numThreads);
-        for (SceneQuerySpiritsResult& result : sceneSpiritsQueryThreadResults_)
+        sceneZonesAndOccludersQueryThreadResults_.Resize(numThreads);
+        for (SceneQueryZonesAndOccludersResult& result : sceneZonesAndOccludersQueryThreadResults_)
             result.Clear();
 
         workQueue->ScheduleWork(GetSceneQueryThreshold(), sceneData.size_, numThreads,
             [this, viewMask, frustum, &sceneData](unsigned beginIndex, unsigned endIndex, unsigned threadIndex)
         {
-            SceneQuerySpiritsResult& result = sceneSpiritsQueryThreadResults_[threadIndex];
+            SceneQueryZonesAndOccludersResult& result = sceneZonesAndOccludersQueryThreadResults_[threadIndex];
             for (unsigned index = beginIndex; index < endIndex; ++index)
             {
                 if (!sceneData.MatchViewMask(index, viewMask))
@@ -452,11 +482,6 @@ public:
                 {
                     result.zones_.Push(static_cast<Zone*>(drawable));
                 }
-                else if (sceneData.IsLight(index))
-                {
-                    if (sceneData.IsInFrustum(index, frustum))
-                        result.lights_.Push(static_cast<Light*>(drawable));
-                }
                 else if (sceneData.IsGeometry(index) && sceneData.occluder_[index])
                 {
                     if (sceneData.IsInFrustum(index, frustum))
@@ -466,26 +491,25 @@ public:
         });
 
         workQueue->Complete(M_MAX_UNSIGNED);
-        sceneSpiritsQueryResult_.Merge(sceneSpiritsQueryThreadResults_);
+        sceneZonesAndOccludersQueryResult_.Merge(sceneZonesAndOccludersQueryThreadResults_);
     }
     /// Prepare zones for further usage.
     virtual void CookZones(Camera* cullCamera, Zone* defaultZone)
     {
-        zones_.zones_.Clear();
-        zones_.zones_.Push(sceneSpiritsQueryResult_.zones_);
+        Vector<Zone*>& zones = sceneZonesAndOccludersQueryResult_.zones_;
         zones_.cameraZoneOverride_ = false;
         zones_.cameraZone_ = nullptr;
         zones_.farClipZone_ = nullptr;
 
         // Sort zones
-        Sort(zones_.zones_.Begin(), zones_.zones_.End(),
+        Sort(zones.Begin(), zones.End(),
             [](Zone* lhs, Zone* rhs) { return lhs->GetPriority() > rhs->GetPriority(); });
 
         // Find camera and far clip zones
         Node* cullCameraNode = cullCamera->GetNode();
         const Vector3 cameraPos = cullCameraNode->GetWorldPosition();
         const Vector3 farClipPos = cameraPos + cullCameraNode->GetWorldDirection() * Vector3(0.0f, 0.0f, cullCamera->GetFarClip());
-        for (Zone* zone : zones_.zones_)
+        for (Zone* zone : zones)
         {
             if (!zones_.cameraZone_ && zone->IsInside(cameraPos))
                 zones_.cameraZone_ = zone;
@@ -502,7 +526,7 @@ public:
             zones_.farClipZone_ = defaultZone;
     }
     /// Query geometries.
-    virtual void QuerySceneGeometries(WorkQueue* workQueue, SceneProcessorDrawableSoA& sceneData,
+    virtual void QuerySceneLightsAndGeometries(WorkQueue* workQueue, SceneProcessorDrawableSoA& sceneData,
         Camera* cullCamera, OcclusionBuffer* occlusionBuffer)
     {
         const unsigned viewMask = cullCamera->GetViewMask();
@@ -512,22 +536,29 @@ public:
         const Vector3 absViewZ = viewZ.Abs();
 
         const unsigned numThreads = workQueue->GetNumThreads() + 1;
-        sceneGeometriesQueryThreadResults_.Resize(numThreads);
-        for (SceneQueryGeometriesResult& result : sceneGeometriesQueryThreadResults_)
+        sceneGeometriesAndLightsQueryThreadResults_.Resize(numThreads);
+        for (SceneQueryGeometriesAndLightsResult& result : sceneGeometriesAndLightsQueryThreadResults_)
             result.Clear();
 
         workQueue->ScheduleWork(GetSceneQueryThreshold(), sceneData.size_, numThreads,
             [=, &sceneData](unsigned beginIndex, unsigned endIndex, unsigned threadIndex)
         {
-            SceneQueryGeometriesResult& result = sceneGeometriesQueryThreadResults_[threadIndex];
+            // TODO(eugeneko) Process lights here
+            SceneQueryGeometriesAndLightsResult& result = sceneGeometriesAndLightsQueryThreadResults_[threadIndex];
             for (unsigned index = beginIndex; index < endIndex; ++index)
             {
                 // Discard drawables from other views
                 if (!sceneData.MatchViewMask(index, viewMask))
                     continue;
 
-                // Discard spirits and drawables outside the frustum
-                if (!sceneData.IsGeometry(index) || !sceneData.IsInFrustum(index, frustum))
+                // Discard drawables except lights and geometries
+                const bool isGeometry = sceneData.IsGeometry(index);
+                const bool isLigth = sceneData.IsLight(index);
+                if (!isGeometry && !isLigth)
+                    continue;
+
+                // Discard invisible
+                if (!sceneData.IsInFrustum(index, frustum))
                     continue;
 
                 // Calculate drawable distance
@@ -539,70 +570,108 @@ public:
                     continue;
 
                 // Discard using occlusion buffer
-                const BoundingBox& boundingBox = sceneData.worldBoundingBox_[index];
-                if (occlusionBuffer && sceneData.occludee_[index] && !occlusionBuffer->IsVisible(boundingBox))
+                if (sceneData.IsOccludedByBuffer(index, occlusionBuffer))
                     continue;
 
                 // Update drawable zone
-                if (!zones_.cameraZoneOverride_ && !zones_.zones_.Empty())
+                Drawable* drawable = sceneData.drawable_[index];
+                if (isGeometry)
                 {
-                    UpdateDirtyZone(sceneData, index, viewMask, frustum);
+                    if (!zones_.cameraZoneOverride_ && !GetZones().Empty())
+                    {
+                        UpdateDirtyZone(sceneData, index, viewMask, frustum);
+                    }
+
+                    // Update min and max Z
+                    float minZ = M_LARGE_VALUE;
+                    float maxZ = M_LARGE_VALUE;
+
+                    const BoundingBox& boundingBox = sceneData.worldBoundingBox_[index];
+                    const Vector3 center = boundingBox.Center();
+                    const Vector3 edge = boundingBox.Size() * 0.5f;
+
+                    // Do not add "infinite" objects like skybox to prevent shadow map focusing behaving erroneously
+                    if (edge.LengthSquared() < M_LARGE_VALUE * M_LARGE_VALUE)
+                    {
+                        const float viewCenterZ = viewZ.DotProduct(center) + viewMatrix.m23_;
+                        const float viewEdgeZ = absViewZ.DotProduct(edge);
+                        minZ = viewCenterZ - viewEdgeZ;
+                        maxZ = viewCenterZ + viewEdgeZ;
+                        result.minZ_ = Min(result.minZ_, minZ);
+                        result.maxZ_ = Max(result.maxZ_, maxZ);
+                    }
+
+                    // Push results
+                    result.geometries_.drawables_.Push(drawable);
+                    result.geometries_.zones_.Push(sceneData.cachedZone_[index]);
+                    result.geometries_.zoneLightMasks_.Push(sceneData.cachedZoneLightMask_[index]);
+                    result.geometries_.zoneShadowMasks_.Push(sceneData.cachedZoneShadowMask_[index]);
+                    result.geometries_.distances_.Push(distance);
+                    result.geometries_.minmaxZ_.Push(Vector2(minZ, maxZ));
                 }
-
-                // Update min and max Z
-                float minZ = M_LARGE_VALUE;
-                float maxZ = M_LARGE_VALUE;
-
-                const Vector3 center = boundingBox.Center();
-                const Vector3 edge = boundingBox.Size() * 0.5f;
-
-                // Do not add "infinite" objects like skybox to prevent shadow map focusing behaving erroneously
-                if (edge.LengthSquared() < M_LARGE_VALUE * M_LARGE_VALUE)
+                else //if (isLight)
                 {
-                    const float viewCenterZ = viewZ.DotProduct(center) + viewMatrix.m23_;
-                    const float viewEdgeZ = absViewZ.DotProduct(edge);
-                    minZ = viewCenterZ - viewEdgeZ;
-                    maxZ = viewCenterZ + viewEdgeZ;
-                    result.minZ_ = Min(result.minZ_, minZ);
-                    result.maxZ_ = Max(result.maxZ_, maxZ);
+                    result.lights_.Push(static_cast<Light*>(drawable));
                 }
-
-                // Push results
-                result.geometries_.Push(sceneData.drawable_[index]);
-                result.zones_.Push(sceneData.cachedZone_[index]);
-                result.zoneLightMasks_.Push(sceneData.cachedZoneLightMask_[index]);
-                result.zoneShadowMasks_.Push(sceneData.cachedZoneShadowMask_[index]);
-                result.distances_.Push(distance);
-                result.minmaxZ_.Push(Vector2(minZ, maxZ));
             }
         });
 
         workQueue->Complete(M_MAX_UNSIGNED);
-        sceneGeometriesQueryResult_.Merge(sceneGeometriesQueryThreadResults_);
+        sceneGeometriesAndLightsQueryResult_.Merge(sceneGeometriesAndLightsQueryThreadResults_);
     }
-    /// Update geometries.
-    virtual void UpdateGeometries(WorkQueue* workQueue, const FrameInfo& frame)
+    /// Update lights and geometries.
+    virtual void UpdateLightsAndGeometries(WorkQueue* workQueue, const FrameInfo& frame)
     {
         const unsigned numThreads = workQueue->GetNumThreads() + 1;
-        workQueue->ScheduleWork(GetSceneQueryThreshold(), sceneGeometriesQueryResult_.geometries_.Size(), numThreads,
-            [this, &frame](unsigned beginIndex, unsigned endIndex, unsigned threadIndex)
+
+        SceneQueryGeometriesSoA& geometries = sceneGeometriesAndLightsQueryResult_.geometries_;
+        workQueue->ScheduleWork(GetSceneQueryThreshold(), geometries.Size(), numThreads,
+            [this, &frame, &geometries](unsigned beginIndex, unsigned endIndex, unsigned threadIndex)
         {
             for (unsigned index = beginIndex; index < endIndex; ++index)
             {
                 // TODO(eugeneko) REMOVE!!
-                Drawable* drawable = sceneGeometriesQueryResult_.geometries_[index];
+                Drawable* drawable = geometries.drawables_[index];
                 drawable->UpdateBatches(frame);
-                drawable->SetZone(sceneGeometriesQueryResult_.zones_[index]);
+                drawable->SetZone(geometries.zones_[index]);
                 drawable->MarkInView(frame);
-                drawable->SetMinMaxZ(sceneGeometriesQueryResult_.minmaxZ_[index].x_, sceneGeometriesQueryResult_.minmaxZ_[index].y_);
+                drawable->SetMinMaxZ(geometries.minmaxZ_[index].x_, geometries.minmaxZ_[index].y_);
+            }
+        });
+
+        Vector<Light*>& lights = sceneGeometriesAndLightsQueryResult_.lights_;
+        workQueue->ScheduleWork(GetSceneQueryThreshold(), lights.Size(), numThreads,
+            [this, &frame, &lights](unsigned beginIndex, unsigned endIndex, unsigned threadIndex)
+        {
+            for (unsigned index = beginIndex; index < endIndex; ++index)
+            {
+                // TODO(eugeneko) REMOVE!!
+                Drawable* drawable = lights[index];
+                drawable->UpdateBatches(frame);
+                drawable->MarkInView(frame);
             }
         });
 
         workQueue->Complete(M_MAX_UNSIGNED);
     }
+    /// Prepare lights for further usage.
+    virtual void CookLights(Camera* cullCamera)
+    {
+        Vector<Light*> lights = sceneGeometriesAndLightsQueryResult_.lights_;
+        // Sort the lights to brightest/closest first, and per-vertex lights first so that per-vertex base pass can be evaluated first
+        for (Light* light : lights)
+        {
+            light->SetIntensitySortValue(cullCamera->GetDistance(light->GetNode()->GetWorldPosition()));
+            light->SetLightQueue(nullptr);
+        }
 
-    const SceneQuerySpiritsResult& GetSpirits() const { return sceneSpiritsQueryResult_; }
-    const SceneQueryGeometriesResult& GetGeometries() const { return sceneGeometriesQueryResult_; }
+        Sort(lights.Begin(), lights.End(), CompareLights);
+    }
+
+    const SceneQueryZonesAndOccludersResult& GetZonesAndOccluders() const { return sceneZonesAndOccludersQueryResult_; }
+    const SceneQueryGeometriesAndLightsResult& GetGeometriesAndLights() const { return sceneGeometriesAndLightsQueryResult_; }
+    const ViewCookedZonesData& GetCookedZonesInfo() const { return zones_; }
+    const Vector<Zone*>& GetZones() const { return sceneZonesAndOccludersQueryResult_.zones_; }
 
 protected:
     void UpdateDirtyZone(SceneProcessorDrawableSoA& sceneData, unsigned index, unsigned viewMask, const Frustum& frustum) const
@@ -617,8 +686,9 @@ protected:
         if (cachedZoneDirty || !cachedZone || !(cachedZoneViewMask & viewMask))
         {
             // Find new zone
-            const bool temporary = sceneData.IsCenterInFrustum(index, frustum);
-            const int highestZonePriority = zones_.zones_.Empty() ? M_MIN_INT : zones_.zones_[0]->GetPriority();
+            const Vector<Zone*>& zones = GetZones();
+            const bool temporary = !sceneData.IsCenterInFrustum(index, frustum);
+            const int highestZonePriority = zones.Empty() ? M_MIN_INT : zones[0]->GetPriority();
 
             Zone* newZone = nullptr;
 
@@ -633,7 +703,7 @@ protected:
             else
             {
                 // Search for appropriate zone
-                for (Zone* zone : zones_.zones_)
+                for (Zone* zone : zones)
                 {
                     if ((sceneData.zoneMask_[index] & zone->GetZoneMask()) && zone->IsInside(drawableCenter))
                     {
@@ -644,21 +714,22 @@ protected:
             }
 
             // Setup new zone
-            sceneData.cachedZoneDirty_[index] = !temporary;
+            sceneData.cachedZoneDirty_[index] = temporary;
             sceneData.cachedZone_[index] = newZone;
+            sceneData.cachedZoneViewMask_[index] = newZone->GetViewMask();
             sceneData.cachedZoneLightMask_[index] = newZone->GetLightMask();
             sceneData.cachedZoneShadowMask_[index] = newZone->GetShadowMask();
         }
     }
 
 private:
-    Vector<SceneQuerySpiritsResult> sceneSpiritsQueryThreadResults_;
-    SceneQuerySpiritsResult sceneSpiritsQueryResult_;
+    Vector<SceneQueryZonesAndOccludersResult> sceneZonesAndOccludersQueryThreadResults_;
+    SceneQueryZonesAndOccludersResult sceneZonesAndOccludersQueryResult_;
 
     ViewCookedZonesData zones_;
 
-    Vector<SceneQueryGeometriesResult> sceneGeometriesQueryThreadResults_;
-    SceneQueryGeometriesResult sceneGeometriesQueryResult_;
+    Vector<SceneQueryGeometriesAndLightsResult> sceneGeometriesAndLightsQueryThreadResults_;
+    SceneQueryGeometriesAndLightsResult sceneGeometriesAndLightsQueryResult_;
 
 
 };
@@ -1288,11 +1359,12 @@ public:
         Zone* defaultZone = view->GetRenderer()->GetDefaultZone();
 
         sceneProcessor_->UpdateDirtyDrawables();
-        viewProcessor_->QuerySceneSpirits(workQueue, sceneProcessor_->GetData(),
+        viewProcessor_->QuerySceneZonesAndOccluders(workQueue, sceneProcessor_->GetData(),
             cullCamera->GetViewMask(), cullCamera->GetFrustum());
         viewProcessor_->CookZones(cullCamera, defaultZone);
-        viewProcessor_->QuerySceneGeometries(workQueue, sceneProcessor_->GetData(), cullCamera, nullptr);
-        viewProcessor_->UpdateGeometries(workQueue, view->GetFrameInfo());
+        viewProcessor_->QuerySceneLightsAndGeometries(workQueue, sceneProcessor_->GetData(), cullCamera, nullptr);
+        viewProcessor_->UpdateLightsAndGeometries(workQueue, view->GetFrameInfo());
+        viewProcessor_->CookLights(cullCamera);
     }
 
     /// Prepare for multi-threading. Calculate total amount of drawables and optimal chunk sizes.

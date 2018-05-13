@@ -113,7 +113,6 @@ static const unsigned MAX_VIEWPORT_TEXTURES = 2;
 /// Internal structure for 3D rendering work. Created for each backbuffer and texture viewport, but not for shadow cameras.
 class URHO3D_API View : public Object
 {
-    friend void CheckVisibilityWork(const WorkItem* item, unsigned threadIndex);
     friend void ProcessLightWork(const WorkItem* item, unsigned threadIndex);
     friend class BasicDrawableProcessor;
 
@@ -258,8 +257,6 @@ private:
         const Frustum& lightViewFrustum, const BoundingBox& lightViewFrustumBox);
     /// Return the viewport for a shadow map split.
     IntRect GetShadowMapViewport(Light* light, int splitIndex, Texture2D* shadowMap);
-    /// Find and set a new zone for a drawable when it has moved.
-    void FindZone(Drawable* drawable);
     /// Return material technique, considering the drawable's LOD distance.
     Technique* GetTechnique(Drawable* drawable, Material* material);
     /// Check if material should render an auxiliary view (if it has a camera attached.)
@@ -318,10 +315,6 @@ private:
 
     /// Drawable processor.
     DrawableProcessor* drawableProcessor_{};
-    /// Zone processor.
-    UniquePtr<ZoneProcessor> zoneProcessor_{};
-    /// Light processor.
-    UniquePtr<LightProcessor> lightProcessor_{};
 
     /// Viewport (rendering) camera.
     Camera* camera_{};
@@ -329,6 +322,10 @@ private:
     Camera* cullCamera_{};
     /// Shared source view. Null if this view is using its own culling.
     WeakPtr<View> sourceView_;
+    /// Zone the camera is inside, or default zone if not assigned.
+    Zone* cameraZone_{};
+    /// Zone at far clip plane.
+    Zone* farClipZone_{};
     /// Occlusion buffer for the main camera.
     OcclusionBuffer* occlusionBuffer_{};
     /// Destination color rendertarget.
@@ -367,6 +364,8 @@ private:
     int minInstances_{};
     /// Geometries updated flag.
     bool geometriesUpdated_{};
+    /// Camera zone's override flag.
+    bool cameraZoneOverride_{};
     /// Draw shadows flag.
     bool drawShadows_{};
     /// Deferred flag. Inferred from the existence of a light volume command in the renderpath.

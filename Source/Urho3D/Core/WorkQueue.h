@@ -90,7 +90,10 @@ public:
     /// Schedule work split into buckets.
     template <class T> void ScheduleWork(unsigned threshold, unsigned count, unsigned numBuckets, const T& work)
     {
-        if (count > 0 && threshold != 0 && count <= threshold)
+        if (count == 0)
+            return;
+
+        if (threshold != 0 && count <= threshold)
         {
             work(0, count, 0);
         }
