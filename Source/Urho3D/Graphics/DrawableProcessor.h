@@ -348,7 +348,7 @@ struct SceneQueryZonesAndOccludersResult
     }
 };
 
-struct SceneQueryGeometriesResult
+struct SceneQueryGeometriesAndLightsResult
 {
     Vector<Light*> lights_;
 
@@ -384,12 +384,12 @@ struct SceneQueryGeometriesResult
 
         assert(IsValid());
     }
-    void Merge(Vector<SceneQueryGeometriesResult>& array)
+    void Merge(Vector<SceneQueryGeometriesAndLightsResult>& array)
     {
         Clear();
         if (array.Size() > 1)
         {
-            for (SceneQueryGeometriesResult& result : array)
+            for (SceneQueryGeometriesAndLightsResult& result : array)
             {
                 lights_.Push(result.lights_);
 
@@ -435,6 +435,8 @@ class ViewProcessor
 {
 public:
     virtual unsigned GetSceneQueryThreshold() { return 64; }
+    virtual unsigned GetGeometryUpdateThreshold() { return 64; }
+    virtual unsigned GetLightUpdateThreshold() { return 64; }
     /// Query zones and occluders.
     virtual void QuerySceneZonesAndOccluders(WorkQueue* workQueue, const SceneProcessorDrawableSoA& sceneData,
         unsigned viewMask, const Frustum& frustum)
@@ -504,7 +506,7 @@ public:
             zones_.farClipZone_ = defaultZone;
     }
     /// Query geometries.
-    virtual void QuerySceneLightsAndGeometries(WorkQueue* workQueue, SceneProcessorDrawableSoA& sceneData,
+    virtual void QuerySceneGeometriesAndLights(WorkQueue* workQueue, SceneProcessorDrawableSoA& sceneData,
         Camera* cullCamera, OcclusionBuffer* occlusionBuffer)
     {
         const unsigned viewMask = cullCamera->GetViewMask();
@@ -515,14 +517,14 @@ public:
 
         const unsigned numThreads = workQueue->GetNumThreads() + 1;
         sceneGeometriesAndLightsQueryThreadResults_.Resize(numThreads);
-        for (SceneQueryGeometriesResult& result : sceneGeometriesAndLightsQueryThreadResults_)
+        for (SceneQueryGeometriesAndLightsResult& result : sceneGeometriesAndLightsQueryThreadResults_)
             result.Clear();
 
         workQueue->ScheduleWork(GetSceneQueryThreshold(), sceneData.size_, numThreads,
             [=, &sceneData](unsigned beginIndex, unsigned endIndex, unsigned threadIndex)
         {
             // TODO(eugeneko) Process lights here
-            SceneQueryGeometriesResult& result = sceneGeometriesAndLightsQueryThreadResults_[threadIndex];
+            SceneQueryGeometriesAndLightsResult& result = sceneGeometriesAndLightsQueryThreadResults_[threadIndex];
             for (unsigned index = beginIndex; index < endIndex; ++index)
             {
                 // Discard drawables from other views
@@ -597,26 +599,12 @@ public:
         workQueue->Complete(M_MAX_UNSIGNED);
         sceneGeometriesAndLightsQueryResult_.Merge(sceneGeometriesAndLightsQueryThreadResults_);
     }
-    /// Update lights and geometries.
-    virtual void UpdateLightsAndGeometries(WorkQueue* workQueue, const FrameInfo& frame)
+    /// Update visible lights.
+    virtual void UpdateLights(WorkQueue* workQueue, const FrameInfo& frame)
     {
         const unsigned numThreads = workQueue->GetNumThreads() + 1;
 
-        workQueue->ScheduleWork(GetSceneQueryThreshold(), sceneGeometriesAndLightsQueryResult_.geometries_.Size(), numThreads,
-            [this, &frame](unsigned beginIndex, unsigned endIndex, unsigned threadIndex)
-        {
-            for (unsigned index = beginIndex; index < endIndex; ++index)
-            {
-                // TODO(eugeneko) REMOVE!!
-                Drawable* drawable = sceneGeometriesAndLightsQueryResult_.geometries_[index];
-                drawable->UpdateBatches(frame);
-                drawable->SetZone(sceneGeometriesAndLightsQueryResult_.zones_[index]);
-                drawable->MarkInView(frame);
-                drawable->SetMinMaxZ(sceneGeometriesAndLightsQueryResult_.minmaxZ_[index].x_, sceneGeometriesAndLightsQueryResult_.minmaxZ_[index].y_);
-            }
-        });
-
-        workQueue->ScheduleWork(GetSceneQueryThreshold(), sceneGeometriesAndLightsQueryResult_.lights_.Size(), numThreads,
+        workQueue->ScheduleWork(GetLightUpdateThreshold(), sceneGeometriesAndLightsQueryResult_.lights_.Size(), numThreads,
             [this, &frame](unsigned beginIndex, unsigned endIndex, unsigned threadIndex)
         {
             for (unsigned index = beginIndex; index < endIndex; ++index)
@@ -643,9 +631,30 @@ public:
 
         Sort(lights.Begin(), lights.End(), CompareLights);
     }
+    /// Update visible geometries.
+    virtual void UpdateGeometries(WorkQueue* workQueue, const FrameInfo& frame)
+    {
+        const unsigned numThreads = workQueue->GetNumThreads() + 1;
+
+        workQueue->ScheduleWork(GetGeometryUpdateThreshold(), sceneGeometriesAndLightsQueryResult_.geometries_.Size(), numThreads,
+            [this, &frame](unsigned beginIndex, unsigned endIndex, unsigned threadIndex)
+        {
+            for (unsigned index = beginIndex; index < endIndex; ++index)
+            {
+                // TODO(eugeneko) REMOVE!!
+                Drawable* drawable = sceneGeometriesAndLightsQueryResult_.geometries_[index];
+                drawable->UpdateBatches(frame);
+                drawable->SetZone(sceneGeometriesAndLightsQueryResult_.zones_[index]);
+                drawable->MarkInView(frame);
+                drawable->SetMinMaxZ(sceneGeometriesAndLightsQueryResult_.minmaxZ_[index].x_, sceneGeometriesAndLightsQueryResult_.minmaxZ_[index].y_);
+            }
+        });
+
+        workQueue->Complete(M_MAX_UNSIGNED);
+    }
 
     const SceneQueryZonesAndOccludersResult& GetZonesAndOccluders() const { return sceneZonesAndOccludersQueryResult_; }
-    const SceneQueryGeometriesResult& GetGeometriesAndLights() const { return sceneGeometriesAndLightsQueryResult_; }
+    const SceneQueryGeometriesAndLightsResult& GetGeometriesAndLights() const { return sceneGeometriesAndLightsQueryResult_; }
     const ViewCookedZonesData& GetCookedZonesInfo() const { return zones_; }
     const Vector<Zone*>& GetZones() const { return sceneZonesAndOccludersQueryResult_.zones_; }
 
@@ -704,8 +713,8 @@ private:
 
     ViewCookedZonesData zones_;
 
-    Vector<SceneQueryGeometriesResult> sceneGeometriesAndLightsQueryThreadResults_;
-    SceneQueryGeometriesResult sceneGeometriesAndLightsQueryResult_;
+    Vector<SceneQueryGeometriesAndLightsResult> sceneGeometriesAndLightsQueryThreadResults_;
+    SceneQueryGeometriesAndLightsResult sceneGeometriesAndLightsQueryResult_;
 
 
 };
@@ -1338,9 +1347,10 @@ public:
         viewProcessor_->QuerySceneZonesAndOccluders(workQueue, sceneProcessor_->GetData(),
             cullCamera->GetViewMask(), cullCamera->GetFrustum());
         viewProcessor_->CookZones(cullCamera, defaultZone);
-        viewProcessor_->QuerySceneLightsAndGeometries(workQueue, sceneProcessor_->GetData(), cullCamera, nullptr);
-        viewProcessor_->UpdateLightsAndGeometries(workQueue, view->GetFrameInfo());
+        viewProcessor_->QuerySceneGeometriesAndLights(workQueue, sceneProcessor_->GetData(), cullCamera, nullptr);
+        viewProcessor_->UpdateLights(workQueue, view->GetFrameInfo());
         viewProcessor_->CookLights(cullCamera);
+        viewProcessor_->UpdateGeometries(workQueue, view->GetFrameInfo());
     }
 
     /// Prepare for multi-threading. Calculate total amount of drawables and optimal chunk sizes.
