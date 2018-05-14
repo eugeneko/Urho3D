@@ -34,8 +34,6 @@ namespace Urho3D
 {
 
 class DrawableProcessor;
-class ZoneProcessor;
-class LightProcessor;
 
 class Camera;
 class DebugRenderer;
@@ -114,7 +112,6 @@ static const unsigned MAX_VIEWPORT_TEXTURES = 2;
 class URHO3D_API View : public Object
 {
     friend void ProcessLightWork(const WorkItem* item, unsigned threadIndex);
-    friend class BasicDrawableProcessor;
 
     URHO3D_OBJECT(View, Object);
 
