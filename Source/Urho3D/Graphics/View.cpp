@@ -87,7 +87,7 @@ public:
 void ProcessLightWork(const WorkItem* item, unsigned threadIndex)
 {
     auto* view = reinterpret_cast<View*>(item->aux_);
-    auto* query = reinterpret_cast<LightQueryResult*>(item->start_);
+    auto* query = reinterpret_cast<LightProcessingResult*>(item->start_);
 
     view->ProcessLight(*query, threadIndex);
 }
@@ -417,6 +417,7 @@ void View::Update(const FrameInfo& frame)
 
 //     drawableProcessor_->PrepareForThreading(GetSubsystem<WorkQueue>());
 //     drawableProcessor_->UpdateDirtyDrawables();
+    drawableProcessor_->Update(GetSubsystem<WorkQueue>(), this);
     GetDrawables();
     GetBatches();
 
@@ -651,9 +652,6 @@ void View::GetDrawables()
     if (!octree_ || !cullCamera_)
         return;
 
-    URHO3D_PROFILE(GetDrawables);
-    drawableProcessor_->Update(GetSubsystem<WorkQueue>(), this);
-
 //     // If occlusion in use, get & render the occluders
 //     occlusionBuffer_ = nullptr;
 //     if (maxOccluderTriangles_ > 0)
@@ -675,20 +673,20 @@ void View::GetDrawables()
     occluders_.Clear();
     geometries_.Clear();
     lights_.Clear();
-    for (Drawable* occluder : drawableProcessor_->viewProcessor_->GetZonesAndOccluders().occluders_)
+    for (Drawable* occluder : drawableProcessor_->viewProcessor_->GetOccluders())
         occluders_.Push(occluder);
-    for (Zone* zone : drawableProcessor_->viewProcessor_->GetZonesAndOccluders().zones_)
+    for (Zone* zone : drawableProcessor_->viewProcessor_->GetZones())
         zones_.Push(zone);
-    for (Light* light : drawableProcessor_->viewProcessor_->GetGeometriesAndLights().lights_)
+    for (Light* light : drawableProcessor_->viewProcessor_->GetLights())
         lights_.Push(light);
-    for (Drawable* geometry : drawableProcessor_->viewProcessor_->GetGeometriesAndLights().geometries_)
+    for (Drawable* geometry : drawableProcessor_->viewProcessor_->GetGeometries())
         geometries_.Push(geometry);
 
     minZ_ = drawableProcessor_->viewProcessor_->GetGeometriesAndLights().minZ_;
     maxZ_ = drawableProcessor_->viewProcessor_->GetGeometriesAndLights().maxZ_;
-    cameraZone_ = drawableProcessor_->viewProcessor_->GetCookedZonesInfo().cameraZone_;
-    cameraZoneOverride_ = drawableProcessor_->viewProcessor_->GetCookedZonesInfo().cameraZoneOverride_;
-    farClipZone_ = drawableProcessor_->viewProcessor_->GetCookedZonesInfo().farClipZone_;
+    cameraZone_ = drawableProcessor_->viewProcessor_->GetCookedZonesData().cameraZone_;
+    cameraZoneOverride_ = drawableProcessor_->viewProcessor_->GetCookedZonesData().cameraZoneOverride_;
+    farClipZone_ = drawableProcessor_->viewProcessor_->GetCookedZonesData().farClipZone_;
 }
 
 void View::GetBatches()
@@ -706,33 +704,56 @@ void View::GetBatches()
 
 void View::ProcessLights()
 {
-    // Process lit geometries and shadow casters for each light
-    URHO3D_PROFILE(ProcessLights);
-
-    auto* queue = GetSubsystem<WorkQueue>();
-    lightQueryResults_.Resize(lights_.Size());
-
-    for (unsigned i = 0; i < lightQueryResults_.Size(); ++i)
-    {
-        SharedPtr<WorkItem> item = queue->GetFreeItem();
-        item->priority_ = M_MAX_UNSIGNED;
-        item->workFunction_ = ProcessLightWork;
-        item->aux_ = this;
-
-        LightQueryResult& query = lightQueryResults_[i];
-        query.light_ = lights_[i];
-
-        item->start_ = &query;
-        queue->AddWorkItem(item);
-    }
-
-    // Ensure all lights have been processed before proceeding
-    queue->Complete(M_MAX_UNSIGNED);
+//     // Process lit geometries and shadow casters for each light
+//     URHO3D_PROFILE(ProcessLights);
+//
+//     auto* queue = GetSubsystem<WorkQueue>();
+//     lightQueryResults_.Resize(lights_.Size());
+//
+//     for (unsigned i = 0; i < lightQueryResults_.Size(); ++i)
+//     {
+//         Light* light = lights_[i];
+//         auto& result = lightQueryResults_[i];
+//         result.light_ = lights_[i];
+//         switch (light->GetLightType())
+//         {
+//         case LIGHT_DIRECTIONAL:
+//             {
+//                 auto source = drawableProcessor_->lightProcessor_->FindDirectionalLight(light);
+//                 result.numSplits_ = 0;
+//                 assert(source);
+//                 result.litGeometries_.Clear();
+//                 for (Drawable* litGeometry : source->litDrawables_)
+//                     result.litGeometries_.Push(litGeometry);
+//                 break;
+//             }
+//         default:
+//             assert(0);
+//             break;
+//         }
+//     }
+//     for (unsigned i = 0; i < lightQueryResults_.Size(); ++i)
+//     {
+//         SharedPtr<WorkItem> item = queue->GetFreeItem();
+//         item->priority_ = M_MAX_UNSIGNED;
+//         item->workFunction_ = ProcessLightWork;
+//         item->aux_ = this;
+//
+//         LightProcessingResult& query = lightQueryResults_[i];
+//         query.light_ = lights_[i];
+//
+//         item->start_ = &query;
+//         queue->AddWorkItem(item);
+//     }
+//
+//     // Ensure all lights have been processed before proceeding
+//     queue->Complete(M_MAX_UNSIGNED);
 }
 
 void View::GetLightBatches()
 {
     BatchQueue* alphaQueue = batchQueues_.Contains(alphaPassIndex_) ? &batchQueues_[alphaPassIndex_] : nullptr;
+    const Vector<LightProcessingResult>& lightQueryResults = drawableProcessor_->lightProcessor_->GetProcessedLights();
 
     // Build light queues and lit batches
     {
@@ -741,7 +762,7 @@ void View::GetLightBatches()
         // Preallocate light queues: per-pixel lights which have lit geometries
         unsigned numLightQueues = 0;
         unsigned usedLightQueues = 0;
-        for (Vector<LightQueryResult>::ConstIterator i = lightQueryResults_.Begin(); i != lightQueryResults_.End(); ++i)
+        for (Vector<LightProcessingResult>::ConstIterator i = lightQueryResults.Begin(); i != lightQueryResults.End(); ++i)
         {
             if (!i->light_->GetPerVertex() && i->litGeometries_.Size())
                 ++numLightQueues;
@@ -751,9 +772,9 @@ void View::GetLightBatches()
         maxLightsDrawables_.Clear();
         auto maxSortedInstances = (unsigned)renderer_->GetMaxSortedInstances();
 
-        for (Vector<LightQueryResult>::Iterator i = lightQueryResults_.Begin(); i != lightQueryResults_.End(); ++i)
+        for (Vector<LightProcessingResult>::ConstIterator i = lightQueryResults.Begin(); i != lightQueryResults.End(); ++i)
         {
-            LightQueryResult& query = *i;
+            const LightProcessingResult& query = *i;
 
             // If light has no affected geometries, no need to process further
             if (query.litGeometries_.Empty())
@@ -2003,8 +2024,9 @@ void View::DrawOccluders(OcclusionBuffer* buffer, const PODVector<Drawable*>& oc
     buffer->BuildDepthHierarchy();
 }
 
-void View::ProcessLight(LightQueryResult& query, unsigned threadIndex)
+void View::ProcessLight(LightProcessingResult& query, unsigned threadIndex)
 {
+#if 0
     Light* light = query.light_;
     LightType type = light->GetLightType();
     unsigned lightMask = light->GetLightMask();
@@ -2113,9 +2135,10 @@ void View::ProcessLight(LightQueryResult& query, unsigned threadIndex)
     // only cost has been the shadow camera setup & queries
     if (query.shadowCasters_.Empty())
         query.numSplits_ = 0;
+#endif
 }
 
-void View::ProcessShadowCasters(LightQueryResult& query, const PODVector<Drawable*>& drawables, unsigned splitIndex)
+void View::ProcessShadowCasters(LightProcessingResult& query, const PODVector<Drawable*>& drawables, unsigned splitIndex)
 {
     Light* light = query.light_;
     unsigned lightMask = light->GetLightMask();
@@ -2257,163 +2280,6 @@ IntRect View::GetShadowMapViewport(Light* light, int splitIndex, Texture2D* shad
     return {};
 }
 
-void View::SetupShadowCameras(LightQueryResult& query)
-{
-    Light* light = query.light_;
-
-    unsigned splits = 0;
-
-    switch (light->GetLightType())
-    {
-    case LIGHT_DIRECTIONAL:
-        {
-            const CascadeParameters& cascade = light->GetShadowCascade();
-
-            float nearSplit = cullCamera_->GetNearClip();
-            float farSplit;
-            int numSplits = light->GetNumShadowSplits();
-
-            while (splits < numSplits)
-            {
-                // If split is completely beyond camera far clip, we are done
-                if (nearSplit > cullCamera_->GetFarClip())
-                    break;
-
-                farSplit = Min(cullCamera_->GetFarClip(), cascade.splits_[splits]);
-                if (farSplit <= nearSplit)
-                    break;
-
-                // Setup the shadow camera for the split
-                Camera* shadowCamera = renderer_->GetShadowCamera();
-                query.shadowCameras_[splits] = shadowCamera;
-                query.shadowNearSplits_[splits] = nearSplit;
-                query.shadowFarSplits_[splits] = farSplit;
-                SetupDirLightShadowCamera(shadowCamera, light, nearSplit, farSplit);
-
-                nearSplit = farSplit;
-                ++splits;
-            }
-        }
-        break;
-
-    case LIGHT_SPOT:
-        {
-            Camera* shadowCamera = renderer_->GetShadowCamera();
-            query.shadowCameras_[0] = shadowCamera;
-            Node* cameraNode = shadowCamera->GetNode();
-            Node* lightNode = light->GetNode();
-
-            cameraNode->SetTransform(lightNode->GetWorldPosition(), lightNode->GetWorldRotation());
-            shadowCamera->SetNearClip(light->GetShadowNearFarRatio() * light->GetRange());
-            shadowCamera->SetFarClip(light->GetRange());
-            shadowCamera->SetFov(light->GetFov());
-            shadowCamera->SetAspectRatio(light->GetAspectRatio());
-
-            splits = 1;
-        }
-        break;
-
-    case LIGHT_POINT:
-        {
-            static const Vector3* directions[] =
-            {
-                &Vector3::RIGHT,
-                &Vector3::LEFT,
-                &Vector3::UP,
-                &Vector3::DOWN,
-                &Vector3::FORWARD,
-                &Vector3::BACK
-            };
-
-            for (unsigned i = 0; i < MAX_CUBEMAP_FACES; ++i)
-            {
-                Camera* shadowCamera = renderer_->GetShadowCamera();
-                query.shadowCameras_[i] = shadowCamera;
-                Node* cameraNode = shadowCamera->GetNode();
-
-                // When making a shadowed point light, align the splits along X, Y and Z axes regardless of light rotation
-                cameraNode->SetPosition(light->GetNode()->GetWorldPosition());
-                cameraNode->SetDirection(*directions[i]);
-                shadowCamera->SetNearClip(light->GetShadowNearFarRatio() * light->GetRange());
-                shadowCamera->SetFarClip(light->GetRange());
-                shadowCamera->SetFov(90.0f);
-                shadowCamera->SetAspectRatio(1.0f);
-            }
-
-            splits = MAX_CUBEMAP_FACES;
-        }
-        break;
-    }
-
-    query.numSplits_ = splits;
-}
-
-void View::SetupDirLightShadowCamera(Camera* shadowCamera, Light* light, float nearSplit, float farSplit)
-{
-    Node* shadowCameraNode = shadowCamera->GetNode();
-    Node* lightNode = light->GetNode();
-    float extrusionDistance = Min(cullCamera_->GetFarClip(), light->GetShadowMaxExtrusion());
-    const FocusParameters& parameters = light->GetShadowFocus();
-
-    // Calculate initial position & rotation
-    Vector3 pos = cullCamera_->GetNode()->GetWorldPosition() - extrusionDistance * lightNode->GetWorldDirection();
-    shadowCameraNode->SetTransform(pos, lightNode->GetWorldRotation());
-
-    // Calculate main camera shadowed frustum in light's view space
-    farSplit = Min(farSplit, cullCamera_->GetFarClip());
-    // Use the scene Z bounds to limit frustum size if applicable
-    if (parameters.focus_)
-    {
-        nearSplit = Max(minZ_, nearSplit);
-        farSplit = Min(maxZ_, farSplit);
-    }
-
-    Frustum splitFrustum = cullCamera_->GetSplitFrustum(nearSplit, farSplit);
-    Polyhedron frustumVolume;
-    frustumVolume.Define(splitFrustum);
-    // If focusing enabled, clip the frustum volume by the combined bounding box of the lit geometries within the frustum
-    if (parameters.focus_)
-    {
-        BoundingBox litGeometriesBox;
-        unsigned lightMask = light->GetLightMask();
-
-        for (unsigned i = 0; i < geometries_.Size(); ++i)
-        {
-            Drawable* drawable = geometries_[i];
-            if (drawable->GetMinZ() <= farSplit && drawable->GetMaxZ() >= nearSplit &&
-                (GetLightMask(drawable) & lightMask))
-                litGeometriesBox.Merge(drawable->GetWorldBoundingBox());
-        }
-
-        if (litGeometriesBox.Defined())
-        {
-            frustumVolume.Clip(litGeometriesBox);
-            // If volume became empty, restore it to avoid zero size
-            if (frustumVolume.Empty())
-                frustumVolume.Define(splitFrustum);
-        }
-    }
-
-    // Transform frustum volume to light space
-    const Matrix3x4& lightView = shadowCamera->GetView();
-    frustumVolume.Transform(lightView);
-
-    // Fit the frustum volume inside a bounding box. If uniform size, use a sphere instead
-    BoundingBox shadowBox;
-    if (!parameters.nonUniform_)
-        shadowBox.Define(Sphere(frustumVolume));
-    else
-        shadowBox.Define(frustumVolume);
-
-    shadowCamera->SetOrthographic(true);
-    shadowCamera->SetAspectRatio(1.0f);
-    shadowCamera->SetNearClip(0.0f);
-    shadowCamera->SetFarClip(shadowBox.max_.z_);
-
-    // Center shadow camera on the bounding box. Can not snap to texels yet as the shadow map viewport is unknown
-    QuantizeDirLightShadowCamera(shadowCamera, light, IntRect(0, 0, 0, 0), shadowBox);
-}
-
 void View::FinalizeShadowCamera(Camera* shadowCamera, Light* light, const IntRect& shadowViewport,
     const BoundingBox& shadowCasterBox)
 {
@@ -2430,7 +2296,7 @@ void View::FinalizeShadowCamera(Camera* shadowCamera, Light* light, const IntRec
         shadowBox.min_.x_ = -shadowBox.max_.x_;
 
         // Requantize and snap to shadow map texels
-        QuantizeDirLightShadowCamera(shadowCamera, light, shadowViewport, shadowBox);
+        LightProcessor::QuantizeDirLightShadowCamera(shadowCamera, light, shadowViewport, shadowBox);
     }
 
     if (type == LIGHT_SPOT && parameters.focus_)
@@ -2462,57 +2328,6 @@ void View::FinalizeShadowCamera(Camera* shadowCamera, Light* light, const IntRec
             shadowCamera->SetZoom(shadowCamera->GetZoom() * ((shadowMapWidth - 4.0f) / shadowMapWidth));
 #endif
         }
-    }
-}
-
-void View::QuantizeDirLightShadowCamera(Camera* shadowCamera, Light* light, const IntRect& shadowViewport,
-    const BoundingBox& viewBox)
-{
-    Node* shadowCameraNode = shadowCamera->GetNode();
-    const FocusParameters& parameters = light->GetShadowFocus();
-    auto shadowMapWidth = (float)(shadowViewport.Width());
-
-    float minX = viewBox.min_.x_;
-    float minY = viewBox.min_.y_;
-    float maxX = viewBox.max_.x_;
-    float maxY = viewBox.max_.y_;
-
-    Vector2 center((minX + maxX) * 0.5f, (minY + maxY) * 0.5f);
-    Vector2 viewSize(maxX - minX, maxY - minY);
-
-    // Quantize size to reduce swimming
-    // Note: if size is uniform and there is no focusing, quantization is unnecessary
-    if (parameters.nonUniform_)
-    {
-        viewSize.x_ = ceilf(sqrtf(viewSize.x_ / parameters.quantize_));
-        viewSize.y_ = ceilf(sqrtf(viewSize.y_ / parameters.quantize_));
-        viewSize.x_ = Max(viewSize.x_ * viewSize.x_ * parameters.quantize_, parameters.minView_);
-        viewSize.y_ = Max(viewSize.y_ * viewSize.y_ * parameters.quantize_, parameters.minView_);
-    }
-    else if (parameters.focus_)
-    {
-        viewSize.x_ = Max(viewSize.x_, viewSize.y_);
-        viewSize.x_ = ceilf(sqrtf(viewSize.x_ / parameters.quantize_));
-        viewSize.x_ = Max(viewSize.x_ * viewSize.x_ * parameters.quantize_, parameters.minView_);
-        viewSize.y_ = viewSize.x_;
-    }
-
-    shadowCamera->SetOrthoSize(viewSize);
-
-    // Center shadow camera to the view space bounding box
-    Quaternion rot(shadowCameraNode->GetWorldRotation());
-    Vector3 adjust(center.x_, center.y_, 0.0f);
-    shadowCameraNode->Translate(rot * adjust, TS_WORLD);
-
-    // If the shadow map viewport is known, snap to whole texels
-    if (shadowMapWidth > 0.0f)
-    {
-        Vector3 viewPos(rot.Inverse() * shadowCameraNode->GetWorldPosition());
-        // Take into account that shadow map border will not be used
-        float invActualSize = 1.0f / (shadowMapWidth - 2.0f);
-        Vector2 texelSize(viewSize.x_ * invActualSize, viewSize.y_ * invActualSize);
-        Vector3 snap(-fmodf(viewPos.x_, texelSize.x_), -fmodf(viewPos.y_, texelSize.y_), 0.0f);
-        shadowCameraNode->Translate(rot * snap, TS_WORLD);
     }
 }
 

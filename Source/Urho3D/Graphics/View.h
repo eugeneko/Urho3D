@@ -54,14 +54,14 @@ struct RenderPathCommand;
 struct WorkItem;
 
 /// Intermediate light processing result.
-struct LightQueryResult
+struct LightProcessingResult
 {
     /// Light.
     Light* light_;
     /// Lit geometries.
-    PODVector<Drawable*> litGeometries_;
+    Vector<Drawable*> litGeometries_;
     /// Shadow casters.
-    PODVector<Drawable*> shadowCasters_;
+    Vector<Drawable*> shadowCasters_;
     /// Shadow cameras.
     Camera* shadowCameras_[MAX_LIGHT_SPLITS];
     /// Shadow caster start indices.
@@ -76,6 +76,14 @@ struct LightQueryResult
     float shadowFarSplits_[MAX_LIGHT_SPLITS];
     /// Shadow map split count.
     unsigned numSplits_;
+    /// Clear.
+    void Clear(Light* light)
+    {
+        light_ = light;
+        litGeometries_.Clear();
+        shadowCasters_.Clear();
+        numSplits_ = 0;
+    }
 };
 
 /// Scene render pass info.
@@ -111,6 +119,7 @@ static const unsigned MAX_VIEWPORT_TEXTURES = 2;
 /// Internal structure for 3D rendering work. Created for each backbuffer and texture viewport, but not for shadow cameras.
 class URHO3D_API View : public Object
 {
+    friend class DrawableProcessor;
     friend void ProcessLightWork(const WorkItem* item, unsigned threadIndex);
 
     URHO3D_OBJECT(View, Object);
@@ -236,19 +245,12 @@ private:
     /// Draw occluders to occlusion buffer.
     void DrawOccluders(OcclusionBuffer* buffer, const PODVector<Drawable*>& occluders);
     /// Query for lit geometries and shadow casters for a light.
-    void ProcessLight(LightQueryResult& query, unsigned threadIndex);
+    void ProcessLight(LightProcessingResult& query, unsigned threadIndex);
     /// Process shadow casters' visibilities and build their combined view- or projection-space bounding box.
-    void ProcessShadowCasters(LightQueryResult& query, const PODVector<Drawable*>& drawables, unsigned splitIndex);
-    /// Set up initial shadow camera view(s).
-    void SetupShadowCameras(LightQueryResult& query);
-    /// Set up a directional light shadow camera
-    void SetupDirLightShadowCamera(Camera* shadowCamera, Light* light, float nearSplit, float farSplit);
+    void ProcessShadowCasters(LightProcessingResult& query, const PODVector<Drawable*>& drawables, unsigned splitIndex);
     /// Finalize shadow camera view after shadow casters and the shadow map are known.
     void
         FinalizeShadowCamera(Camera* shadowCamera, Light* light, const IntRect& shadowViewport, const BoundingBox& shadowCasterBox);
-    /// Quantize a directional light shadow camera view to eliminate swimming.
-    void
-        QuantizeDirLightShadowCamera(Camera* shadowCamera, Light* light, const IntRect& shadowViewport, const BoundingBox& viewBox);
     /// Check visibility of one shadow caster.
     bool IsShadowCasterVisible(Drawable* drawable, BoundingBox lightViewBox, Camera* shadowCamera, const Matrix3x4& lightView,
         const Frustum& lightViewFrustum, const BoundingBox& lightViewFrustumBox);
@@ -402,8 +404,6 @@ private:
     HashSet<Drawable*> maxLightsDrawables_;
     /// Rendertargets defined by the renderpath.
     HashMap<StringHash, Texture*> renderTargets_;
-    /// Intermediate light processing results.
-    Vector<LightQueryResult> lightQueryResults_;
     /// Info for scene render passes defined by the renderpath.
     PODVector<ScenePassInfo> scenePasses_;
     /// Per-pixel light queues.

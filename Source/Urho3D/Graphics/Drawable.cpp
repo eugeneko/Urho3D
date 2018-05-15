@@ -79,8 +79,6 @@ Drawable::Drawable(Context* context, unsigned char drawableFlags) :
     drawDistance_(0.0f),
     shadowDistance_(0.0f),
     sortValue_(0.0f),
-    minZ_(0.0f),
-    maxZ_(0.0f),
     lodBias_(1.0f),
     basePassFlags_(0),
     maxLights_(0),
@@ -100,9 +98,9 @@ Drawable::~Drawable()
 void Drawable::RegisterObject(Context* context)
 {
     URHO3D_ATTRIBUTE("Max Lights", int, maxLights_, 0, AM_DEFAULT);
-    URHO3D_ATTRIBUTE_EX("View Mask", int, viewMask_, UpdateViewMask, DEFAULT_VIEWMASK, AM_DEFAULT);
-    URHO3D_ATTRIBUTE("Light Mask", int, lightMask_, DEFAULT_LIGHTMASK, AM_DEFAULT);
-    URHO3D_ATTRIBUTE("Shadow Mask", int, shadowMask_, DEFAULT_SHADOWMASK, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("View Mask", int, viewMask_, MarkDrawableParametersDirty, DEFAULT_VIEWMASK, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("Light Mask", int, lightMask_, MarkDrawableParametersDirty, DEFAULT_LIGHTMASK, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("Shadow Mask", int, shadowMask_, MarkDrawableParametersDirty, DEFAULT_SHADOWMASK, AM_DEFAULT);
     URHO3D_ACCESSOR_ATTRIBUTE("Zone Mask", GetZoneMask, SetZoneMask, unsigned, DEFAULT_ZONEMASK, AM_DEFAULT);
 }
 
@@ -174,12 +172,14 @@ void Drawable::DrawDebugGeometry(DebugRenderer* debug, bool depthTest)
 void Drawable::SetDrawDistance(float distance)
 {
     drawDistance_ = distance;
+    MarkDrawableParametersDirty();
     MarkNetworkUpdate();
 }
 
 void Drawable::SetShadowDistance(float distance)
 {
     shadowDistance_ = distance;
+    MarkDrawableParametersDirty();
     MarkNetworkUpdate();
 }
 
@@ -192,27 +192,28 @@ void Drawable::SetLodBias(float bias)
 void Drawable::SetViewMask(unsigned mask)
 {
     viewMask_ = mask;
-    // TODO Update attributes
-    if (drawableIndex_)
-        drawableIndex_.processor_->SetViewMask(drawableIndex_.index_, viewMask_);
+    MarkDrawableParametersDirty();
     MarkNetworkUpdate();
 }
 
 void Drawable::SetLightMask(unsigned mask)
 {
     lightMask_ = mask;
+    MarkDrawableParametersDirty();
     MarkNetworkUpdate();
 }
 
 void Drawable::SetShadowMask(unsigned mask)
 {
     shadowMask_ = mask;
+    MarkDrawableParametersDirty();
     MarkNetworkUpdate();
 }
 
 void Drawable::SetZoneMask(unsigned mask)
 {
     zoneMask_ = mask;
+    MarkDrawableParametersDirty();
     // Mark dirty to reset cached zone
     OnMarkedDirty(node_);
     MarkNetworkUpdate();
@@ -227,13 +228,14 @@ void Drawable::SetMaxLights(unsigned num)
 void Drawable::SetCastShadows(bool enable)
 {
     castShadows_ = enable;
+    MarkDrawableParametersDirty();
     MarkNetworkUpdate();
 }
 
 void Drawable::SetOccluder(bool enable)
 {
     occluder_ = enable;
-    UpdateOccluder();
+    MarkDrawableParametersDirty();
     MarkNetworkUpdate();
 }
 
@@ -242,11 +244,10 @@ void Drawable::SetOccludee(bool enable)
     if (enable != occludee_)
     {
         occludee_ = enable;
-        if (drawableIndex_)
-            drawableIndex_.processor_->SetOccludee(drawableIndex_.index_, occludee_);
         // Reinsert to octree to make sure octant occlusion does not erroneously hide this drawable
         if (octant_ && !updateQueued_)
             octant_->GetRoot()->QueueUpdate(this);
+        MarkDrawableParametersDirty();
         MarkNetworkUpdate();
     }
 }
@@ -381,7 +382,7 @@ void Drawable::OnSceneSet(Scene* scene)
 void Drawable::OnMarkedDirty(Node* node)
 {
     if (drawableIndex_)
-        drawableIndex_.processor_->MarkDirty(drawableIndex_.index_);
+        drawableIndex_.scene_->MarkDrawableDirty(this);
 
     worldBoundingBoxDirty_ = true;
     if (!updateQueued_ && octant_)
@@ -406,7 +407,7 @@ void Drawable::AddToOctree()
         {
             octree->AddDrawable(this);
             // TODO(eugeneko): Refactor injection
-            octree->drawableProcessor_->sceneProcessor_->AddDrawable(this);
+            octree->sceneGrid_->AddDrawable(this);
         }
         else
             URHO3D_LOGERROR("No Octree component in scene, drawable will not render");
@@ -420,12 +421,8 @@ void Drawable::AddToOctree()
 
 void Drawable::RemoveFromOctree()
 {
-    // TODO(eugeneko): Refactor injection
     if (drawableIndex_)
-    {
-        Octree* octree = octant_->GetRoot();
-        octree->drawableProcessor_->sceneProcessor_->RemoveDrawable(this);
-    }
+        drawableIndex_.scene_->RemoveDrawable(this);
 
     if (octant_)
     {
@@ -440,16 +437,10 @@ void Drawable::RemoveFromOctree()
     }
 }
 
-void Drawable::UpdateViewMask()
+void Drawable::MarkDrawableParametersDirty()
 {
     if (drawableIndex_)
-        drawableIndex_.processor_->SetViewMask(drawableIndex_.index_, viewMask_);
-}
-
-void Drawable::UpdateOccluder()
-{
-    if (drawableIndex_)
-        drawableIndex_.processor_->SetOccluder(drawableIndex_.index_, occluder_);
+        drawableIndex_.scene_->UpdateDrawableParameters(this);
 }
 
 bool WriteDrawablesToOBJ(PODVector<Drawable*> drawables, File* outputFile, bool asZUp, bool asRightHanded, bool writeLightmapUV)

@@ -24,6 +24,7 @@
 
 #include "../Core/Context.h"
 #include "../Graphics/DebugRenderer.h"
+#include "../Graphics/DrawableProcessor.h"
 #include "../Graphics/Octree.h"
 #include "../Graphics/TextureCube.h"
 #include "../Graphics/Zone.h"
@@ -85,8 +86,8 @@ void Zone::RegisterObject(Context* context)
     URHO3D_ATTRIBUTE_EX("Priority", int, priority_, MarkNodeDirty, 0, AM_DEFAULT);
     URHO3D_MIXED_ACCESSOR_ATTRIBUTE("Zone Texture", GetZoneTextureAttr, SetZoneTextureAttr, ResourceRef,
         ResourceRef(TextureCube::GetTypeStatic()), AM_DEFAULT);
-    URHO3D_ATTRIBUTE("Light Mask", int, lightMask_, DEFAULT_LIGHTMASK, AM_DEFAULT);
-    URHO3D_ATTRIBUTE("Shadow Mask", int, shadowMask_, DEFAULT_SHADOWMASK, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("Light Mask", int, lightMask_, MarkZoneDirty, DEFAULT_LIGHTMASK, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("Shadow Mask", int, shadowMask_, MarkZoneDirty, DEFAULT_SHADOWMASK, AM_DEFAULT);
     URHO3D_ACCESSOR_ATTRIBUTE("Zone Mask", GetZoneMask, SetZoneMask, unsigned, DEFAULT_ZONEMASK, AM_DEFAULT);
 }
 
@@ -228,6 +229,8 @@ ResourceRef Zone::GetZoneTextureAttr() const
 
 void Zone::OnMarkedDirty(Node* node)
 {
+    MarkZoneDirty();
+
     // Due to the octree query and weak pointer manipulation, is not safe from worker threads
     Scene* scene = GetScene();
     if (scene && scene->IsThreadedUpdate())
@@ -348,6 +351,12 @@ void Zone::ClearDrawablesZone()
     lastWorldBoundingBox_ = GetWorldBoundingBox();
     lastAmbientStartZone_.Reset();
     lastAmbientEndZone_.Reset();
+}
+
+void Zone::MarkZoneDirty()
+{
+    if (drawableIndex_)
+        drawableIndex_.scene_->MarkZoneDirty(this);
 }
 
 }

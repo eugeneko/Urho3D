@@ -163,6 +163,7 @@ class URHO3D_API Octree : public Component, public Octant
     URHO3D_OBJECT(Octree, Component);
 
 public:
+    UniquePtr<SceneGrid> sceneGrid_;
     UniquePtr<DrawableProcessor> drawableProcessor_;
 
     /// Construct.

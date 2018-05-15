@@ -131,6 +131,8 @@ protected:
     void ClearDrawablesZone();
     /// Mark node transform dirty.
     void MarkNodeDirty() { OnMarkedDirty(node_); }
+    /// Mark drawable parameters dirty.
+    void MarkZoneDirty();
 
     /// Cached inverse world transform matrix.
     mutable Matrix3x4 inverseWorld_;

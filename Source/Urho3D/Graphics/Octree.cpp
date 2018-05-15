@@ -314,7 +314,11 @@ Octree::Octree(Context* context) :
     Octant(BoundingBox(-DEFAULT_OCTREE_SIZE, DEFAULT_OCTREE_SIZE), 0, nullptr, this),
     numLevels_(DEFAULT_OCTREE_LEVELS)
 {
-    drawableProcessor_ = MakeUnique<DrawableProcessor>();
+    sceneGrid_ = MakeUnique<SceneGrid>();
+    sceneGrid_->Reset(worldBoundingBox_, IntVector3(1, 1, 1));
+//     sceneGrid_->Reset(worldBoundingBox_, IntVector3(16, 1, 16));
+    drawableProcessor_ = MakeUnique<DrawableProcessor>(context);
+    drawableProcessor_->sceneGrid_ = sceneGrid_.Get();
     // If the engine is running headless, subscribe to RenderUpdate events for manually updating the octree
     // to allow raycasts and animation update
     if (!GetSubsystem<Graphics>())
@@ -483,7 +487,7 @@ void Octree::AddManualDrawable(Drawable* drawable)
 
     AddDrawable(drawable);
     // TODO(eugeneko): Refactor injection
-    drawableProcessor_->sceneProcessor_->AddDrawable(drawable);
+    sceneGrid_->AddDrawable(drawable);
 }
 
 void Octree::RemoveManualDrawable(Drawable* drawable)

@@ -43,7 +43,8 @@ static const int MAX_VERTEX_LIGHTS = 4;
 static const float ANIMATION_LOD_BASESCALE = 2500.0f;
 
 class Camera;
-class SceneProcessor;
+class SceneGrid;
+struct SceneGridCell;
 class File;
 class Geometry;
 class Light;
@@ -107,9 +108,11 @@ struct URHO3D_API SourceBatch
 
 struct DrawableIndex
 {
-    SceneProcessor* processor_ = nullptr;
-    unsigned index_ = M_MAX_UNSIGNED;
-    operator bool() const { return !!processor_; }
+    SceneGrid* scene_{};
+    SceneGridCell* cell_{};
+    unsigned sceneIndex_{};
+    unsigned cellIndex_{};
+    operator bool() const { return !!scene_; }
 };
 
 /// Base class for visible components.
@@ -240,13 +243,6 @@ public:
     /// Set sorting value.
     void SetSortValue(float value);
 
-    /// Set view-space depth bounds.
-    void SetMinMaxZ(float minZ, float maxZ)
-    {
-        minZ_ = minZ;
-        maxZ_ = maxZ;
-    }
-
     /// Mark in view. Also clear the light list.
     void MarkInView(const FrameInfo& frame);
     /// Mark in view without specifying a camera. Used for shadow casters.
@@ -292,12 +288,6 @@ public:
     /// Return the first added per-pixel light.
     Light* GetFirstLight() const { return firstLight_; }
 
-    /// Return the minimum view-space depth.
-    float GetMinZ() const { return minZ_; }
-
-    /// Return the maximum view-space depth.
-    float GetMaxZ() const { return maxZ_; }
-
     /// Add a per-pixel light affecting the object this frame.
     void AddLight(Light* light)
     {
@@ -334,8 +324,8 @@ protected:
     /// Remove from octree.
     void RemoveFromOctree();
 
-    void UpdateViewMask();
-    void UpdateOccluder();
+    /// Mark drawable parameters dirty.
+    void MarkDrawableParametersDirty();
 
     /// Move into another octree octant.
     void SetOctant(Octant* octant) { octant_ = octant; }
@@ -386,10 +376,6 @@ protected:
     float shadowDistance_;
     /// Current sort value.
     float sortValue_;
-    /// Current minimum view space depth.
-    float minZ_;
-    /// Current maximum view space depth.
-    float maxZ_;
     /// LOD bias.
     float lodBias_;
     /// Base pass flags, bit per batch.
