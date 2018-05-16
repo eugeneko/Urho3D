@@ -356,7 +356,7 @@ void Zone::ClearDrawablesZone()
 void Zone::MarkZoneDirty()
 {
     if (drawableIndex_)
-        drawableIndex_.scene_->MarkZoneDirty(this);
+        drawableIndex_.grid_->MarkZoneDirty(this);
 }
 
 }

@@ -108,11 +108,11 @@ struct URHO3D_API SourceBatch
 
 struct DrawableIndex
 {
-    SceneGrid* scene_{};
+    SceneGrid* grid_{};
     SceneGridCell* cell_{};
-    unsigned sceneIndex_{};
+    unsigned gridIndex_{};
     unsigned cellIndex_{};
-    operator bool() const { return !!scene_; }
+    operator bool() const { return !!grid_; }
 };
 
 /// Base class for visible components.
@@ -132,6 +132,14 @@ public:
     /// Register object attributes. Drawable must be registered first.
     static void RegisterObject(Context* context);
 
+    void SetDrawableIndexInCell(unsigned index)
+    {
+        drawableIndex_.cellIndex_ = index;
+    }
+    void SetDrawableIndexInGrid(unsigned index)
+    {
+        drawableIndex_.gridIndex_ = index;
+    }
     void SetDrawableIndex(const DrawableIndex& drawableIndex)
     {
         drawableIndex_ = drawableIndex;

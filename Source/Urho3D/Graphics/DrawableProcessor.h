@@ -159,6 +159,12 @@ struct SceneGridCellDrawableSoA
         assert(index < size_);
         --size_;
 
+        if (size_ >= 1)
+        {
+            // Re-assign last drawable index
+            drawable_.Back()->SetDrawableIndexInCell(index);
+        }
+
         drawable_.EraseSwap(index);
         drawableType_.EraseSwap(index);
         drawableFlag_.EraseSwap(index);
@@ -278,7 +284,7 @@ struct SceneGridCell
     SceneGridCellDrawableSoA data_;
     bool IsInside(const BoundingBox& boundingBox) const
     {
-        return boundingBox_.IsInsideFast(boundingBox) == INSIDE;
+        return boundingBox_.IsInside(boundingBox) == INSIDE;
     }
 };
 
@@ -308,6 +314,12 @@ struct SceneGridDrawableSoA
         assert(index < size_);
         --size_;
 
+        if (size_ >= 1)
+        {
+            // Re-assign last drawable index
+            drawable_.Back()->SetDrawableIndexInGrid(index);
+        }
+
         drawable_.EraseSwap(index);
         drawableType_.EraseSwap(index);
 
@@ -325,6 +337,44 @@ struct SceneGridDrawableSoA
 
 };
 
+struct SceneGridCellRef
+{
+    Intersection intersection_{};
+    unsigned beginIndex_{};
+    unsigned endIndex_{};
+    SceneGridCellDrawableSoA* data_{};
+};
+
+struct SceneGridQueryResult
+{
+    void Clear()
+    {
+        cellMasks_.Clear();
+        cells_.Clear();
+        threadRanges_.Clear();
+    }
+    template <class T> void ScheduleWork(WorkQueue* workQueue, const T& work)
+    {
+        const unsigned numThreads = threadRanges_.Size();
+        for (unsigned i = 0; i < numThreads; ++i)
+        {
+            const unsigned beginCell = threadRanges_[i].first_;
+            const unsigned endCell = threadRanges_[i].second_;
+            workQueue->ScheduleWork(
+                [=](unsigned threadIndex)
+            {
+                for (unsigned cellIndex = beginCell; cellIndex < endCell; ++cellIndex)
+                {
+                    work(cells_[cellIndex], threadIndex);
+                }
+            });
+        }
+    }
+    Vector<Intersection> cellMasks_;
+    Vector<SceneGridCellRef> cells_;
+    Vector<Pair<unsigned, unsigned>> threadRanges_;
+};
+
 class SceneGrid
 {
 public:
@@ -338,20 +388,20 @@ public:
     {
         boundingBox_ = boundingBox;
         numCellsXYZ_ = numCellsXYZ;
-        const Vector3 floatNumCells(static_cast<float>(numCellsXYZ_.x_), static_cast<float>(numCellsXYZ_.y_), static_cast<float>(numCellsXYZ_.z_));
-        cellSize_ = boundingBox_.Size() / floatNumCells;
+        numCells_ = static_cast<unsigned>(numCellsXYZ_.x_ * numCellsXYZ_.y_ * numCellsXYZ_.z_) + 1;
+        floatNumCellsXYZ_ = Vector3(static_cast<float>(numCellsXYZ_.x_), static_cast<float>(numCellsXYZ_.y_), static_cast<float>(numCellsXYZ_.z_));
+        cellSize_ = boundingBox_.Size() / floatNumCellsXYZ_;
 
         drawablesData_.Clear();
+        cells_.Resize(numCells_);
 
         // Reset default cell
-        defaultCell_.index_ = IntVector3::ONE * -1;
-        defaultCell_.boundingBox_ = BoundingBox(-M_LARGE_VALUE, M_LARGE_VALUE);
-        defaultCell_.data_.Clear();
+        SceneGridCell* defaultCell = GetDefaultCell();
+        defaultCell->index_ = IntVector3::ONE * -1;
+        defaultCell->boundingBox_ = BoundingBox(-M_LARGE_VALUE, M_LARGE_VALUE);
+        defaultCell->data_.Clear();
 
         // Reset cells
-        const unsigned numCells = static_cast<unsigned>(numCellsXYZ_.x_ * numCellsXYZ_.y_ * numCellsXYZ_.z_);
-        cells_.Resize(numCells);
-
         unsigned index = 0;
         for (int x = 0; x < numCellsXYZ.x_; ++x)
         {
@@ -373,34 +423,99 @@ public:
     /// Update dirty drawables.
     void UpdateDirtyDrawables()
     {
-        UpdateDirtyDrawablesInCell(defaultCell_);
         for (SceneGridCell& cell : cells_)
             UpdateDirtyDrawablesInCell(cell);
     }
     /// Remove all drawables.
     void RemoveAllDrawables()
     {
-        RemoveAllDrawablesInCell(defaultCell_);
         for (SceneGridCell& cell : cells_)
             RemoveAllDrawablesInCell(cell);
+    }
+
+    /// Query cells in frustum.
+    void QueryCellsInFrustum(const Frustum& frustum, unsigned threadingThreshold, unsigned numThreads,
+        SceneGridQueryResult& result)
+    {
+        result.Clear();
+
+        result.cellMasks_.Resize(numCells_);
+
+        // Test intersection and count all drawables inside
+        unsigned numDrawables = 0;
+        for (unsigned threadIndex = 0; threadIndex < numCells_; ++threadIndex)
+        {
+            result.cellMasks_[threadIndex] = OUTSIDE;
+            if (cells_[threadIndex].data_.size_ > 0)
+            {
+                const Intersection intersection = frustum.IsInside(cells_[threadIndex].boundingBox_);
+                result.cellMasks_[threadIndex] = intersection;
+                if (intersection != OUTSIDE)
+                    numDrawables += cells_[threadIndex].data_.size_;
+            }
+        }
+
+        // Apply threshold
+        if (numDrawables < threadingThreshold)
+            numThreads = 1;
+        else if (numDrawables < numThreads)
+            numThreads = numDrawables;
+
+        // Append cells
+        const unsigned maxDrawablesPerThread = (numDrawables - 1) / numThreads + 1;
+
+        unsigned rangeBegin = 0;
+        unsigned cellIndex = 0;
+        unsigned beginIndex = 0;
+        for (unsigned threadIndex = 0; threadIndex < numThreads; ++threadIndex)
+        {
+            unsigned remainingDrawables = maxDrawablesPerThread;
+            while (remainingDrawables > 0 && cellIndex < numCells_)
+            {
+                SceneGridCell& cell = cells_[cellIndex];
+                const unsigned cellSize = cell.data_.size_;
+
+                // Skip empty cell
+                if (result.cellMasks_[cellIndex] == OUTSIDE || beginIndex >= cellSize)
+                {
+                    ++cellIndex;
+                    beginIndex = 0;
+                    continue;
+                }
+
+                // Append cell
+                SceneGridCellRef ref;
+                ref.data_ = &cell.data_;
+                ref.beginIndex_ = beginIndex;
+                ref.endIndex_ = beginIndex + Min(cell.data_.size_ - beginIndex, remainingDrawables);
+                ref.intersection_ = result.cellMasks_[cellIndex];
+                result.cells_.Push(ref);
+
+                remainingDrawables -= ref.endIndex_ - ref.beginIndex_;
+                beginIndex = ref.endIndex_;
+            }
+
+            result.threadRanges_.Push({ rangeBegin, result.cells_.Size() });
+            rangeBegin = result.cells_.Size();
+        }
     }
 
     /// Add drawable.
     void AddDrawable(Drawable* drawable)
     {
         DrawableIndex drawableIndex = drawable->GetDrawableIndex();
-        assert(!drawableIndex || drawableIndex.scene_ == this);
+        assert(!drawableIndex || drawableIndex.grid_ == this);
 
         // Push global data and assign global index
         drawablesData_.Push(drawable);
-        drawableIndex.scene_ = this;
-        drawableIndex.sceneIndex_ = drawablesData_.size_ - 1;
+        drawableIndex.grid_ = this;
+        drawableIndex.gridIndex_ = drawablesData_.size_ - 1;
 
         // Insert into new cell and assign local index
-        SceneGridCell& cell = FindCell(drawable->GetWorldBoundingBox());
-        cell.data_.Push(drawable);
-        drawableIndex.cell_ = &cell;
-        drawableIndex.cellIndex_ = cell.data_.size_ - 1;
+        SceneGridCell* cell = FindCell(drawable->GetWorldBoundingBox());
+        cell->data_.Push(drawable);
+        drawableIndex.cell_ = cell;
+        drawableIndex.cellIndex_ = cell->data_.size_ - 1;
 
         // Update index
         drawable->SetDrawableIndex(drawableIndex);
@@ -409,13 +524,12 @@ public:
     void RemoveDrawable(Drawable* drawable)
     {
         const DrawableIndex drawableIndex = drawable->GetDrawableIndex();
-        assert(drawableIndex.scene_ == this);
+        assert(drawableIndex.grid_ == this);
 
         // Remove zone
         if (drawable->GetDrawableFlags() & DRAWABLE_ZONE)
         {
             Zone* zone = static_cast<Zone*>(drawable);
-            defaultCell_.data_.ResetZone(zone);
             for (SceneGridCell& cell : cells_)
                 cell.data_.ResetZone(zone);
         }
@@ -425,13 +539,13 @@ public:
         const unsigned index = drawableIndex.cellIndex_;
 
         cellData.EraseSwap(index);
-        drawablesData_.EraseSwap(drawableIndex.sceneIndex_);
+        drawablesData_.EraseSwap(drawableIndex.gridIndex_);
     }
     /// Mark drawable dirty.
     void MarkDrawableDirty(Drawable* drawable)
     {
         const DrawableIndex drawableIndex = drawable->GetDrawableIndex();
-        assert(drawableIndex.scene_ == this);
+        assert(drawableIndex.grid_ == this);
 
         SceneGridCell& cell = *drawableIndex.cell_;
         cell.data_.dirty_[drawableIndex.cellIndex_] = true;
@@ -440,7 +554,7 @@ public:
     void UpdateDrawableParameters(Drawable* drawable)
     {
         const DrawableIndex drawableIndex = drawable->GetDrawableIndex();
-        assert(drawableIndex.scene_ == this);
+        assert(drawableIndex.grid_ == this);
 
         SceneGridCellDrawableSoA& cellData = drawableIndex.cell_->data_;
         const unsigned index = drawableIndex.cellIndex_;
@@ -450,16 +564,17 @@ public:
     /// Mark zone dirty.
     void MarkZoneDirty(Zone* zone)
     {
-        defaultCell_.data_.MarkZonesDirty();
         for (SceneGridCell& cell : cells_)
             cell.data_.MarkZonesDirty();
     }
 
+    /// Get default cell.
+    SceneGridCell* GetDefaultCell() { return &cells_[numCells_ - 1]; }
     /// Find cell for specified bounding box.
-    SceneGridCell& FindCell(const BoundingBox& drawableBoundingBox)
+    SceneGridCell* FindCell(const BoundingBox& drawableBoundingBox)
     {
         const Vector3 drawableCenter = drawableBoundingBox.Center();
-        const IntVector3 cellIndex = VectorFloorToInt((drawableCenter - boundingBox_.min_) / boundingBox_.Size());
+        const IntVector3 cellIndex = VectorFloorToInt((drawableCenter - boundingBox_.min_) / boundingBox_.Size() * floatNumCellsXYZ_);
         if (cellIndex.x_ >= 0 && cellIndex.y_ >= 0 && cellIndex.z_ >= 0
             && cellIndex.x_ < numCellsXYZ_.x_ && cellIndex.y_ < numCellsXYZ_.y_ && cellIndex.z_ < numCellsXYZ_.z_)
         {
@@ -467,10 +582,10 @@ public:
                 + cellIndex.y_ * numCellsXYZ_.z_ + cellIndex.z_);
             if (cells_[index].IsInside(drawableBoundingBox))
             {
-                return cells_[index];
+                return &cells_[index];
             }
         }
-        return defaultCell_;
+        return GetDefaultCell();
     }
     // TODO(eugeneko) Kill me
     SceneGridCellDrawableSoA& GetData() { return cells_[0].data_; }
@@ -493,26 +608,26 @@ protected:
             data.cachedZoneDirty_[i] = true;
 
             // If this cell is default or drawable doesn't fit, update cell
-            if (&cell == &defaultCell_ || !cell.IsInside(data.boundingBox_[i]))
+            if (&cell == GetDefaultCell() || !cell.IsInside(data.boundingBox_[i]))
             {
-                SceneGridCell& newCell = FindCell(data.boundingBox_[i]);
-                if (&newCell != &cell)
+                SceneGridCell* newCell = FindCell(data.boundingBox_[i]);
+                if (newCell != &cell)
                 {
                     DrawableIndex drawableIndex = drawable->GetDrawableIndex();
 
                     // Move to other cell
-                    newCell.data_.Push(drawable);
+                    newCell->data_.Push(drawable);
                     cell.data_.EraseSwap(drawableIndex.cellIndex_);
 
-                    drawableIndex.cell_ = &cell;
-                    drawableIndex.cellIndex_ = newCell.data_.size_ - 1;
+                    drawableIndex.cell_ = newCell;
+                    drawableIndex.cellIndex_ = newCell->data_.size_ - 1;
                     drawable->SetDrawableIndex(drawableIndex);
                 }
             }
 
         }
     }
-    void RemoveAllDrawablesInCell(SceneGridCell& cell)
+    static void RemoveAllDrawablesInCell(SceneGridCell& cell)
     {
         for (Drawable* drawable : cell.data_.drawable_)
             drawable->SetDrawableIndex(DrawableIndex{});
@@ -521,9 +636,10 @@ protected:
 
     BoundingBox boundingBox_;
     IntVector3 numCellsXYZ_;
+    unsigned numCells_{};
+    Vector3 floatNumCellsXYZ_;
     Vector3 cellSize_;
 
-    SceneGridCell defaultCell_;
     Vector<SceneGridCell> cells_;
 
     SceneGridDrawableSoA drawablesData_;
@@ -670,36 +786,38 @@ class ViewProcessor
 {
 public:
     virtual unsigned GetSceneQueryThreshold() { return 64; }
-    virtual unsigned GetGeometryUpdateThreshold() { return 64; }
     virtual unsigned GetLightUpdateThreshold() { return 64; }
     /// Query zones and occluders.
-    virtual void QuerySceneZonesAndOccluders(WorkQueue* workQueue, const SceneGridCellDrawableSoA& sceneData,
+    virtual void QuerySceneZonesAndOccluders(WorkQueue* workQueue, SceneGrid* sceneGrid,
         unsigned viewMask, const Frustum& frustum)
     {
         const unsigned numThreads = workQueue->GetNumThreads() + 1;
+        sceneGrid->QueryCellsInFrustum(frustum, GetSceneQueryThreshold(), numThreads, zonesAndOccludersQuery_);
+
         zonesAndOccludersThreadResults_.Resize(numThreads);
         for (SceneQueryZonesAndOccludersResult& result : zonesAndOccludersThreadResults_)
             result.Clear();
 
-        workQueue->ScheduleWork(GetSceneQueryThreshold(), sceneData.size_, numThreads,
-            [this, viewMask, frustum, &sceneData](unsigned beginIndex, unsigned endIndex, unsigned threadIndex)
+        zonesAndOccludersQuery_.ScheduleWork(workQueue,
+            [=](SceneGridCellRef& cellRef, unsigned threadIndex)
         {
+            SceneGridCellDrawableSoA& data = *cellRef.data_;
             SceneQueryZonesAndOccludersResult& result = zonesAndOccludersThreadResults_[threadIndex];
-            for (unsigned index = beginIndex; index < endIndex; ++index)
+            for (unsigned index = cellRef.beginIndex_; index < cellRef.endIndex_; ++index)
             {
-                if (!sceneData.MatchViewMask(index, viewMask))
+                if (!data.MatchViewMask(index, viewMask))
                     continue;
 
-                Drawable* drawable = sceneData.drawable_[index];
+                Drawable* drawable = data.drawable_[index];
 
                 // TODO(eugeneko) Get rid of branching
-                if (sceneData.IsZone(index))
+                if (data.IsZone(index))
                 {
                     result.zones_.Push(static_cast<Zone*>(drawable));
                 }
-                else if (sceneData.IsGeometry(index) && sceneData.occluder_[index])
+                else if (data.IsGeometry(index) && data.occluder_[index])
                 {
-                    if (sceneData.IsInFrustum(index, frustum))
+                    if (cellRef.intersection_ == INSIDE || data.IsInFrustum(index, frustum))
                         result.occluders_.Push(drawable);
                 }
             }
@@ -741,7 +859,7 @@ public:
             zonesData_.farClipZone_ = defaultZone;
     }
     /// Query geometries.
-    virtual void QuerySceneGeometriesAndLights(WorkQueue* workQueue, SceneGridCellDrawableSoA& sceneData,
+    virtual void QuerySceneGeometriesAndLights(WorkQueue* workQueue, SceneGrid* sceneGrid,
         Camera* cullCamera, OcclusionBuffer* occlusionBuffer)
     {
         const unsigned viewMask = cullCamera->GetViewMask();
@@ -753,57 +871,61 @@ public:
         const unsigned cameraZoneShadowMask = zonesData_.cameraZone_->GetShadowMask();
 
         const unsigned numThreads = workQueue->GetNumThreads() + 1;
+        sceneGrid->QueryCellsInFrustum(frustum, GetSceneQueryThreshold(), numThreads, geometriesAndLightsQuery_);
+
         geometriesAndLightsThreadResults_.Resize(numThreads);
         for (SceneQueryGeometriesAndLightsResult& result : geometriesAndLightsThreadResults_)
             result.Clear();
 
-        workQueue->ScheduleWork(GetSceneQueryThreshold(), sceneData.size_, numThreads,
-            [=, &sceneData](unsigned beginIndex, unsigned endIndex, unsigned threadIndex)
+        zonesAndOccludersQuery_.ScheduleWork(workQueue,
+            [=](SceneGridCellRef& cellRef, unsigned threadIndex)
         {
-            // TODO(eugeneko) Process lights here
+            SceneGridCellDrawableSoA& data = *cellRef.data_;
             SceneQueryGeometriesAndLightsResult& result = geometriesAndLightsThreadResults_[threadIndex];
-            for (unsigned index = beginIndex; index < endIndex; ++index)
+
+            // TODO(eugeneko) Process lights here
+            for (unsigned index = cellRef.beginIndex_; index < cellRef.endIndex_; ++index)
             {
                 // Discard drawables from other views
-                if (!sceneData.MatchViewMask(index, viewMask))
+                if (!data.MatchViewMask(index, viewMask))
                     continue;
 
                 // Discard drawables except lights and geometries
-                const bool isGeometry = sceneData.IsGeometry(index);
-                const bool isLigth = sceneData.IsLight(index);
+                const bool isGeometry = data.IsGeometry(index);
+                const bool isLigth = data.IsLight(index);
                 if (!isGeometry && !isLigth)
                     continue;
 
                 // Discard invisible
-                if (!sceneData.IsInFrustum(index, frustum))
+                if (cellRef.intersection_ == INTERSECTS && !data.IsInFrustum(index, frustum))
                     continue;
 
                 // Calculate drawable distance
-                const float drawDistance = sceneData.drawDistance_[index];
-                const float distance = cullCamera->GetDistance(sceneData.boundingSphere_[index].center_);
+                const float drawDistance = data.drawDistance_[index];
+                const float distance = cullCamera->GetDistance(data.boundingSphere_[index].center_);
 
                 // Discard if drawable is too far
                 if (drawDistance > 0.0f && distance > drawDistance)
                     continue;
 
                 // Discard using occlusion buffer
-                if (sceneData.IsOccludedByBuffer(index, occlusionBuffer))
+                if (data.IsOccludedByBuffer(index, occlusionBuffer))
                     continue;
 
                 // Update drawable zone
-                Drawable* drawable = sceneData.drawable_[index];
+                Drawable* drawable = data.drawable_[index];
                 if (isGeometry)
                 {
                     if (!zonesData_.cameraZoneOverride_ && !GetZones().Empty())
                     {
-                        UpdateDirtyZone(sceneData, index, viewMask, frustum);
+                        UpdateDirtyZone(data, index, viewMask, frustum);
                     }
 
                     // Update min and max Z
                     float minZ = M_LARGE_VALUE;
                     float maxZ = M_LARGE_VALUE;
 
-                    const BoundingBox& boundingBox = sceneData.boundingBox_[index];
+                    const BoundingBox& boundingBox = data.boundingBox_[index];
                     const Vector3 center = boundingBox.Center();
                     const Vector3 edge = boundingBox.Size() * 0.5f;
 
@@ -819,10 +941,10 @@ public:
                     }
 
                     // Get actual zone
-                    Zone* cachedZone = sceneData.cachedZone_[index];
+                    Zone* cachedZone = data.cachedZone_[index];
                     Zone* actualZone = cachedZone;
-                    unsigned zoneLightMask = sceneData.cachedZoneLightMask_[index];
-                    unsigned zoneShadowMask = sceneData.cachedZoneShadowMask_[index];
+                    unsigned zoneLightMask = data.cachedZoneLightMask_[index];
+                    unsigned zoneShadowMask = data.cachedZoneShadowMask_[index];
 
                     if (zonesData_.cameraZoneOverride_ || !cachedZone)
                     {
@@ -832,8 +954,8 @@ public:
                     }
 
                     // Get masks
-                    const unsigned drawableLightMask = sceneData.lightMask_[index];
-                    const unsigned drawableShadowMask = sceneData.shadowMask_[index];
+                    const unsigned drawableLightMask = data.lightMask_[index];
+                    const unsigned drawableShadowMask = data.shadowMask_[index];
 
                     // Push results
                     result.geometries_.Push(drawable);
@@ -919,20 +1041,20 @@ public:
     const ViewProcessorDrawableSoA& GetDrawablesData() { return drawablesData_; }
 
 protected:
-    void UpdateDirtyZone(SceneGridCellDrawableSoA& sceneData, unsigned index, unsigned viewMask, const Frustum& frustum) const
+    void UpdateDirtyZone(SceneGridCellDrawableSoA& cellData, unsigned index, unsigned viewMask, const Frustum& frustum) const
     {
-        const Vector3 drawableCenter = sceneData.boundingSphere_[index].center_;
+        const Vector3 drawableCenter = cellData.boundingSphere_[index].center_;
 
-        Zone* cachedZone = sceneData.cachedZone_[index];
-        const bool cachedZoneDirty = sceneData.cachedZoneDirty_[index];
-        const unsigned cachedZoneViewMask = sceneData.cachedZoneViewMask_[index];
+        Zone* cachedZone = cellData.cachedZone_[index];
+        const bool cachedZoneDirty = cellData.cachedZoneDirty_[index];
+        const unsigned cachedZoneViewMask = cellData.cachedZoneViewMask_[index];
 
         // TODO(eugeneko) Is branch is not optimized for multiple zones
         if (cachedZoneDirty || !cachedZone || !(cachedZoneViewMask & viewMask))
         {
             // Find new zone
             const ZoneVector& zones = GetZones();
-            const bool temporary = !sceneData.IsCenterInFrustum(index, frustum);
+            const bool temporary = !cellData.IsCenterInFrustum(index, frustum);
             const int highestZonePriority = zones.Empty() ? M_MIN_INT : zones[0]->GetPriority();
 
             Zone* newZone = nullptr;
@@ -940,7 +1062,7 @@ protected:
             // First check if the current zone remains a conclusive result
             if (cachedZone && (cachedZone->GetViewMask() & viewMask)
                 && cachedZone->GetPriority() >= highestZonePriority
-                && (sceneData.zoneMask_[index] & cachedZone->GetZoneMask())
+                && (cellData.zoneMask_[index] & cachedZone->GetZoneMask())
                 && cachedZone->IsInside(drawableCenter))
             {
                 newZone = cachedZone;
@@ -950,7 +1072,7 @@ protected:
                 // Search for appropriate zone
                 for (Zone* zone : zones)
                 {
-                    if ((sceneData.zoneMask_[index] & zone->GetZoneMask()) && zone->IsInside(drawableCenter))
+                    if ((cellData.zoneMask_[index] & zone->GetZoneMask()) && zone->IsInside(drawableCenter))
                     {
                         newZone = zone;
                         break;
@@ -959,20 +1081,22 @@ protected:
             }
 
             // Setup new zone
-            sceneData.cachedZoneDirty_[index] = temporary;
-            sceneData.cachedZone_[index] = newZone;
-            sceneData.cachedZoneViewMask_[index] = newZone->GetViewMask();
-            sceneData.cachedZoneLightMask_[index] = newZone->GetLightMask();
-            sceneData.cachedZoneShadowMask_[index] = newZone->GetShadowMask();
+            cellData.cachedZoneDirty_[index] = temporary;
+            cellData.cachedZone_[index] = newZone;
+            cellData.cachedZoneViewMask_[index] = newZone->GetViewMask();
+            cellData.cachedZoneLightMask_[index] = newZone->GetLightMask();
+            cellData.cachedZoneShadowMask_[index] = newZone->GetShadowMask();
         }
     }
 
 private:
+    SceneGridQueryResult zonesAndOccludersQuery_;
     Vector<SceneQueryZonesAndOccludersResult> zonesAndOccludersThreadResults_;
     SceneQueryZonesAndOccludersResult zonesAndOccluders_;
 
     ViewCookedZonesData zonesData_;
 
+    SceneGridQueryResult geometriesAndLightsQuery_;
     Vector<SceneQueryGeometriesAndLightsResult> geometriesAndLightsThreadResults_;
     SceneQueryGeometriesAndLightsResult geometriesAndLights_;
 
@@ -1262,13 +1386,13 @@ public:
 
         {
             URHO3D_PROFILE(GetDrawables);
-            viewProcessor_->QuerySceneZonesAndOccluders(workQueue, sceneGrid_->GetData(),
+            viewProcessor_->QuerySceneZonesAndOccluders(workQueue, sceneGrid_,
                 cullCamera->GetViewMask(), cullCamera->GetFrustum());
             viewProcessor_->CookZones(cullCamera, defaultZone);
-            viewProcessor_->QuerySceneGeometriesAndLights(workQueue, sceneGrid_->GetData(), cullCamera, nullptr);
+            viewProcessor_->QuerySceneGeometriesAndLights(workQueue, sceneGrid_, cullCamera, nullptr);
             viewProcessor_->UpdateLights(workQueue, view->GetFrameInfo());
             viewProcessor_->CookLights(cullCamera);
-            viewProcessor_->ResetVisibleObjects(sceneGrid_->GetData());
+//             viewProcessor_->ResetVisibleObjects(sceneGrid_->GetData());
         }
 
         {
@@ -1280,8 +1404,8 @@ public:
 
         {
             URHO3D_PROFILE(UpdateBatches);
-            drawableUpdateManager_->UpdateDrawables(
-                workQueue, view->GetFrameInfo(), sceneGrid_->GetData(), viewProcessor_->GetDrawablesData());
+//             drawableUpdateManager_->UpdateDrawables(
+//                 workQueue, view->GetFrameInfo(), sceneGrid_->GetData(), viewProcessor_->GetDrawablesData());
         }
     }
 

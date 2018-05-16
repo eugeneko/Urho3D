@@ -315,8 +315,8 @@ Octree::Octree(Context* context) :
     numLevels_(DEFAULT_OCTREE_LEVELS)
 {
     sceneGrid_ = MakeUnique<SceneGrid>();
-    sceneGrid_->Reset(worldBoundingBox_, IntVector3(1, 1, 1));
-//     sceneGrid_->Reset(worldBoundingBox_, IntVector3(16, 1, 16));
+//     sceneGrid_->Reset(worldBoundingBox_, IntVector3(1, 1, 1));
+    sceneGrid_->Reset(BoundingBox(-200, 200), IntVector3(16, 1, 16));
     drawableProcessor_ = MakeUnique<DrawableProcessor>(context);
     drawableProcessor_->sceneGrid_ = sceneGrid_.Get();
     // If the engine is running headless, subscribe to RenderUpdate events for manually updating the octree

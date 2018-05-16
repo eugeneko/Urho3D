@@ -382,7 +382,7 @@ void Drawable::OnSceneSet(Scene* scene)
 void Drawable::OnMarkedDirty(Node* node)
 {
     if (drawableIndex_)
-        drawableIndex_.scene_->MarkDrawableDirty(this);
+        drawableIndex_.grid_->MarkDrawableDirty(this);
 
     worldBoundingBoxDirty_ = true;
     if (!updateQueued_ && octant_)
@@ -422,7 +422,7 @@ void Drawable::AddToOctree()
 void Drawable::RemoveFromOctree()
 {
     if (drawableIndex_)
-        drawableIndex_.scene_->RemoveDrawable(this);
+        drawableIndex_.grid_->RemoveDrawable(this);
 
     if (octant_)
     {
@@ -440,7 +440,7 @@ void Drawable::RemoveFromOctree()
 void Drawable::MarkDrawableParametersDirty()
 {
     if (drawableIndex_)
-        drawableIndex_.scene_->UpdateDrawableParameters(this);
+        drawableIndex_.grid_->UpdateDrawableParameters(this);
 }
 
 bool WriteDrawablesToOBJ(PODVector<Drawable*> drawables, File* outputFile, bool asZUp, bool asRightHanded, bool writeLightmapUV)
