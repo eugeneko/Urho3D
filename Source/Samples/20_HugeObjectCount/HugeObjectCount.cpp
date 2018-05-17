@@ -47,7 +47,7 @@ URHO3D_DEFINE_APPLICATION_MAIN(HugeObjectCount)
 HugeObjectCount::HugeObjectCount(Context* context) :
     Sample(context),
     animate_(false),
-    useGroups_(false)
+    singleMaterial_(false)
 {
 }
 
@@ -55,6 +55,9 @@ void HugeObjectCount::Start()
 {
     // Execute base class startup
     Sample::Start();
+
+    DebugHud* debugHud = GetSubsystem<DebugHud>();
+    debugHud->SetMode(DEBUGHUD_SHOW_ALL);
 
     // Create the scene content
     CreateScene();
@@ -71,6 +74,13 @@ void HugeObjectCount::Start()
     // Set the mouse mode to use in the sample
     Sample::InitMouseMode(MM_RELATIVE);
 }
+
+static const bool USE_CLASSIC_SCENE = 1;
+static const float XZ_GEOMETRY_RANGE = 800.0f;
+static const float XZ_LIGHT_RANGE = 400.0f;
+static const int NUM_OBJECTS = 125;
+static const int NUM_LIGHTS = 32;
+static const int NUM_MATERIALS = 256;
 
 void HugeObjectCount::CreateScene()
 {
@@ -92,7 +102,7 @@ void HugeObjectCount::CreateScene()
     Node* zoneNode = scene_->CreateChild("Zone");
     auto* zone = zoneNode->CreateComponent<Zone>();
     zone->SetBoundingBox(BoundingBox(-1000.0f, 1000.0f));
-    zone->SetFogColor(Color(0.2f, 0.2f, 0.2f));
+    zone->SetFogColor(Color(0.4f, 0.4f, 0.4f));
     zone->SetFogStart(200.0f);
     zone->SetFogEnd(300.0f);
 
@@ -101,52 +111,79 @@ void HugeObjectCount::CreateScene()
     lightNode->SetDirection(Vector3(-0.6f, -1.0f, -0.8f)); // The direction vector does not need to be normalized
     auto* light = lightNode->CreateComponent<Light>();
     light->SetLightType(LIGHT_DIRECTIONAL);
+    light->SetCastShadows(true);
+    light->SetShadowBias(BiasParameters(0.00025f, 0.5f));
+    light->SetShadowCascade(CascadeParameters(10.0f, 50.0f, 200.0f, 0.0f, 0.8f));
 
-    if (!useGroups_)
+    if (0)
     {
-        light->SetColor(Color(0.7f, 0.35f, 0.0f));
+        Node* boxNode = scene_->CreateChild("BigBox");
+        boxNode->SetPosition(Vector3(0.0f, 20.0f, 0.0f));
+        boxNode->SetScale(20.0f);
+        auto* boxObject = boxNode->CreateComponent<StaticModel>();
+        boxObject->SetModel(cache->GetResource<Model>("Models/Box.mdl"));
+        boxObject->SetMaterial(cache->GetResource<Material>("Materials/GreenTransparent.xml"));
+        boxObject->SetOccluder(true);
+        boxNodes_.Push(SharedPtr<Node>(boxNode));
+    }
 
-        // Create individual box StaticModels in the scene
-        for (int y = -125; y < 125; ++y)
+    {
+        light->SetColor(Color(0.5f, 0.5f, 0.5f));
+
+        // Create geometries
+        auto model = cache->GetResource<Model>("Models/Sphere.mdl");
+        auto baseMaterial = cache->GetResource<Material>("Materials/StoneTiled.xml");
+        Vector<SharedPtr<Material>> materials;
+        for (unsigned i = 0; i < NUM_MATERIALS; ++i)
         {
-            for (int x = -125; x < 125; ++x)
+            Color color;
+            color.r_ = Random(0.1f, 1.0f);
+            color.g_ = Random(0.1f, 1.0f);
+            color.b_ = Random(0.1f, 1.0f);
+
+            auto material = baseMaterial->Clone();
+            material->SetShaderParameter("MatSpecColor", color);
+            materials.Push(material);
+        }
+        for (int y = 0; y < NUM_OBJECTS; ++y)
+        {
+            for (int x = 0; x < NUM_OBJECTS; ++x)
             {
+                unsigned materialIndex = (unsigned)Random((int)materials.Size());
+                float factor = Vector2(x, y).Length() / Vector2(NUM_OBJECTS, NUM_OBJECTS).Length();
+                float scale = Pow(factor, 1.5f);
+
+                Vector3 position;
+                position.x_ = scale * x * XZ_GEOMETRY_RANGE / NUM_OBJECTS;
+                position.y_ = Random(-10.0f, 10.0f);
+                position.z_ = scale * y * XZ_GEOMETRY_RANGE / NUM_OBJECTS;
+
                 Node* boxNode = scene_->CreateChild("Box");
-                boxNode->SetPosition(Vector3(x * 0.3f, 0.0f, y * 0.3f));
-                boxNode->SetScale(0.25f);
+                boxNode->SetPosition(position);
+                boxNode->SetScale(Max(1.0f, scale * 10.0f));
                 auto* boxObject = boxNode->CreateComponent<StaticModel>();
-                boxObject->SetModel(cache->GetResource<Model>("Models/Box.mdl"));
+                boxObject->SetModel(model);
+                boxObject->SetMaterial(singleMaterial_ ? baseMaterial : materials[materialIndex]);
+                boxObject->SetCastShadows(true);
                 boxNodes_.Push(SharedPtr<Node>(boxNode));
             }
         }
-    }
-    else
-    {
-        light->SetColor(Color(0.6f, 0.6f, 0.6f));
-        light->SetSpecularIntensity(1.5f);
 
-        // Create StaticModelGroups in the scene
-        StaticModelGroup* lastGroup = nullptr;
-
-        for (int y = -125; y < 125; ++y)
+        // Create lights
         {
-            for (int x = -125; x < 125; ++x)
+            for (unsigned i = 0; i < NUM_LIGHTS; ++i)
             {
-                // Create new group if no group yet, or the group has already "enough" objects. The tradeoff is between culling
-                // accuracy and the amount of CPU processing needed for all the objects. Note that the group's own transform
-                // does not matter, and it does not render anything if instance nodes are not added to it
-                if (!lastGroup || lastGroup->GetNumInstanceNodes() >= 25 * 25)
-                {
-                    Node* boxGroupNode = scene_->CreateChild("BoxGroup");
-                    lastGroup = boxGroupNode->CreateComponent<StaticModelGroup>();
-                    lastGroup->SetModel(cache->GetResource<Model>("Models/Box.mdl"));
-                }
+                Vector3 position;
+                position.x_ = Random(0.0f, XZ_LIGHT_RANGE);
+                position.y_ = 5.0f;
+                position.z_ = Random(0.0f, XZ_LIGHT_RANGE);
+                float radius = Random(15.0f, 30.0f);
 
-                Node* boxNode = scene_->CreateChild("Box");
-                boxNode->SetPosition(Vector3(x * 0.3f, 0.0f, y * 0.3f));
-                boxNode->SetScale(0.25f);
-                boxNodes_.Push(SharedPtr<Node>(boxNode));
-                lastGroup->AddInstanceNode(boxNode);
+                Node* lightNode = scene_->CreateChild("PointLight");
+                lightNode->SetPosition(position);
+                auto* light = lightNode->CreateComponent<Light>();
+                light->SetLightType(LIGHT_POINT);
+                light->SetRange(radius);
             }
         }
     }
@@ -155,9 +192,12 @@ void HugeObjectCount::CreateScene()
     if (!cameraNode_)
     {
         cameraNode_ = new Node(context_);
-        cameraNode_->SetPosition(Vector3(0.0f, 10.0f, -100.0f));
+        cameraNode_->SetPosition(Vector3(-10.0f, 15.0f, -10.0f));
+        cameraNode_->SetDirection(Vector3(4, -1, 4));
         auto* camera = cameraNode_->CreateComponent<Camera>();
-        camera->SetFarClip(300.0f);
+        camera->SetFarClip(600.0f);
+        pitch_ = cameraNode_->GetWorldRotation().EulerAngles().x_;
+        yaw_ = cameraNode_->GetWorldRotation().EulerAngles().y_;
     }
 }
 
@@ -258,7 +298,7 @@ void HugeObjectCount::HandleUpdate(StringHash eventType, VariantMap& eventData)
     // Toggle grouped / ungrouped mode
     if (input->GetKeyPress(KEY_G))
     {
-        useGroups_ = !useGroups_;
+        singleMaterial_ = !singleMaterial_;
         CreateScene();
     }
 

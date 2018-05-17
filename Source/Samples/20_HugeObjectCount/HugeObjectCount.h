@@ -94,5 +94,5 @@ private:
     /// Animation flag.
     bool animate_;
     /// Group optimization flag.
-    bool useGroups_;
+    bool singleMaterial_;
 };
