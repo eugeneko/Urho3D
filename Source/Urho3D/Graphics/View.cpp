@@ -962,6 +962,7 @@ void View::GetBatches()
     threadedGeometries_.Clear();
 
     ProcessLights();
+//     CookBatches();
     GetLightBatches();
     GetBaseBatches();
 }
@@ -990,6 +991,138 @@ void View::ProcessLights()
 
     // Ensure all lights have been processed before proceeding
     queue->Complete(M_MAX_UNSIGNED);
+}
+
+struct DrawableBatches
+{
+    Drawable* drawable_{};
+    Zone* zone_{};
+    const SourceBatch* batches_{};
+    unsigned numBatches_{};
+    float lodDistance_{};
+    unsigned char lightMask_{};
+    bool operator < (const DrawableBatches& rhs) const { return drawable_ < rhs.drawable_; }
+};
+
+struct LitGeometry
+{
+    Drawable* drawable_{};
+    float sortValue_{};
+    unsigned short lightIndex_{};
+    bool perVertex_{};
+    bool negativeLight_{};
+    bool operator < (const LitGeometry& rhs) const
+    {
+        if (drawable_ != rhs.drawable_)
+            return drawable_ < rhs.drawable_;
+        if (perVertex_ != rhs.perVertex_)
+            return perVertex_ < rhs.perVertex_;
+        return sortValue_ < rhs.sortValue_;
+    }
+};
+
+static const unsigned maxPixelLights_ = 4;
+static Vector<DrawableBatches> visibleGeometries_;
+static Vector<LitGeometry> litGeometries_;
+
+float CalculateSortValue(Light* light, const BoundingBox& box)
+{
+    light->SetIntensitySortValue(box);
+    return light->GetSortValue();
+}
+
+void View::CookBatches()
+{
+    {
+        URHO3D_PROFILE(TEMP_CollectVisibleGeometry);
+        visibleGeometries_.Clear();
+        for (Drawable* geometry : geometries_)
+        {
+            const Vector<SourceBatch>& batches = geometry->GetBatches();
+            DrawableBatches dest;
+            dest.drawable_ = geometry;
+            dest.zone_ = GetZone(geometry);
+            dest.batches_ = batches.Buffer();
+            dest.numBatches_ = batches.Size();
+            dest.lodDistance_ = geometry->GetLodDistance();
+            dest.lightMask_ = GetLightMask(geometry) & 0xff;
+            visibleGeometries_.Push(dest);
+        }
+    }
+    {
+        URHO3D_PROFILE(TEMP_CollectLitGeometry);
+        litGeometries_.Clear();
+        for (unsigned lightIndex = 0; lightIndex < lightQueryResults_.Size(); ++lightIndex)
+        {
+            Light* light = lights_[lightIndex];
+            const PODVector<Drawable*>& litGeometries = lightQueryResults_[lightIndex].litGeometries_;
+            for (unsigned i = 0; i < litGeometries.Size(); ++i)
+            {
+                Drawable* drawable = litGeometries[i];
+                LitGeometry dest;
+                dest.drawable_ = drawable;
+                dest.lightIndex_ = static_cast<unsigned short>(lightIndex);
+                dest.sortValue_ = CalculateSortValue(light, drawable->GetWorldBoundingBox());
+                dest.perVertex_ = light->GetPerVertex();
+                dest.negativeLight_ = light->IsNegative();
+                litGeometries_.Push(dest);
+            }
+        }
+    }
+    {
+        URHO3D_PROFILE(SortDrawables);
+        Sort(visibleGeometries_.Begin(), visibleGeometries_.End());
+        Sort(litGeometries_.Begin(), litGeometries_.End());
+    }
+    {
+        URHO3D_PROFILE(GetBatches);
+        auto currentLitGeometry = litGeometries_.Begin();
+        auto endLitGeometry = litGeometries_.End();
+        for (unsigned i = 0; i < visibleGeometries_.Size(); ++i)
+        {
+            const DrawableBatches& geometry = visibleGeometries_[i];
+            Drawable* drawable = geometry.drawable_;
+            Zone* zone = geometry.zone_;
+            // Check if there's at least one light
+            if (currentLitGeometry != endLitGeometry && currentLitGeometry->drawable_ == drawable)
+            {
+                // Get pixel lights
+                unsigned numPixelLights = 0;
+                auto beginPixelLight = currentLitGeometry;
+                auto endPixelLight = beginPixelLight;
+                while (endPixelLight != endLitGeometry && currentLitGeometry->drawable_ == drawable
+                    && numPixelLights < maxPixelLights_ && !endPixelLight->perVertex_)
+                {
+                    ++numPixelLights;
+                    ++endPixelLight;
+                }
+
+                // Get vertex lights
+                unsigned numVertexLights = 0;
+                auto beginVertexLight = endPixelLight;
+                auto endVertexLight = beginVertexLight;
+                while (endVertexLight != endLitGeometry && currentLitGeometry->drawable_ == drawable
+                    && numVertexLights < MAX_VERTEX_LIGHTS && !endVertexLight->perVertex_)
+                {
+                    ++numVertexLights;
+                    ++endVertexLight;
+                }
+
+                // Skip other lights
+                currentLitGeometry = endVertexLight;
+                while (currentLitGeometry != endLitGeometry && currentLitGeometry->drawable_ == drawable)
+                    ++currentLitGeometry;
+
+                // Check if lit base optimization allowed
+                const bool allowLitBase = useLitBase_ && !beginPixelLight->negativeLight_
+                    && numVertexLights == 0 && !zone->GetAmbientGradient();
+
+                if (allowLitBase)
+                {
+                }
+            }
+        }
+    }
 }
 
 void View::GetLightBatches()

@@ -202,6 +202,8 @@ private:
     void GetBatches();
     /// Get lit geometries and shadowcasters for visible lights.
     void ProcessLights();
+    /// Cook batches.
+    void CookBatches();
     /// Get batches from lit geometries and shadowcasters.
     void GetLightBatches();
     /// Get unlit batches.

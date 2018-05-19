@@ -216,7 +216,7 @@ public:
     /// Create an element at the end.
     template <class... Args> T& Emplace(Args&&... args)
     {
-        T value(std::forward(args)...);
+        T value(std::forward<Args>(args)...);
         Push(std::move(value));
         return Back();
     }
