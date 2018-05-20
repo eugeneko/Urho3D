@@ -25,6 +25,7 @@
 #include "../Core/Profiler.h"
 #include "../Core/WorkQueue.h"
 #include "../Graphics/Camera.h"
+#include "../Graphics/BatchCollector.h"
 #include "../Graphics/DebugRenderer.h"
 #include "../Graphics/Geometry.h"
 #include "../Graphics/Graphics.h"
@@ -445,6 +446,7 @@ bool View::Define(RenderSurface* renderTarget, Viewport* viewport)
     }
 
     octree_ = nullptr;
+    batchCollector_ = nullptr;
     // Get default zone first in case we do not have zones defined
     cameraZone_ = farClipZone_ = renderer_->GetDefaultZone();
 
@@ -512,6 +514,9 @@ bool View::Define(RenderSurface* renderTarget, Viewport* viewport)
     if (viewSize_.y_ > viewSize_.x_ * 4)
         maxOccluderTriangles_ = 0;
 
+    batchCollector_ = MakeShared<BatchCollector>(context_);
+    batchCollector_->Initialize(true, scenePasses_);
+
     return true;
 }
 
@@ -533,6 +538,7 @@ void View::Update(const FrameInfo& frame)
     int maxSortedInstances = renderer_->GetMaxSortedInstances();
 
     // Clear buffers, geometry, light, occluder & batch list
+    batchCollector_->Clear(frame_.frameNumber_);
     renderTargets_.Clear();
     geometries_.Clear();
     lights_.Clear();
@@ -962,8 +968,10 @@ void View::GetBatches()
     threadedGeometries_.Clear();
 
     ProcessLights();
+
 //     GetLightBatches();
 //     GetBaseBatches();
+
     GetLightBatches(true);
     GetBaseBatches(true);
     CookBatches();
@@ -995,17 +1003,7 @@ void View::ProcessLights()
     queue->Complete(M_MAX_UNSIGNED);
 }
 
-struct DrawableBatches
-{
-    Drawable* drawable_{};
-    Zone* zone_{};
-    const SourceBatch* batches_{};
-    unsigned numBatches_{};
-    float lodDistance_{};
-    unsigned char lightMask_{};
-    bool operator < (const DrawableBatches& rhs) const { return drawable_ < rhs.drawable_; }
-};
-
+#if 0
 struct LitGeometry
 {
     Drawable* drawable_{};
@@ -1022,6 +1020,7 @@ struct LitGeometry
         return sortValue_ < rhs.sortValue_;
     }
 };
+#endif // 0
 
 struct BatchDestinationInfo
 {
@@ -1048,13 +1047,23 @@ struct BatchVectorSoA
 };
 
 static const unsigned maxPixelLights_ = 4;
+// #if 0
+SceneGridDrawableSoA globalSceneData_;
+static HashMap<Drawable*, unsigned> globalGeometriesIndex_;
+void _passDrawable(Drawable* drawable)
+{
+    if (globalGeometriesIndex_.Contains(drawable))
+        return;
+    globalGeometriesIndex_[drawable] = globalSceneData_.size_;
+    globalSceneData_.Push(drawable);
+}
+// #endif
 
 static Vector<LightBatchQueue*> lightBatchQueues_;
 static Vector<BatchQueue*> litBasePassBatchQueues_;
 static Vector<BatchQueue*> lightPassBatchQueues_;
 
-static Vector<DrawableBatches> visibleGeometries_;
-static Vector<LitGeometry> litGeometries_;
+static Vector<LitGeometryDescIdx> litGeometries_;
 static BatchVectorSoA batches_;
 
 float CalculateSortValue(Light* light, const BoundingBox& box)
@@ -1067,9 +1076,43 @@ void View::CookBatches()
 {
     URHO3D_PROFILE(CookBatches);
 
-    visibleGeometries_.Clear();
-    litGeometries_.Clear();
-    batches_.Clear();
+    {
+        URHO3D_PROFILE(TEMP_CollectArrays);
+
+        batches_.Clear();
+        litGeometries_.Clear();
+        globalSceneData_.ClearVisible();
+        for (Drawable* drawable : geometries_)
+        {
+            _passDrawable(drawable);
+            globalSceneData_.visible_[globalGeometriesIndex_[drawable]] = true;
+        }
+
+        for (unsigned lightIndex = 0; lightIndex < lightQueryResults_.Size(); ++lightIndex)
+        {
+            Light* light = lights_[lightIndex];
+            const PODVector<Drawable*>& litGeometries = lightQueryResults_[lightIndex].litGeometries_;
+            for (unsigned i = 0; i < litGeometries.Size(); ++i)
+            {
+                Drawable* drawable = litGeometries[i];
+                LitGeometryDescIdx dest;
+                dest.drawableIndex_ = globalGeometriesIndex_[drawable];
+                dest.lightIndex_ = static_cast<unsigned short>(lightIndex);
+                dest.sortValue_ = CalculateSortValue(light, drawable->GetWorldBoundingBox());
+                dest.perVertex_ = light->GetPerVertex();
+                dest.negativeLight_ = light->IsNegative();
+                litGeometries_.Push(dest);
+            }
+        }
+    }
+
+    {
+        URHO3D_PROFILE(PrepareGeometries);
+        // Sort arrays
+        batchCollector_->CollectLights(lights_);
+        batchCollector_->CollectVisibleGeometry(globalSceneData_);
+        batchCollector_->CollectLitGeometries(litGeometries_, globalSceneData_);
+    }
 
     lightBatchQueues_.Resize(lights_.Size());
     litBasePassBatchQueues_.Resize(lights_.Size());
@@ -1097,61 +1140,29 @@ void View::CookBatches()
     }
 
     {
-        URHO3D_PROFILE(TEMP_CollectVisibleGeometry);
-        for (Drawable* geometry : geometries_)
-        {
-            const Vector<SourceBatch>& batches = geometry->GetBatches();
-            DrawableBatches dest;
-            dest.drawable_ = geometry;
-            dest.zone_ = GetZone(geometry);
-            dest.batches_ = batches.Buffer();
-            dest.numBatches_ = batches.Size();
-            dest.lodDistance_ = geometry->GetLodDistance();
-            dest.lightMask_ = GetLightMask(geometry) & 0xff;
-            visibleGeometries_.Push(dest);
-        }
-    }
-    {
-        URHO3D_PROFILE(TEMP_CollectLitGeometry);
-        for (unsigned lightIndex = 0; lightIndex < lightQueryResults_.Size(); ++lightIndex)
-        {
-            Light* light = lights_[lightIndex];
-            const PODVector<Drawable*>& litGeometries = lightQueryResults_[lightIndex].litGeometries_;
-            for (unsigned i = 0; i < litGeometries.Size(); ++i)
-            {
-                Drawable* drawable = litGeometries[i];
-                LitGeometry dest;
-                dest.drawable_ = drawable;
-                dest.lightIndex_ = static_cast<unsigned short>(lightIndex);
-                dest.sortValue_ = CalculateSortValue(light, drawable->GetWorldBoundingBox());
-                dest.perVertex_ = light->GetPerVertex();
-                dest.negativeLight_ = light->IsNegative();
-                litGeometries_.Push(dest);
-            }
-        }
-    }
-    {
-        URHO3D_PROFILE(SortDrawables);
-        Sort(visibleGeometries_.Begin(), visibleGeometries_.End());
-        Sort(litGeometries_.Begin(), litGeometries_.End());
-    }
-    {
         URHO3D_PROFILE(GetBatches);
-        auto currentLitGeometry = litGeometries_.Begin();
-        auto endLitGeometry = litGeometries_.End();
-        for (unsigned i = 0; i < visibleGeometries_.Size(); ++i)
+
+        auto& visibleGeometriesArray = batchCollector_->GetVisibleGeometries();
+        auto& numLightsArray = batchCollector_->GetVisibleGeometriesNumLights();
+        auto& litGeometriesArray = batchCollector_->GetLitGeometries();
+
+        auto beginLitGeometry = litGeometries_.Begin();
+        for (unsigned i = 0; i < visibleGeometriesArray.Size(); ++i)
         {
-            const DrawableBatches& geometry = visibleGeometries_[i];
-            Drawable* drawable = geometry.drawable_;
-            Zone* zone = geometry.zone_;
-            const bool drawableHasSimpleMask = geometry.lightMask_ == (zone->GetLightMask() & 0xffu);
+            const unsigned numLights = numLightsArray[i];
+            auto endLitGeometry = beginLitGeometry + numLights;
+            Drawable* drawable = visibleGeometriesArray[i];
+            Zone* zone = GetZone(drawable);
+            //const float lodDistance = geometry->GetLodDistance();
+            const unsigned cutLightMask = GetLightMask(drawable) & 0xff;
+
+            const bool drawableHasSimpleMask = cutLightMask == (zone->GetLightMask() & 0xffu);
 
             // Get pixel lights
             unsigned numPixelLights = 0;
-            auto beginPixelLight = currentLitGeometry;
+            auto beginPixelLight = beginLitGeometry;
             auto endPixelLight = beginPixelLight;
-            while (endPixelLight != endLitGeometry && endPixelLight->drawable_ == drawable
-                && numPixelLights < maxPixelLights_ && !endPixelLight->perVertex_)
+            while (endPixelLight != endLitGeometry && numPixelLights < maxPixelLights_ && !endPixelLight->perVertex_)
             {
                 ++numPixelLights;
                 ++endPixelLight;
@@ -1161,17 +1172,14 @@ void View::CookBatches()
             unsigned numVertexLights = 0;
             auto beginVertexLight = endPixelLight;
             auto endVertexLight = beginVertexLight;
-            while (endVertexLight != endLitGeometry && endVertexLight->drawable_ == drawable
-                && numVertexLights < MAX_VERTEX_LIGHTS)
+            while (endVertexLight != endLitGeometry && numVertexLights < MAX_VERTEX_LIGHTS)
             {
                 ++numVertexLights;
                 ++endVertexLight;
             }
 
             // Skip other lights
-            currentLitGeometry = endVertexLight;
-            while (currentLitGeometry != endLitGeometry && currentLitGeometry->drawable_ == drawable)
-                ++currentLitGeometry;
+            beginLitGeometry = endLitGeometry;
 
             // Check if lit base optimization allowed
             const bool allowLitBase = useLitBase_ && numVertexLights == 0 && numPixelLights > 0
@@ -1203,7 +1211,7 @@ void View::CookBatches()
                     destBatch.isBase_ = false;
                     destBatch.lightQueue_ = nullptr;
                     destBatch.pass_ = tech->GetSupportedPass(info.passIndex_);
-                    destBatch.lightMask_ = geometry.lightMask_;
+                    destBatch.lightMask_ = cutLightMask;
 
                     // Skip if not needed
                     if (!destBatch.pass_)
@@ -1264,7 +1272,7 @@ void View::CookBatches()
                     if (allowLitBaseForBatch)
                     {
                         assert(numPixelLights > 0);
-                        const LitGeometry& lightData = *beginPixelLight;
+                        const LitGeometryDescIdx& lightData = *beginPixelLight;
 
                         destBatch.isBase_ = false;
                         destBatch.lightQueue_ = lightBatchQueues_[lightData.lightIndex_];
@@ -1278,11 +1286,11 @@ void View::CookBatches()
                     }
                     else
                     {
-                        const LitGeometry& lightData = *beginPixelLight;
+                        const LitGeometryDescIdx& lightData = *beginPixelLight;
 
                         destBatch.isBase_ = true;
                         destBatch.lightQueue_ = nullptr; // TODO(eugeneko) Vertex lights here
-                        destBatch.lightMask_ = geometry.lightMask_;
+                        destBatch.lightMask_ = cutLightMask;
                         destBatch.pass_ = baseOrAlphaPass;
 
                         destInfo.queue_ = baseBatchQueue;
@@ -1299,7 +1307,7 @@ void View::CookBatches()
                         Pass* lightPass = tech->GetSupportedPass(lightPassIndex_);
                         for (unsigned i = startPixelLight; i < numPixelLights; ++i)
                         {
-                            const LitGeometry& lightData = *(beginPixelLight + i);
+                            const LitGeometryDescIdx& lightData = *(beginPixelLight + i);
 
                             destBatch.isBase_ = false;
                             destBatch.lightQueue_ = lightBatchQueues_[lightData.lightIndex_];
@@ -1326,7 +1334,7 @@ void View::CookBatches()
                     if (allowLitBaseForBatch)
                     {
                         assert(numPixelLights > 0);
-                        const LitGeometry& lightData = *beginPixelLight;
+                        const LitGeometryDescIdx& lightData = *beginPixelLight;
 
                         destBatch.isBase_ = false;
                         destBatch.lightQueue_ = lightBatchQueues_[lightData.lightIndex_];
@@ -1337,11 +1345,11 @@ void View::CookBatches()
                     }
                     else
                     {
-                        const LitGeometry& lightData = *beginPixelLight;
+                        const LitGeometryDescIdx& lightData = *beginPixelLight;
 
                         destBatch.isBase_ = true;
                         destBatch.lightQueue_ = nullptr; // TODO(eugeneko) Vertex lights here
-                        destBatch.lightMask_ = geometry.lightMask_;
+                        destBatch.lightMask_ = cutLightMask;
                         destBatch.pass_ = baseOrAlphaPass;
 
                         batches_.Push(destBatch, destInfo);
@@ -1354,7 +1362,7 @@ void View::CookBatches()
                         Pass* lightPass = tech->GetSupportedPass(lightPassIndex_);
                         for (unsigned i = startPixelLight; i < numPixelLights; ++i)
                         {
-                            const LitGeometry& lightData = *(beginPixelLight + i);
+                            const LitGeometryDescIdx& lightData = *(beginPixelLight + i);
 
                             destBatch.isBase_ = false;
                             destBatch.lightQueue_ = lightBatchQueues_[lightData.lightIndex_];

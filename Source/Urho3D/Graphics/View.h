@@ -34,6 +34,7 @@ namespace Urho3D
 {
 
 class Camera;
+class BatchCollector;
 class DebugRenderer;
 class Light;
 class Drawable;
@@ -439,6 +440,9 @@ private:
     const RenderPathCommand* passCommand_{};
     /// Flag for scene being resolved from the backbuffer.
     bool usedResolve_{};
+
+    /// Batch collector.
+    SharedPtr<BatchCollector> batchCollector_;
 };
 
 }
