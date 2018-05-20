@@ -1107,8 +1107,7 @@ void View::CookBatches()
     }
 
     {
-        URHO3D_PROFILE(PrepareGeometries);
-        // Sort arrays
+        URHO3D_PROFILE(SortGeometries);
         batchCollector_->CollectLights(lights_);
         batchCollector_->CollectVisibleGeometry(globalSceneData_);
         batchCollector_->CollectLitGeometries(litGeometries_, globalSceneData_);
@@ -1146,7 +1145,7 @@ void View::CookBatches()
         auto& numLightsArray = batchCollector_->GetVisibleGeometriesNumLights();
         auto& litGeometriesArray = batchCollector_->GetLitGeometries();
 
-        auto beginLitGeometry = litGeometries_.Begin();
+        auto beginLitGeometry = litGeometriesArray.Begin();
         for (unsigned i = 0; i < visibleGeometriesArray.Size(); ++i)
         {
             const unsigned numLights = numLightsArray[i];
@@ -1272,7 +1271,7 @@ void View::CookBatches()
                     if (allowLitBaseForBatch)
                     {
                         assert(numPixelLights > 0);
-                        const LitGeometryDescIdx& lightData = *beginPixelLight;
+                        const LitGeometryDescPacked& lightData = *beginPixelLight;
 
                         destBatch.isBase_ = false;
                         destBatch.lightQueue_ = lightBatchQueues_[lightData.lightIndex_];
@@ -1286,7 +1285,7 @@ void View::CookBatches()
                     }
                     else
                     {
-                        const LitGeometryDescIdx& lightData = *beginPixelLight;
+                        const LitGeometryDescPacked& lightData = *beginPixelLight;
 
                         destBatch.isBase_ = true;
                         destBatch.lightQueue_ = nullptr; // TODO(eugeneko) Vertex lights here
@@ -1305,9 +1304,9 @@ void View::CookBatches()
                     if (numPixelLights > startPixelLight)
                     {
                         Pass* lightPass = tech->GetSupportedPass(lightPassIndex_);
-                        for (unsigned i = startPixelLight; i < numPixelLights; ++i)
+                        for (unsigned j = startPixelLight; j < numPixelLights; ++j)
                         {
-                            const LitGeometryDescIdx& lightData = *(beginPixelLight + i);
+                            const LitGeometryDescPacked& lightData = *(beginPixelLight + j);
 
                             destBatch.isBase_ = false;
                             destBatch.lightQueue_ = lightBatchQueues_[lightData.lightIndex_];
@@ -1334,7 +1333,7 @@ void View::CookBatches()
                     if (allowLitBaseForBatch)
                     {
                         assert(numPixelLights > 0);
-                        const LitGeometryDescIdx& lightData = *beginPixelLight;
+                        const LitGeometryDescPacked& lightData = *beginPixelLight;
 
                         destBatch.isBase_ = false;
                         destBatch.lightQueue_ = lightBatchQueues_[lightData.lightIndex_];
@@ -1345,7 +1344,7 @@ void View::CookBatches()
                     }
                     else
                     {
-                        const LitGeometryDescIdx& lightData = *beginPixelLight;
+                        const LitGeometryDescPacked& lightData = *beginPixelLight;
 
                         destBatch.isBase_ = true;
                         destBatch.lightQueue_ = nullptr; // TODO(eugeneko) Vertex lights here
@@ -1360,9 +1359,9 @@ void View::CookBatches()
                     if (numPixelLights > startPixelLight)
                     {
                         Pass* lightPass = tech->GetSupportedPass(lightPassIndex_);
-                        for (unsigned i = startPixelLight; i < numPixelLights; ++i)
+                        for (unsigned j = startPixelLight; j < numPixelLights; ++j)
                         {
-                            const LitGeometryDescIdx& lightData = *(beginPixelLight + i);
+                            const LitGeometryDescPacked& lightData = *(beginPixelLight + j);
 
                             destBatch.isBase_ = false;
                             destBatch.lightQueue_ = lightBatchQueues_[lightData.lightIndex_];
