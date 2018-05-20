@@ -205,9 +205,9 @@ private:
     /// Cook batches.
     void CookBatches();
     /// Get batches from lit geometries and shadowcasters.
-    void GetLightBatches();
+    void GetLightBatches(bool stripped = false);
     /// Get unlit batches.
-    void GetBaseBatches();
+    void GetBaseBatches(bool stripped = false);
     /// Update geometries and sort batches.
     void UpdateGeometries();
     /// Get pixel lit batches for a certain light and drawable.
