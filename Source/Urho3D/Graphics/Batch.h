@@ -242,7 +242,8 @@ public:
     unsigned GetNumInstances() const;
 
     /// Return whether the batch group is empty.
-    bool IsEmpty() const { return batches_.Empty() && batchGroups_.Empty(); }
+    // TODO(eugeneko) Remove this hack and split these two guys
+    bool IsEmpty() const { return batches_.Empty() && batchGroups_.Empty() && sortedBatches_.Empty() && sortedBatchGroups_.Empty(); }
 
     /// Instanced draw calls.
     HashMap<BatchGroupKey, BatchGroup> batchGroups_;

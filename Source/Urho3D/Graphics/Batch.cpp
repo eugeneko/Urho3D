@@ -722,23 +722,32 @@ void BatchQueue::Clear(int maxSortedInstances)
     batches_.Clear();
     sortedBatches_.Clear();
     batchGroups_.Clear();
+    sortedBatchGroups_.Clear();
     maxSortedInstances_ = (unsigned)maxSortedInstances;
 }
 
 void BatchQueue::SortBackToFront()
 {
-    sortedBatches_.Resize(batches_.Size());
+    // TODO(eugeneko) Remove these hacks
+    if (sortedBatches_.Empty())
+    {
+        sortedBatches_.Resize(batches_.Size());
 
-    for (unsigned i = 0; i < batches_.Size(); ++i)
-        sortedBatches_[i] = &batches_[i];
+        for (unsigned i = 0; i < batches_.Size(); ++i)
+            sortedBatches_[i] = &batches_[i];
+    }
 
     Sort(sortedBatches_.Begin(), sortedBatches_.End(), CompareBatchesBackToFront);
 
-    sortedBatchGroups_.Resize(batchGroups_.Size());
+    // TODO(eugeneko) Remove these hacks
+    if (sortedBatchGroups_.Empty())
+    {
+        sortedBatchGroups_.Resize(batchGroups_.Size());
 
-    unsigned index = 0;
-    for (HashMap<BatchGroupKey, BatchGroup>::Iterator i = batchGroups_.Begin(); i != batchGroups_.End(); ++i)
-        sortedBatchGroups_[index++] = &i->second_;
+        unsigned index = 0;
+        for (HashMap<BatchGroupKey, BatchGroup>::Iterator i = batchGroups_.Begin(); i != batchGroups_.End(); ++i)
+            sortedBatchGroups_[index++] = &i->second_;
+    }
 
     Sort(sortedBatchGroups_.Begin(), sortedBatchGroups_.End(), CompareBatchGroupOrder);
 }
