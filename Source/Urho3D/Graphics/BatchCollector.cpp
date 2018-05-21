@@ -70,8 +70,9 @@ BatchCollector::BatchCollector(Context* context)
 
 void BatchCollector::Initialize(bool threading, const PODVector<ScenePassInfo>& scenePasses)
 {
-    threading_ = threading;
+    threading_ = threading && workQueue_->GetNumThreads() > 0;
     const unsigned numThreads = threading_ ? workQueue_->GetNumThreads() + 1 : 1;
+    perThreadData_.Resize(numThreads);
 
     // Calculate max scene pass
     unsigned maxScenePass = 0;
@@ -79,20 +80,24 @@ void BatchCollector::Initialize(bool threading, const PODVector<ScenePassInfo>& 
         maxScenePass = Max(maxScenePass, info.passIndex_);
 
     // Allocate queues for scene passes
-    scenePassQueues_.Clear();
-    scenePassQueues_.Resize(maxScenePass + 1);
-    for (const ScenePassInfo& info : scenePasses)
+    scenePassQueuesPool_.Clear();
+    for (unsigned threadIndex = 0; threadIndex < numThreads; ++threadIndex)
     {
-        scenePassQueues_[info.passIndex_] = MakeUnique<ThreadedGroupedBatchQueue>();
-        scenePassQueues_[info.passIndex_]->threadQueues_.Resize(numThreads);
+        BatchCollectorPerThreadData& threadData = perThreadData_[threadIndex];
+        threadData.scenePassQueues_.Clear();
+        threadData.scenePassQueues_.Resize(maxScenePass + 1);
+        for (const ScenePassInfo& info : scenePasses)
+            threadData.scenePassQueues_[info.passIndex_] = AllocateScenePassQueue();
     }
 }
 
-void BatchCollector::Clear(unsigned frameNumber)
+void BatchCollector::Clear(unsigned frameNumber, unsigned maxSortedInstances)
 {
     lights_.Clear();
     visibleGeometries_.Clear();
     litGeometries_.Clear();
+    for (BatchCollectorPerThreadData& perThread : perThreadData_)
+        perThread.Clear(maxSortedInstances);
 }
 
 void BatchCollector::CollectLights(const PODVector<Light*>& lights)

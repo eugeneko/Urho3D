@@ -432,11 +432,8 @@ bool View::Define(RenderSurface* renderTarget, Viewport* viewport)
                 }
             }
 
-            HashMap<unsigned, BatchQueue>::Iterator j = batchQueues_.Find(info.passIndex_);
-            if (j == batchQueues_.End())
-                j = batchQueues_.Insert(Pair<unsigned, BatchQueue>(info.passIndex_, BatchQueue()));
-            info.batchQueue_ = &j->second_;
-            SetQueueShaderDefines(*info.batchQueue_, command);
+            // TODO(eugeneko) Implement me
+            //SetQueueShaderDefines(*info.batchQueue_, command);
 
             scenePasses_.Push(info);
         }
@@ -538,7 +535,7 @@ void View::Update(const FrameInfo& frame)
     int maxSortedInstances = renderer_->GetMaxSortedInstances();
 
     // Clear buffers, geometry, light, occluder & batch list
-    batchCollector_->Clear(frame_.frameNumber_);
+    batchCollector_->Clear(frame_.frameNumber_, maxSortedInstances);
     renderTargets_.Clear();
     geometries_.Clear();
     lights_.Clear();
@@ -546,8 +543,6 @@ void View::Update(const FrameInfo& frame)
     occluders_.Clear();
     activeOccluders_ = 0;
     vertexLightQueues_.Clear();
-    for (HashMap<unsigned, BatchQueue>::Iterator i = batchQueues_.Begin(); i != batchQueues_.End(); ++i)
-        i->second_.Clear(maxSortedInstances);
 
     if (hasScenePasses_ && (!cullCamera_ || !octree_))
     {
@@ -1124,8 +1119,8 @@ void View::CookBatches()
         lightPassBatchQueues_[i] = lightBatchQueue ? &lightBatchQueue->litBatches_ : nullptr;
     }
 
-    BatchQueue* baseBatchQueue = batchQueues_.Contains(basePassIndex_) ? &batchQueues_[basePassIndex_] : nullptr;
-    BatchQueue* alphaBatchQueue = batchQueues_.Contains(alphaPassIndex_) ? &batchQueues_[alphaPassIndex_] : nullptr;
+    BatchQueue* baseBatchQueue = batchCollector_->GetScenePassQueue(basePassIndex_);
+    BatchQueue* alphaBatchQueue = batchCollector_->GetScenePassQueue(alphaPassIndex_);
     const bool allowAlphaShadows = !renderer_->GetReuseShadowMaps();
 
     ScenePassInfo* basePassInfo = nullptr;
@@ -1224,7 +1219,7 @@ void View::CookBatches()
                     }
 
                     BatchDestinationInfo destInfo;
-                    destInfo.queue_ = info.batchQueue_;
+                    destInfo.queue_ = batchCollector_->GetScenePassQueue(info.passIndex_);
                     destInfo.technique_ = tech;
                     // TODO(eugeneko) What's the point of this condition?
                     destInfo.allowInstancing_ = info.allowInstancing_ && (!info.markToStencil_ || drawableHasSimpleMask);
@@ -1390,7 +1385,7 @@ void View::CookBatches()
 
 void View::GetLightBatches(bool stripped)
 {
-    BatchQueue* alphaQueue = batchQueues_.Contains(alphaPassIndex_) ? &batchQueues_[alphaPassIndex_] : nullptr;
+    BatchQueue* alphaQueue = batchCollector_->GetScenePassQueue(alphaPassIndex_);
 
     // Build light queues and lit batches
     {
@@ -1664,7 +1659,7 @@ void View::GetBaseBatches(bool stripped)
                 if (allowInstancing && info.markToStencil_ && destBatch.lightMask_ != (destBatch.zone_->GetLightMask() & 0xffu))
                     allowInstancing = false;
 
-                AddBatchToQueue(*info.batchQueue_, destBatch, tech, allowInstancing);
+                AddBatchToQueue(*batchCollector_->GetScenePassQueue(info.passIndex_), destBatch, tech, allowInstancing);
             }
         }
     }
@@ -1697,7 +1692,7 @@ void View::UpdateGeometries()
                 item->priority_ = M_MAX_UNSIGNED;
                 item->workFunction_ =
                     command.sortMode_ == SORT_FRONTTOBACK ? SortBatchQueueFrontToBackWork : SortBatchQueueBackToFrontWork;
-                item->start_ = &batchQueues_[command.passIndex_];
+                item->start_ = batchCollector_->GetScenePassQueue(command.passIndex_);
                 queue->AddWorkItem(item);
             }
         }
@@ -1971,7 +1966,7 @@ void View::ExecuteRenderPathCommands()
 
             case CMD_SCENEPASS:
                 {
-                    BatchQueue& queue = actualView->batchQueues_[command.passIndex_];
+                    BatchQueue& queue = *actualView->batchCollector_->GetScenePassQueue(command.passIndex_);
                     if (!queue.IsEmpty())
                     {
                         URHO3D_PROFILE(RenderScenePass);
@@ -2292,7 +2287,7 @@ void View::RenderQuad(RenderPathCommand& command)
 bool View::IsNecessary(const RenderPathCommand& command)
 {
     return command.enabled_ && command.outputs_.Size() &&
-           (command.type_ != CMD_SCENEPASS || !batchQueues_[command.passIndex_].IsEmpty());
+           (command.type_ != CMD_SCENEPASS || !batchCollector_->GetScenePassQueue(command.passIndex_)->IsEmpty());
 }
 
 bool View::CheckViewportRead(const RenderPathCommand& command)
@@ -3358,8 +3353,8 @@ void View::PrepareInstancingBuffer()
 
     unsigned totalInstances = 0;
 
-    for (HashMap<unsigned, BatchQueue>::Iterator i = batchQueues_.Begin(); i != batchQueues_.End(); ++i)
-        totalInstances += i->second_.GetNumInstances();
+    for (ScenePassInfo& info : scenePasses_)
+        totalInstances += batchCollector_->GetScenePassQueue(info.passIndex_)->GetNumInstances();
 
     for (Vector<LightBatchQueue>::Iterator i = lightQueues_.Begin(); i != lightQueues_.End(); ++i)
     {
@@ -3379,8 +3374,8 @@ void View::PrepareInstancingBuffer()
         return;
 
     const unsigned stride = instancingBuffer->GetVertexSize();
-    for (HashMap<unsigned, BatchQueue>::Iterator i = batchQueues_.Begin(); i != batchQueues_.End(); ++i)
-        i->second_.SetInstancingData(dest, stride, freeIndex);
+    for (ScenePassInfo& info : scenePasses_)
+        batchCollector_->GetScenePassQueue(info.passIndex_)->SetInstancingData(dest, stride, freeIndex);
 
     for (Vector<LightBatchQueue>::Iterator i = lightQueues_.Begin(); i != lightQueues_.End(); ++i)
     {

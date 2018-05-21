@@ -88,8 +88,7 @@ struct ScenePassInfo
     bool markToStencil_;
     /// Vertex light flag.
     bool vertexLights_;
-    /// Batch queue.
-    BatchQueue* batchQueue_;
+
 };
 
 /// Per-thread geometry, light and scene range collection structure.
@@ -418,8 +417,6 @@ private:
     Vector<LightBatchQueue> lightQueues_;
     /// Per-vertex light queues.
     HashMap<unsigned long long, LightBatchQueue> vertexLightQueues_;
-    /// Batch queues by pass index.
-    HashMap<unsigned, BatchQueue> batchQueues_;
     /// Index of the GBuffer pass.
     unsigned gBufferPassIndex_{};
     /// Index of the opaque forward base pass.

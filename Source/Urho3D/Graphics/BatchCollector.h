@@ -124,9 +124,17 @@ struct LitGeometryDescPacked
 
 };
 
-struct ThreadedGroupedBatchQueue
+struct BatchCollectorPerThreadData
 {
-    Vector<BatchQueue> threadQueues_;
+    Vector<BatchQueue*> scenePassQueues_;
+    void Clear(unsigned maxSortedInstances)
+    {
+        for (BatchQueue* queue : scenePassQueues_)
+        {
+            if (queue)
+                queue->Clear(maxSortedInstances);
+        }
+    }
 };
 
 class BatchCollector : public Object
@@ -137,7 +145,7 @@ public:
     BatchCollector(Context* context);
     void Initialize(bool threading, const PODVector<ScenePassInfo>& scenePasses);
 
-    void Clear(unsigned frameNumber);
+    void Clear(unsigned frameNumber, unsigned maxSortedInstances);
     /// Collect lights. Lights shall have the same indexes as used in LitGeometryDesc.
     void CollectLights(const PODVector<Light*>& lights);
     /// Collect visible geometries.
@@ -148,6 +156,18 @@ public:
     const Vector<Drawable*>& GetVisibleGeometries() const { return visibleGeometries_; }
     const Vector<unsigned>& GetVisibleGeometriesNumLights() const { return numLightsPerVisibleGeometry_; }
     const Vector<LitGeometryDescPacked>& GetLitGeometries() const { return litGeometries_; }
+    BatchQueue* GetScenePassQueue(unsigned passIndex)
+    {
+        assert(perThreadData_.Size() == 0);
+        return perThreadData_[0].scenePassQueues_[passIndex];
+    }
+
+private:
+    BatchQueue* AllocateScenePassQueue()
+    {
+        scenePassQueuesPool_.Emplace(MakeUnique<BatchQueue>());
+        return scenePassQueuesPool_.Back().Get();
+    }
 
 private:
     WorkQueue* workQueue_{};
@@ -158,7 +178,8 @@ private:
     Vector<unsigned> numLightsPerVisibleGeometry_;
     Vector<LitGeometryDescPacked> litGeometries_;
 
-    Vector<UniquePtr<ThreadedGroupedBatchQueue>> scenePassQueues_;
+    Vector<UniquePtr<BatchQueue>> scenePassQueuesPool_;
+    Vector<BatchCollectorPerThreadData> perThreadData_;
 };
 
 }
