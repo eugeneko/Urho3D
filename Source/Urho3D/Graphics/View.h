@@ -169,7 +169,8 @@ public:
     const PODVector<Light*>& GetLights() const { return lights_; }
 
     /// Return light batch queues.
-    const Vector<LightBatchQueue>& GetLightQueues() const { return lightQueues_; }
+    // TODO(eugeneko) Fix me
+//     const Vector<LightBatchQueue*>& GetLightQueues() const { return lightQueues_; }
 
     /// Return the last used software occlusion buffer.
     OcclusionBuffer* GetOcclusionBuffer() const { return occlusionBuffer_; }
@@ -413,8 +414,6 @@ private:
     Vector<LightQueryResult> lightQueryResults_;
     /// Info for scene render passes defined by the renderpath.
     PODVector<ScenePassInfo> scenePasses_;
-    /// Per-pixel light queues.
-    Vector<LightBatchQueue> lightQueues_;
     /// Per-vertex light queues.
     HashMap<unsigned long long, LightBatchQueue> vertexLightQueues_;
     /// Index of the GBuffer pass.

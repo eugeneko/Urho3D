@@ -130,20 +130,45 @@ struct BatchQueueData
     HashMap<BatchGroupKey, BatchGroup> batchGroups_;
     Vector<Batch> batches_;
     void ShallowClear();
-    void AppendGroups(const BatchQueueData& other);
     void AddBatch(const Batch& batch, bool allowInstancing);
+    void AppendBatchGroups(const BatchQueueData& other);
+    void ExportBatches(BatchQueue& queue);
+    void ExportBatchGroups(BatchQueue& queue);
+    static void ShallowClear(Vector<BatchQueueData*>& queues);
+};
+
+struct LightBatchQueueData
+{
+    BatchQueueData* litBaseQueueData_{};
+    BatchQueueData* lightQueueData_{};
 };
 
 struct BatchCollectorPerThreadData
 {
+    /// Batch queues for each scene pass. Indexed via passIndex. Null for non-existing pass.
     Vector<BatchQueueData*> scenePassQueueData_;
-    void Clear()
+
+    /// Persistent mapping for light batch queues data.
+    HashMap<Light*, LightBatchQueueData> lightBatchQueueDataMap_;
+    /// Batch queues for each light "litbase" pass. Indexed via lightIndex. Null for vertex lights.
+    Vector<BatchQueueData*> litBaseQueueData_;
+    /// Batch queues for each light "light" pass. Indexed via lightIndex. Null for vertex lights.
+    Vector<BatchQueueData*> lightQueueData_;
+
+    /// Clear light arrays.
+    void ClearLightArrays(unsigned numLights)
     {
-        for (BatchQueueData* queue : scenePassQueueData_)
-        {
-            if (queue)
-                queue->ShallowClear();
-        }
+        litBaseQueueData_.Clear();
+        litBaseQueueData_.Resize(numLights);
+        lightQueueData_.Clear();
+        lightQueueData_.Resize(numLights);
+    }
+    /// Perform shallow clear w/o deallocation.
+    void ShallowClear()
+    {
+        BatchQueueData::ShallowClear(scenePassQueueData_);
+        BatchQueueData::ShallowClear(litBaseQueueData_);
+        BatchQueueData::ShallowClear(lightQueueData_);
     }
 };
 
@@ -155,9 +180,10 @@ public:
     BatchCollector(Context* context);
     void Initialize(bool threading, const PODVector<ScenePassInfo>& scenePasses);
 
-    void Clear(unsigned frameNumber, unsigned maxSortedInstances);
-    /// Collect lights. Lights shall have the same indexes as used in LitGeometryDesc.
-    void CollectLights(const PODVector<Light*>& lights);
+    /// Clear the state before processing the frame.
+    void Clear(unsigned frameNumber);
+    /// Process lights. Lights shall be ordered according to lightIndex.
+    void ProcessLights(const PODVector<Light*>& lights);
     /// Collect visible geometries.
     void CollectVisibleGeometry(SceneGridDrawableSoA& sceneData);
     /// Collect lit geometries from given unsorted array of lit geometries.
@@ -165,6 +191,10 @@ public:
 
     /// Add scene pass batch.
     void AddScenePassBatch(unsigned threadIndex, unsigned passIndex, const Batch& batch, bool grouped);
+    /// Add light batch for "litbase" pass.
+    void AddLitBaseBatch(unsigned threadIndex, unsigned lightIndex, const Batch& batch, bool grouped);
+    /// Add light batch for "light" pass.
+    void AddLightBatch(unsigned threadIndex, unsigned lightIndex, const Batch& batch, bool grouped);
 
     /// Merge threaded results.
     void MergeThreadedResults();
@@ -177,10 +207,22 @@ public:
     const Vector<Drawable*>& GetVisibleGeometries() const { return visibleGeometries_; }
     const Vector<unsigned>& GetVisibleGeometriesNumLights() const { return numLightsPerVisibleGeometry_; }
     const Vector<LitGeometryDescPacked>& GetLitGeometries() const { return litGeometries_; }
+
     BatchQueue* GetScenePassQueue(unsigned passIndex)
     {
         return scenePassQueues_[passIndex].Get();
     }
+    LightBatchQueue* GetLightBatchQueue(unsigned lightIndex)
+    {
+        return lightBatchQueues_[lightIndex];
+    }
+
+    /// Return whether the calculations are threaded.
+    bool IsThreaded() const { return threading_; }
+    /// Get all light batch queues. Indexed via lightIndex. Not null.
+    const Vector<LightBatchQueue*>& GetLightBatchQueues() const { return lightBatchQueues_; }
+    /// Return whether there is any light batch queue.
+    bool HasLightBatchQueues() const { return !lightBatchQueues_.Empty(); }
 
 private:
     BatchQueueData* AllocateStaticQueueData()
@@ -188,6 +230,18 @@ private:
         staticQueueDataPool_.Emplace(MakeUnique<BatchQueueData>());
         return staticQueueDataPool_.Back().Get();
     }
+    BatchQueueData* AllocateDynamicQueueData()
+    {
+        dynamicQueueDataPool_.Emplace(MakeUnique<BatchQueueData>());
+        return dynamicQueueDataPool_.Back().Get();
+    }
+    LightBatchQueue* AllocateLightBatchQueue()
+    {
+        lightBatchQueuePool_.Emplace(MakeUnique<LightBatchQueue>());
+        return lightBatchQueuePool_.Back().Get();
+    }
+    void ProcessLight(unsigned lightIndex);
+    void FinalizeBatchQueue(BatchQueue& queue, bool allowShadows);
     void FinalizeBatch(Batch& batch, bool allowShadows, const BatchQueue& queue);
     void FinalizeBatchGroup(BatchGroup& batchGroup, bool allowShadows, const BatchQueue& queue);
 
@@ -197,16 +251,27 @@ private:
     bool threading_{};
     unsigned maxScenePassIndex_{};
     unsigned numThreads_{};
+    unsigned maxSortedInstances_{};
 
+    /// Persistent mapping for light batch queues.
+    HashMap<Light*, LightBatchQueue*> lightBatchQueueMap_;
+
+    /// Currently visible lights. Indexed via lightIndex. Not null.
     Vector<Light*> lights_;
+    /// Light batch queues. Indexed via lightIndex. Not null.
+    Vector<LightBatchQueue*> lightBatchQueues_;
+
     Vector<Drawable*> visibleGeometries_;
     Vector<unsigned> numLightsPerVisibleGeometry_;
     Vector<LitGeometryDescPacked> litGeometries_;
 
-    Vector<UniquePtr<BatchQueueData>> staticQueueDataPool_;
     Vector<BatchCollectorPerThreadData> perThreadData_;
 
     Vector<UniquePtr<BatchQueue>> scenePassQueues_;
+
+    Vector<UniquePtr<BatchQueueData>> staticQueueDataPool_;
+    Vector<UniquePtr<BatchQueueData>> dynamicQueueDataPool_;
+    Vector<UniquePtr<LightBatchQueue>> lightBatchQueuePool_;
 };
 
 }
