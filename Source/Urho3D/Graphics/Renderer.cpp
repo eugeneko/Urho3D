@@ -1266,7 +1266,7 @@ void Renderer::SetBatchShaders(Batch& batch, Technique* tech, bool allowShadows,
     // Log error if shaders could not be assigned, but only once per technique
     if (!batch.vertexShader_ || !batch.pixelShader_)
     {
-        if (!shaderErrorDisplayed_.Contains(tech))
+        if (tech && !shaderErrorDisplayed_.Contains(tech)) // TODO(eugeneko) remove this hack
         {
             shaderErrorDisplayed_.Insert(tech);
             URHO3D_LOGERROR("Technique " + tech->GetName() + " has missing shaders");

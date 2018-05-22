@@ -149,6 +149,21 @@ struct BatchGroup : public Batch
     /// Destruct.
     ~BatchGroup() = default;
 
+    /// Return whether the group is empty.
+    bool IsEmpty() const { return instances_.Empty(); }
+
+    /// Clear group data.
+    void Clear()
+    {
+        instances_.Clear();
+    }
+
+    /// Reset batch fields.
+    void ResetBatch(const Batch& batch)
+    {
+        Batch::operator =(batch);
+    }
+
     /// Add world transform(s) from a batch.
     void AddTransforms(const Batch& batch)
     {

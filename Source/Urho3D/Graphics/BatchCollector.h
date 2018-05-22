@@ -35,6 +35,7 @@ namespace Urho3D
 {
 
 struct ScenePassInfo;
+class Renderer;
 class WorkQueue;
 
 // TODO(eugeneko) This is stub, replace after SceneGrid integration
@@ -124,15 +125,24 @@ struct LitGeometryDescPacked
 
 };
 
+struct BatchQueueData
+{
+    HashMap<BatchGroupKey, BatchGroup> batchGroups_;
+    Vector<Batch> batches_;
+    void ShallowClear();
+    void AppendGroups(const BatchQueueData& other);
+    void AddBatch(const Batch& batch, bool allowInstancing);
+};
+
 struct BatchCollectorPerThreadData
 {
-    Vector<BatchQueue*> scenePassQueues_;
-    void Clear(unsigned maxSortedInstances)
+    Vector<BatchQueueData*> scenePassQueueData_;
+    void Clear()
     {
-        for (BatchQueue* queue : scenePassQueues_)
+        for (BatchQueueData* queue : scenePassQueueData_)
         {
             if (queue)
-                queue->Clear(maxSortedInstances);
+                queue->ShallowClear();
         }
     }
 };
@@ -153,33 +163,50 @@ public:
     /// Collect lit geometries from given unsorted array of lit geometries.
     void CollectLitGeometries(const Vector<LitGeometryDescIdx>& litGeometries, SceneGridDrawableSoA& sceneData);
 
+    /// Add scene pass batch.
+    void AddScenePassBatch(unsigned threadIndex, unsigned passIndex, const Batch& batch, bool grouped);
+
+    /// Merge threaded results.
+    void MergeThreadedResults();
+    /// Fill batch queues.
+    void FillBatchQueues();
+    /// Compose threaded results.
+    // TODO(eugeneko) Remove this parameter
+    void FinalizeBatches(unsigned alphaPassIndex);
+
     const Vector<Drawable*>& GetVisibleGeometries() const { return visibleGeometries_; }
     const Vector<unsigned>& GetVisibleGeometriesNumLights() const { return numLightsPerVisibleGeometry_; }
     const Vector<LitGeometryDescPacked>& GetLitGeometries() const { return litGeometries_; }
     BatchQueue* GetScenePassQueue(unsigned passIndex)
     {
-        assert(perThreadData_.Size() == 0);
-        return perThreadData_[0].scenePassQueues_[passIndex];
+        return scenePassQueues_[passIndex].Get();
     }
 
 private:
-    BatchQueue* AllocateScenePassQueue()
+    BatchQueueData* AllocateStaticQueueData()
     {
-        scenePassQueuesPool_.Emplace(MakeUnique<BatchQueue>());
-        return scenePassQueuesPool_.Back().Get();
+        staticQueueDataPool_.Emplace(MakeUnique<BatchQueueData>());
+        return staticQueueDataPool_.Back().Get();
     }
+    void FinalizeBatch(Batch& batch, bool allowShadows, const BatchQueue& queue);
+    void FinalizeBatchGroup(BatchGroup& batchGroup, bool allowShadows, const BatchQueue& queue);
 
 private:
+    Renderer* renderer_{};
     WorkQueue* workQueue_{};
     bool threading_{};
+    unsigned maxScenePassIndex_{};
+    unsigned numThreads_{};
 
     Vector<Light*> lights_;
     Vector<Drawable*> visibleGeometries_;
     Vector<unsigned> numLightsPerVisibleGeometry_;
     Vector<LitGeometryDescPacked> litGeometries_;
 
-    Vector<UniquePtr<BatchQueue>> scenePassQueuesPool_;
+    Vector<UniquePtr<BatchQueueData>> staticQueueDataPool_;
     Vector<BatchCollectorPerThreadData> perThreadData_;
+
+    Vector<UniquePtr<BatchQueue>> scenePassQueues_;
 };
 
 }

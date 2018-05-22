@@ -26,20 +26,20 @@
 #include "../Core/Context.h"
 #include "../Core/WorkQueue.h"
 #include "../Graphics/BatchCollector.h"
+#include "../Graphics/Geometry.h"
+#include "../Graphics/Renderer.h"
 
 // TODO(eugeneko) Remove these dependencies
 #include "../Graphics/View.h"
 // #include "../Core/Profiler.h"
 // #include "../Graphics/Camera.h"
 // #include "../Graphics/DebugRenderer.h"
-// #include "../Graphics/Geometry.h"
 // #include "../Graphics/Graphics.h"
 // #include "../Graphics/GraphicsEvents.h"
 // #include "../Graphics/GraphicsImpl.h"
 // #include "../Graphics/Material.h"
 // #include "../Graphics/OcclusionBuffer.h"
 // #include "../Graphics/Octree.h"
-// #include "../Graphics/Renderer.h"
 // #include "../Graphics/RenderPath.h"
 // #include "../Graphics/ShaderVariation.h"
 // #include "../Graphics/Skybox.h"
@@ -61,8 +61,77 @@
 namespace Urho3D
 {
 
+void BatchQueueData::ShallowClear()
+{
+    batches_.Clear();
+    for (auto& group : batchGroups_)
+    {
+        group.second_.Clear();
+    }
+}
+
+void BatchQueueData::AppendGroups(const BatchQueueData& other)
+{
+    for (const auto& otherGroup : other.batchGroups_)
+    {
+        const BatchGroupKey& key = otherGroup.first_;
+        auto iterGroup = batchGroups_.Find(key);
+        if (iterGroup == batchGroups_.End())
+        {
+            // Copy entire group
+            iterGroup = batchGroups_.Insert(MakePair(key, BatchGroup()));
+            iterGroup->second_ = otherGroup.second_;
+        }
+        else
+        {
+            // Copy instances only
+            iterGroup->second_.instances_.Push(otherGroup.second_.instances_);
+        }
+    }
+}
+
+void BatchQueueData::AddBatch(const Batch& batch, bool allowInstancing)
+{
+    if (allowInstancing)
+    {
+        BatchGroupKey key(batch);
+
+        // Find new group or spawn empty
+        auto iterGroup = batchGroups_.Find(key);
+        if (iterGroup == batchGroups_.End())
+            iterGroup = batchGroups_.Insert(MakePair(key, BatchGroup()));
+
+        // Reset batch if group was empty
+        BatchGroup& group = iterGroup->second_;
+        if (group.IsEmpty())
+            group.ResetBatch(batch);
+
+        // Add instance
+        group.AddTransforms(batch);
+    }
+    else
+    {
+        // If batch is static with multiple world transforms and cannot instance, we must push copies of the batch individually
+        if (batch.geometryType_ == GEOM_STATIC && batch.numWorldTransforms_ > 1)
+        {
+            Batch batchCopy = batch;
+            batchCopy.numWorldTransforms_ = 1;
+            for (unsigned i = 0; i < batch.numWorldTransforms_; ++i)
+            {
+                batchCopy.worldTransform_ = &batch.worldTransform_[i];
+                batches_.Push(batchCopy);
+            }
+        }
+        else
+            batches_.Push(batch);
+
+    }
+}
+
+//////////////////////////////////////////////////////////////////////////
 BatchCollector::BatchCollector(Context* context)
     : Object(context)
+    , renderer_(context->GetSubsystem<Renderer>())
     , workQueue_(context->GetSubsystem<WorkQueue>())
 {
 
@@ -71,23 +140,29 @@ BatchCollector::BatchCollector(Context* context)
 void BatchCollector::Initialize(bool threading, const PODVector<ScenePassInfo>& scenePasses)
 {
     threading_ = threading && workQueue_->GetNumThreads() > 0;
-    const unsigned numThreads = threading_ ? workQueue_->GetNumThreads() + 1 : 1;
-    perThreadData_.Resize(numThreads);
+    numThreads_ = threading_ ? workQueue_->GetNumThreads() + 1 : 1;
+    perThreadData_.Resize(numThreads_);
 
     // Calculate max scene pass
-    unsigned maxScenePass = 0;
+    maxScenePassIndex_ = 0;
     for (const ScenePassInfo& info : scenePasses)
-        maxScenePass = Max(maxScenePass, info.passIndex_);
+        maxScenePassIndex_ = Max(maxScenePassIndex_, info.passIndex_);
 
-    // Allocate queues for scene passes
-    scenePassQueuesPool_.Clear();
-    for (unsigned threadIndex = 0; threadIndex < numThreads; ++threadIndex)
+    // Create batch queues for scene passes
+    scenePassQueues_.Clear();
+    scenePassQueues_.Resize(maxScenePassIndex_ + 1);
+    for (const ScenePassInfo& info : scenePasses)
+        scenePassQueues_[info.passIndex_] = MakeUnique<BatchQueue>();
+
+    // Allocate queue data for scene passes
+    staticQueueDataPool_.Clear();
+    for (unsigned threadIndex = 0; threadIndex < numThreads_; ++threadIndex)
     {
         BatchCollectorPerThreadData& threadData = perThreadData_[threadIndex];
-        threadData.scenePassQueues_.Clear();
-        threadData.scenePassQueues_.Resize(maxScenePass + 1);
+        threadData.scenePassQueueData_.Clear();
+        threadData.scenePassQueueData_.Resize(maxScenePassIndex_ + 1);
         for (const ScenePassInfo& info : scenePasses)
-            threadData.scenePassQueues_[info.passIndex_] = AllocateScenePassQueue();
+            threadData.scenePassQueueData_[info.passIndex_] = AllocateStaticQueueData();
     }
 }
 
@@ -96,8 +171,13 @@ void BatchCollector::Clear(unsigned frameNumber, unsigned maxSortedInstances)
     lights_.Clear();
     visibleGeometries_.Clear();
     litGeometries_.Clear();
+    for (unsigned passIndex = 0; passIndex < maxScenePassIndex_; ++passIndex)
+    {
+        if (scenePassQueues_[passIndex])
+            scenePassQueues_[passIndex]->Clear(maxSortedInstances);
+    }
     for (BatchCollectorPerThreadData& perThread : perThreadData_)
-        perThread.Clear(maxSortedInstances);
+        perThread.Clear();
 }
 
 void BatchCollector::CollectLights(const PODVector<Light*>& lights)
@@ -165,6 +245,102 @@ void BatchCollector::CollectLitGeometries(const Vector<LitGeometryDescIdx>& litG
             }
         }
     }
+}
+
+void BatchCollector::AddScenePassBatch(unsigned threadIndex, unsigned passIndex, const Batch& batch, bool grouped)
+{
+    BatchQueueData* queueData = perThreadData_[threadIndex].scenePassQueueData_[passIndex];
+    assert(queueData);
+    queueData->AddBatch(batch, grouped);
+}
+
+void BatchCollector::MergeThreadedResults()
+{
+    if (!threading_)
+        return;
+
+    // Merge scene pass results
+    for (unsigned passIndex = 0; passIndex < maxScenePassIndex_; ++passIndex)
+    {
+        BatchQueueData* destData = perThreadData_[0].scenePassQueueData_[passIndex];
+        if (!destData)
+            continue;
+
+        // Append all groups to first threaded storage
+        for (unsigned threadIndex = 1; threadIndex < numThreads_; ++threadIndex)
+        {
+            BatchQueueData* sourceData = perThreadData_[threadIndex].scenePassQueueData_[passIndex];
+            assert(sourceData);
+            destData->AppendGroups(*sourceData);
+        }
+    }
+
+}
+
+void BatchCollector::FillBatchQueues()
+{
+    for (unsigned passIndex = 0; passIndex < maxScenePassIndex_; ++passIndex)
+    {
+        BatchQueue* queue = scenePassQueues_[passIndex].Get();
+        if (!queue)
+            continue;
+
+        // Copy pointers to batch groups from first threaded storage
+        BatchQueueData* mergedQueueData = perThreadData_[0].scenePassQueueData_[passIndex];
+        assert(mergedQueueData);
+        for (auto& batchGroup : mergedQueueData->batchGroups_)
+            queue->sortedBatchGroups_.Push(&batchGroup.second_);
+
+        // Copy pointers to batches from each threaded storage
+        for (unsigned threadIndex = 0; threadIndex < numThreads_; ++threadIndex)
+        {
+            BatchQueueData* queueData = perThreadData_[threadIndex].scenePassQueueData_[passIndex];
+            assert(queueData);
+            for (Batch& batch : queueData->batches_)
+                queue->sortedBatches_.Push(&batch);
+        }
+    }
+}
+
+void BatchCollector::FinalizeBatches(unsigned alphaPassIndex)
+{
+    const bool reuseShadowMaps = renderer_->GetReuseShadowMaps();
+    for (unsigned passIndex = 0; passIndex < maxScenePassIndex_; ++passIndex)
+    {
+        BatchQueue* queue = scenePassQueues_[passIndex].Get();
+        if (!queue)
+            continue;
+
+        const bool allowShadows = passIndex != alphaPassIndex || !reuseShadowMaps;
+        for (Batch* batch : queue->sortedBatches_)
+            FinalizeBatch(*batch, allowShadows, *queue);
+        for (BatchGroup* batchGroup : queue->sortedBatchGroups_)
+            FinalizeBatch(*batchGroup, allowShadows, *queue);
+    }
+}
+
+void BatchCollector::FinalizeBatch(Batch& batch, bool allowShadows, const BatchQueue& queue)
+{
+    if (!batch.material_)
+        batch.material_ = renderer_->GetDefaultMaterial();
+
+    renderer_->SetBatchShaders(batch, nullptr, allowShadows, queue);
+    batch.CalculateSortKey();
+}
+
+void BatchCollector::FinalizeBatchGroup(BatchGroup& batchGroup, bool allowShadows, const BatchQueue& queue)
+{
+    const int minInstances_ = renderer_->GetMinInstances();
+
+    // Convert to instanced if possible
+    if (batchGroup.geometryType_ == GEOM_STATIC && batchGroup.geometry_->GetIndexBuffer()
+        && (int)batchGroup.instances_.Size() >= minInstances_)
+    {
+        batchGroup.geometryType_ = GEOM_INSTANCED;
+    }
+
+    // Finalize as batch
+    FinalizeBatch(batchGroup, allowShadows, queue);
 }
 
 #if 0

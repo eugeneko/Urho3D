@@ -53,6 +53,8 @@
 
 #include "../DebugNew.h"
 
+static const bool LEGACY_PROCESSING = false;
+
 namespace Urho3D
 {
 
@@ -512,7 +514,7 @@ bool View::Define(RenderSurface* renderTarget, Viewport* viewport)
         maxOccluderTriangles_ = 0;
 
     batchCollector_ = MakeShared<BatchCollector>(context_);
-    batchCollector_->Initialize(true, scenePasses_);
+    batchCollector_->Initialize(!LEGACY_PROCESSING, scenePasses_);
 
     return true;
 }
@@ -964,12 +966,17 @@ void View::GetBatches()
 
     ProcessLights();
 
-//     GetLightBatches();
-//     GetBaseBatches();
-
-    GetLightBatches(true);
-    GetBaseBatches(true);
-    CookBatches();
+    if (LEGACY_PROCESSING)
+    {
+        GetLightBatches();
+        GetBaseBatches();
+    }
+    else
+    {
+        GetLightBatches(true);
+        GetBaseBatches(true);
+        CookBatches();
+    }
 }
 
 void View::ProcessLights()
@@ -1119,8 +1126,7 @@ void View::CookBatches()
         lightPassBatchQueues_[i] = lightBatchQueue ? &lightBatchQueue->litBatches_ : nullptr;
     }
 
-    BatchQueue* baseBatchQueue = batchCollector_->GetScenePassQueue(basePassIndex_);
-    BatchQueue* alphaBatchQueue = batchCollector_->GetScenePassQueue(alphaPassIndex_);
+    const bool hasAlphaPass = !!batchCollector_->GetScenePassQueue(alphaPassIndex_);
     const bool allowAlphaShadows = !renderer_->GetReuseShadowMaps();
 
     ScenePassInfo* basePassInfo = nullptr;
@@ -1218,13 +1224,8 @@ void View::CookBatches()
                         assert(0);
                     }
 
-                    BatchDestinationInfo destInfo;
-                    destInfo.queue_ = batchCollector_->GetScenePassQueue(info.passIndex_);
-                    destInfo.technique_ = tech;
-                    // TODO(eugeneko) What's the point of this condition?
-                    destInfo.allowInstancing_ = info.allowInstancing_ && (!info.markToStencil_ || drawableHasSimpleMask);
-
-                    batches_.Push(destBatch, destInfo);
+                    const bool allowInstancing = info.allowInstancing_ && (!info.markToStencil_ || drawableHasSimpleMask);
+                    batchCollector_->AddScenePassBatch(0, info.passIndex_, destBatch, allowInstancing);
                 }
 
                 // Do not create pixel lit forward passes for materials that render into the G-buffer
@@ -1234,12 +1235,10 @@ void View::CookBatches()
 
                 // Find either base or alpha pass
                 bool isAlpha = false;
-                BatchQueue* baseOrAlphaQueue = baseBatchQueue;
                 Pass* baseOrAlphaPass = tech->GetSupportedPass(basePassIndex_);
-                if (!baseOrAlphaPass && alphaBatchQueue)
+                if (!baseOrAlphaPass && hasAlphaPass)
                 {
                     isAlpha = true;
-                    baseOrAlphaQueue = alphaBatchQueue;
                     baseOrAlphaPass = tech->GetSupportedPass(alphaPassIndex_);
                 }
 
@@ -1287,11 +1286,9 @@ void View::CookBatches()
                         destBatch.lightMask_ = cutLightMask;
                         destBatch.pass_ = baseOrAlphaPass;
 
-                        destInfo.queue_ = baseBatchQueue;
-                        destInfo.allowInstancing_ = basePassInfo->allowInstancing_
+                        const bool allowInstancing = basePassInfo->allowInstancing_
                             && (!basePassInfo->markToStencil_ || drawableHasSimpleMask);
-
-                        batches_.Push(destBatch, destInfo);
+                        batchCollector_->AddScenePassBatch(0, basePassIndex_, destBatch, allowInstancing);
                     }
 
                     // Apply other lights
@@ -1315,14 +1312,8 @@ void View::CookBatches()
                         }
                     }
                 }
-                else if (alphaBatchQueue)
+                else if (hasAlphaPass)
                 {
-                    // Alpha batches are always put into alpha queue
-                    BatchDestinationInfo destInfo;
-                    destInfo.queue_ = alphaBatchQueue;
-                    destInfo.technique_ = tech;
-                    destInfo.allowInstancing_ = false;
-
                     // Add base or litbase batch
                     // TODO(eugeneko) Why isBase is true for "alpha", but false for "litbase"? Same for light mask.
                     if (allowLitBaseForBatch)
@@ -1335,7 +1326,7 @@ void View::CookBatches()
                         destBatch.lightMask_ = 0;
                         destBatch.pass_ = litBaseOrAlphaPass;
 
-                        batches_.Push(destBatch, destInfo);
+                        batchCollector_->AddScenePassBatch(0, alphaPassIndex_, destBatch, false);
                     }
                     else
                     {
@@ -1346,7 +1337,7 @@ void View::CookBatches()
                         destBatch.lightMask_ = cutLightMask;
                         destBatch.pass_ = baseOrAlphaPass;
 
-                        batches_.Push(destBatch, destInfo);
+                        batchCollector_->AddScenePassBatch(0, alphaPassIndex_, destBatch, false);
                     }
 
                     // Apply other lights
@@ -1363,7 +1354,7 @@ void View::CookBatches()
                             destBatch.lightMask_ = 0;
                             destBatch.pass_ = lightPass;
 
-                            batches_.Push(destBatch, destInfo);
+                            batchCollector_->AddScenePassBatch(0, alphaPassIndex_, destBatch, false);
                         }
                     }
                 }
@@ -1371,15 +1362,15 @@ void View::CookBatches()
         }
     }
 
-    // Demultiplex batches
     {
-        URHO3D_PROFILE(DemultiplexBatches);
-        for (unsigned i = 0; i < batches_.Size(); ++i)
-        {
-            BatchDestinationInfo destInfo = batches_.dest_[i];
-            AddBatchToQueue(*destInfo.queue_, batches_.batches_[i], destInfo.technique_, destInfo.allowInstancing_,
-                destInfo.queue_ != alphaBatchQueue || allowAlphaShadows);
-        }
+        URHO3D_PROFILE(ComposeBatches);
+        batchCollector_->MergeThreadedResults();
+        batchCollector_->FillBatchQueues();
+    }
+
+    {
+        URHO3D_PROFILE(FinalizeBatches);
+        batchCollector_->FinalizeBatches(alphaPassIndex_);
     }
 }
 
