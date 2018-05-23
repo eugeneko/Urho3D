@@ -373,6 +373,7 @@ bool View::Define(RenderSurface* renderTarget, Viewport* viewport)
         maxOccluderTriangles_ = 0;
 
     // Initialize drawable processor
+    sceneGrid_ = octree_->sceneGrid_.Get();
     drawableProcessor_ = octree_->drawableProcessor_.Get();
     // TODO(eugeneko) This re-creation sucks
     if (!batchCollector_)
@@ -400,7 +401,7 @@ void View::Update(const FrameInfo& frame)
     SendViewEvent(E_BEGINVIEWUPDATE);
 
     // Clear buffers, geometry, light, occluder & batch list
-    batchCollector_->Clear(frame_.frameNumber_);
+    batchCollector_->Clear(cullCamera_, frame_.frameNumber_);
     renderTargets_.Clear();
     geometries_.Clear();
     lights_.Clear();
@@ -421,9 +422,25 @@ void View::Update(const FrameInfo& frame)
 
 //     drawableProcessor_->PrepareForThreading(GetSubsystem<WorkQueue>());
 //     drawableProcessor_->UpdateDirtyDrawables();
-    drawableProcessor_->Update(GetSubsystem<WorkQueue>(), this);
-    GetDrawables();
-    GetBatches();
+
+//     drawableProcessor_->Update(GetSubsystem<WorkQueue>(), this);
+//     GetDrawables();
+//     GetBatches();
+
+    {
+        URHO3D_PROFILE(UpdateDirtyDrawables);
+        sceneGrid_->UpdateDirtyDrawables();
+        sceneGrid_->ClearTemporaryData();
+    }
+
+    {
+        URHO3D_PROFILE(GetDrawables);
+        batchCollector_->CollectZonesAndOccluders(sceneGrid_);
+        batchCollector_->ProcessZones();
+        batchCollector_->CollectGeometriesAndLights(sceneGrid_, nullptr);
+    }
+
+
 
     renderer_->StorePreparedView(this, cullCamera_);
 
@@ -833,6 +850,7 @@ void View::CookBatches()
 {
     URHO3D_PROFILE(CookBatches);
 
+#if 0
     {
         URHO3D_PROFILE(TEMP_CollectArrays);
 
@@ -862,6 +880,7 @@ void View::CookBatches()
             }
         }
     }
+#endif
 
     {
         URHO3D_PROFILE(SortGeometries);

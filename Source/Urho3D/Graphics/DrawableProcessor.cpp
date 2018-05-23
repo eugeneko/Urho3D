@@ -39,7 +39,7 @@
 namespace Urho3D
 {
 
-void LightProcessor::SetupDirLightShadowCamera(Camera* cullCamera, const SceneQueryGeometriesAndLightsResult& visibleGeometries,
+void LightProcessor::SetupDirLightShadowCamera(Camera* cullCamera, const OldSceneQueryGeometriesAndLightsResult& visibleGeometries,
     Camera* shadowCamera, Light* light, float nearSplit, float farSplit)
 {
     Node* shadowCameraNode = shadowCamera->GetNode();
@@ -158,7 +158,7 @@ void LightProcessor::QuantizeDirLightShadowCamera(Camera* shadowCamera, Light* l
 }
 
 void LightProcessor::SetupShadowCameras(Renderer* renderer, Camera* cullCamera,
-    const SceneQueryGeometriesAndLightsResult& visibleGeometries, LightProcessingResult& query)
+    const OldSceneQueryGeometriesAndLightsResult& visibleGeometries, LightProcessingResult& query)
 {
     Light* light = query.light_;
 

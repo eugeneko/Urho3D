@@ -293,12 +293,32 @@ struct SceneGridDrawableSoA
     unsigned size_{};
     DrawableVector drawable_;
     Vector<StringHash> drawableType_;
+    Vector<bool> visible_;
+    Vector<unsigned> numLights_;
+    Vector<unsigned> firstLight_;
 
     bool IsValid() const
     {
         return size_ == drawable_.Size()
             && size_ == drawableType_.Size()
+            && size_ == visible_.Size()
+            && size_ == numLights_.Size()
+            && size_ == firstLight_.Size()
             ;
+    }
+    // TODO(eugeneko) remove me
+    void ClearVisible()
+    {
+        ClearTemporary();
+    }
+    void ClearTemporary()
+    {
+        for (unsigned i = 0; i < size_; ++i)
+        {
+            visible_[i] = false;
+            numLights_[i] = 0;
+            firstLight_[i] = 0;
+        }
     }
     void Push(Drawable* drawable)
     {
@@ -306,6 +326,9 @@ struct SceneGridDrawableSoA
 
         drawable_.Push(drawable);
         drawableType_.Push(drawable->GetType());
+        visible_.Push(false);
+        numLights_.Push(0);
+        firstLight_.Push(0);
 
         assert(IsValid());
     }
@@ -322,6 +345,9 @@ struct SceneGridDrawableSoA
 
         drawable_.EraseSwap(index);
         drawableType_.EraseSwap(index);
+        visible_.EraseSwap(index);
+        numLights_.EraseSwap(index);
+        firstLight_.EraseSwap(index);
 
         assert(IsValid());
     }
@@ -331,6 +357,9 @@ struct SceneGridDrawableSoA
 
         drawable_.Clear();
         drawableType_.Clear();
+        visible_.Clear();
+        numLights_.Clear();
+        firstLight_.Clear();
 
         assert(IsValid());
     }
@@ -425,6 +454,11 @@ public:
     {
         for (SceneGridCell& cell : cells_)
             UpdateDirtyDrawablesInCell(cell);
+    }
+    /// Reset all temporary marks.
+    void ClearTemporaryData()
+    {
+        drawablesData_.ClearTemporary();
     }
     /// Remove all drawables.
     void RemoveAllDrawables()
@@ -568,6 +602,8 @@ public:
             cell.data_.MarkZonesDirty();
     }
 
+    /// Get global data.
+    SceneGridDrawableSoA& GetGlobalData() { return drawablesData_; }
     /// Get default cell.
     SceneGridCell* GetDefaultCell() { return &cells_[numCells_ - 1]; }
     /// Find cell for specified bounding box.
@@ -654,6 +690,11 @@ struct SceneQueryZonesAndOccludersResult
         occluders_.Clear();
         zones_.Clear();
     }
+    void Append(const SceneQueryZonesAndOccludersResult& other)
+    {
+        occluders_.Push(other.occluders_);
+        zones_.Push(other.zones_);
+    }
     void Merge(Vector<SceneQueryZonesAndOccludersResult>& array)
     {
         Clear();
@@ -674,6 +715,26 @@ struct SceneQueryZonesAndOccludersResult
 };
 
 struct SceneQueryGeometriesAndLightsResult
+{
+    LightVector lights_;
+    float minZ_{};
+    float maxZ_{};
+    void Clear()
+    {
+        lights_.Clear();
+        minZ_ = M_INFINITY;
+        maxZ_ = 0.0f;
+    }
+    void Append(const SceneQueryGeometriesAndLightsResult& other)
+    {
+        lights_.Push(other.lights_);
+
+        minZ_ = Min(minZ_, other.minZ_);
+        maxZ_ = Max(maxZ_, other.maxZ_);
+    }
+};
+
+struct OldSceneQueryGeometriesAndLightsResult
 {
     LightVector lights_;
 
@@ -718,12 +779,12 @@ struct SceneQueryGeometriesAndLightsResult
 
         assert(IsValid());
     }
-    void Merge(Vector<SceneQueryGeometriesAndLightsResult>& array)
+    void Merge(Vector<OldSceneQueryGeometriesAndLightsResult>& array)
     {
         Clear();
         if (array.Size() > 1)
         {
-            for (SceneQueryGeometriesAndLightsResult& result : array)
+            for (OldSceneQueryGeometriesAndLightsResult& result : array)
             {
                 lights_.Push(result.lights_);
 
@@ -761,6 +822,7 @@ struct SceneQueryGeometriesAndLightsResult
     }
 };
 
+// TODO(eugeneko) Rename
 struct ViewCookedZonesData
 {
     bool cameraZoneOverride_{};
@@ -874,14 +936,14 @@ public:
         sceneGrid->QueryCellsInFrustum(frustum, GetSceneQueryThreshold(), numThreads, geometriesAndLightsQuery_);
 
         geometriesAndLightsThreadResults_.Resize(numThreads);
-        for (SceneQueryGeometriesAndLightsResult& result : geometriesAndLightsThreadResults_)
+        for (OldSceneQueryGeometriesAndLightsResult& result : geometriesAndLightsThreadResults_)
             result.Clear();
 
         zonesAndOccludersQuery_.ScheduleWork(workQueue,
             [=](SceneGridCellRef& cellRef, unsigned threadIndex)
         {
             SceneGridCellDrawableSoA& data = *cellRef.data_;
-            SceneQueryGeometriesAndLightsResult& result = geometriesAndLightsThreadResults_[threadIndex];
+            OldSceneQueryGeometriesAndLightsResult& result = geometriesAndLightsThreadResults_[threadIndex];
 
             // TODO(eugeneko) Process lights here
             for (unsigned index = cellRef.beginIndex_; index < cellRef.endIndex_; ++index)
@@ -1006,7 +1068,7 @@ public:
         for (Light* light : lights)
         {
             light->SetIntensitySortValue(cullCamera->GetDistance(light->GetNode()->GetWorldPosition()));
-            light->SetLightQueue(nullptr);
+//             light->SetLightQueue(nullptr);
         }
 
         Sort(lights.Begin(), lights.End(), CompareLights);
@@ -1031,7 +1093,7 @@ public:
     }
 
     const SceneQueryZonesAndOccludersResult& GetZonesAndOccluders() const { return zonesAndOccluders_; }
-    const SceneQueryGeometriesAndLightsResult& GetGeometriesAndLights() const { return geometriesAndLights_; }
+    const OldSceneQueryGeometriesAndLightsResult& GetGeometriesAndLights() const { return geometriesAndLights_; }
     const ViewCookedZonesData& GetCookedZonesData() const { return zonesData_; }
     const ZoneVector& GetZones() const { return zonesAndOccluders_.zones_; }
     const DrawableVector& GetOccluders() const { return zonesAndOccluders_.occluders_; }
@@ -1097,8 +1159,8 @@ private:
     ViewCookedZonesData zonesData_;
 
     SceneGridQueryResult geometriesAndLightsQuery_;
-    Vector<SceneQueryGeometriesAndLightsResult> geometriesAndLightsThreadResults_;
-    SceneQueryGeometriesAndLightsResult geometriesAndLights_;
+    Vector<OldSceneQueryGeometriesAndLightsResult> geometriesAndLightsThreadResults_;
+    OldSceneQueryGeometriesAndLightsResult geometriesAndLights_;
 
     ViewProcessorDrawableSoA drawablesData_;
 };
@@ -1291,7 +1353,7 @@ public:
             lights_.Push(light, drawShadows);
     }
     virtual void QueryLitAndShadowGeometries(WorkQueue* workQueue, Renderer* renderer, Camera* cullCamera,
-        const SceneQueryGeometriesAndLightsResult& visibleGeometries, const SceneGridCellDrawableSoA& sceneData)
+        const OldSceneQueryGeometriesAndLightsResult& visibleGeometries, const SceneGridCellDrawableSoA& sceneData)
     {
         const unsigned numThreads = workQueue->GetNumThreads() + 1;
 
@@ -1340,9 +1402,9 @@ public:
 public:
     /// Set up initial shadow camera view(s).
     static void SetupShadowCameras(Renderer* renderer, Camera* cullCamera,
-        const SceneQueryGeometriesAndLightsResult& visibleGeometries, LightProcessingResult& query);
+        const OldSceneQueryGeometriesAndLightsResult& visibleGeometries, LightProcessingResult& query);
     /// Set up a directional light shadow camera.
-    static void SetupDirLightShadowCamera(Camera* cullCamera, const SceneQueryGeometriesAndLightsResult& visibleGeometries,
+    static void SetupDirLightShadowCamera(Camera* cullCamera, const OldSceneQueryGeometriesAndLightsResult& visibleGeometries,
         Camera* shadowCamera, Light* light, float nearSplit, float farSplit);
     /// Quantize a directional light shadow camera view to eliminate swimming.
     static void QuantizeDirLightShadowCamera(Camera* shadowCamera, Light* light, const IntRect& shadowViewport, const BoundingBox& viewBox);

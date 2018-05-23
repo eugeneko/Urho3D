@@ -24,6 +24,7 @@
 
 #include "../Core/Object.h"
 #include "../Graphics/Batch.h"
+#include "../Graphics/DrawableProcessor.h"
 #include "../Container/HashMap.h"
 // #include "../Container/List.h"
 // #include "../Graphics/Batch.h"
@@ -37,61 +38,6 @@ namespace Urho3D
 struct ScenePassInfo;
 class Renderer;
 class WorkQueue;
-
-// TODO(eugeneko) This is stub, replace after SceneGrid integration
-struct SceneGridDrawableSoA
-{
-    unsigned size_{};
-    Vector<Drawable*> drawable_;
-    Vector<StringHash> drawableType_;
-    Vector<bool> visible_;
-    Vector<unsigned> numLights_;
-    Vector<unsigned> firstLight_;
-
-    bool IsValid() const
-    {
-        return size_ == drawable_.Size()
-            && size_ == drawableType_.Size()
-            && size_ == visible_.Size()
-            && size_ == numLights_.Size()
-            && size_ == firstLight_.Size()
-            ;
-    }
-    void ClearVisible()
-    {
-        for (unsigned i = 0; i < size_; ++i)
-            visible_[i] = false;
-    }
-    void ClearTemporary()
-    {
-        for (unsigned i = 0; i < size_; ++i)
-        {
-            numLights_[i] = 0;
-            firstLight_[i] = 0;
-        }
-    }
-    void Push(Drawable* drawable)
-    {
-        ++size_;
-
-        drawable_.Push(drawable);
-        drawableType_.Push(drawable->GetType());
-        visible_.Push(false);
-        numLights_.Push(0);
-        firstLight_.Push(0);
-
-        assert(IsValid());
-    }
-    void EraseSwap(unsigned index)
-    {
-        assert(0);
-    }
-    void Clear()
-    {
-        assert(0);
-    }
-
-};
 
 struct LitGeometryDescIdx
 {
@@ -181,7 +127,13 @@ public:
     void Initialize(bool threading, const PODVector<ScenePassInfo>& scenePasses);
 
     /// Clear the state before processing the frame.
-    void Clear(unsigned frameNumber);
+    void Clear(Camera* cullCamera, unsigned frameNumber);
+    /// Collect zones and occluders.
+    void CollectZonesAndOccluders(SceneGrid* sceneGrid);
+    /// Process zones.
+    void ProcessZones();
+    /// Collect geometries and lights.
+    void CollectGeometriesAndLights(SceneGrid* sceneGrid, OcclusionBuffer* occlusionBuffer);
     /// Process lights. Lights shall be ordered according to lightIndex.
     void ProcessLights(const PODVector<Light*>& lights);
     /// Collect visible geometries.
@@ -219,6 +171,10 @@ public:
 
     /// Return whether the calculations are threaded.
     bool IsThreaded() const { return threading_; }
+    /// Return whether there are active zones.
+    bool HasActiveZones() const { return !zonesAndOccluders_[0].zones_.Empty(); }
+    /// Get all active zones.
+    const Vector<Zone*>& GetActiveZones() const { return zonesAndOccluders_[0].zones_; }
     /// Get all light batch queues. Indexed via lightIndex. Not null.
     const Vector<LightBatchQueue*>& GetLightBatchQueues() const { return lightBatchQueues_; }
     /// Return whether there is any light batch queue.
@@ -240,18 +196,59 @@ private:
         lightBatchQueuePool_.Emplace(MakeUnique<LightBatchQueue>());
         return lightBatchQueuePool_.Back().Get();
     }
+    template <class T> void ClearVector(T& vector)
+    {
+        for (auto& item : vector)
+            item.Clear();
+    }
+    template <class T> void AppendVectorToFirst(T& vector)
+    {
+        for (unsigned i = 1; i < vector.Size(); ++i)
+            vector[0].Append(vector[i]);
+    }
     void ProcessLight(unsigned lightIndex);
     void FinalizeBatchQueue(BatchQueue& queue, bool allowShadows);
     void FinalizeBatch(Batch& batch, bool allowShadows, const BatchQueue& queue);
     void FinalizeBatchGroup(BatchGroup& batchGroup, bool allowShadows, const BatchQueue& queue);
 
 private:
+    /// Update drawable zone
+    static void UpdateDirtyZone(const Vector<Zone*>& zones, SceneGridCellDrawableSoA& cellData, unsigned index,
+        unsigned viewMask, const Frustum& frustum);
+
+private:
+    /// @name Constants since initialization
+    /// @{
+
     Renderer* renderer_{};
     WorkQueue* workQueue_{};
     bool threading_{};
     unsigned maxScenePassIndex_{};
     unsigned numThreads_{};
     unsigned maxSortedInstances_{};
+
+    /// @}
+
+private:
+    /// Per-frame constants
+    /// @{
+
+    Camera* cullCamera_{};
+    unsigned viewMask_{};
+    unsigned frustumQueryThreadingThreshold_{ 32 };
+
+    /// @}
+
+    /// Scene query for zones and occluders.
+    SceneGridQueryResult zonesAndOccludersQuery_;
+    /// Temporary buffer for visible zones and occluders. Size is equal to number of threads.
+    Vector<SceneQueryZonesAndOccludersResult> zonesAndOccluders_;
+    /// Processed zone data.
+    ViewCookedZonesData zonesData_;
+    /// Scene query for geometries and lights.
+    SceneGridQueryResult geometriesAndLightsQuery_;
+    /// Temporary buffer for visible geometries and lights. Size is equal to number of threads.
+    Vector<SceneQueryGeometriesAndLightsResult> geometriesAndLights_;
 
     /// Persistent mapping for light batch queues.
     HashMap<Light*, LightBatchQueue*> lightBatchQueueMap_;

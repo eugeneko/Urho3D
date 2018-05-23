@@ -315,9 +315,6 @@ private:
     /// Octree to use.
     Octree* octree_{};
 
-    /// Drawable processor.
-    DrawableProcessor* drawableProcessor_{};
-
     /// Viewport (rendering) camera.
     Camera* camera_{};
     /// Culling camera. Usually same as the viewport camera.
@@ -432,8 +429,12 @@ private:
     /// Flag for scene being resolved from the backbuffer.
     bool usedResolve_{};
 
+    /// Scene grid.
+    SceneGrid* sceneGrid_;
     /// Batch collector.
     SharedPtr<BatchCollector> batchCollector_;
+    /// Drawable processor.
+    DrawableProcessor* drawableProcessor_{};
 };
 
 }

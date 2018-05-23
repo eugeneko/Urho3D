@@ -164,11 +164,16 @@ BatchCollector::BatchCollector(Context* context)
 
 void BatchCollector::Initialize(bool threading, const PODVector<ScenePassInfo>& scenePasses)
 {
+    // Calculate constants
     threading_ = threading && workQueue_->GetNumThreads() > 0;
     numThreads_ = threading_ ? workQueue_->GetNumThreads() + 1 : 1;
     perThreadData_.Resize(numThreads_);
 
     maxSortedInstances_ = static_cast<unsigned>(renderer_->GetMaxSortedInstances());
+
+    // Allocate query storages
+    zonesAndOccluders_.Resize(numThreads_);
+    geometriesAndLights_.Resize(numThreads_);
 
     // Calculate max scene pass
     maxScenePassIndex_ = 0;
@@ -193,13 +198,203 @@ void BatchCollector::Initialize(bool threading, const PODVector<ScenePassInfo>& 
     }
 }
 
-void BatchCollector::Clear(unsigned frameNumber)
+void BatchCollector::Clear(Camera* cullCamera, unsigned frameNumber)
 {
+    cullCamera_ = cullCamera;
+    viewMask_ = cullCamera->GetViewMask();
+
     lights_.Clear();
     visibleGeometries_.Clear();
     litGeometries_.Clear();
     for (BatchCollectorPerThreadData& perThread : perThreadData_)
         perThread.ShallowClear();
+}
+
+void BatchCollector::CollectZonesAndOccluders(SceneGrid* sceneGrid)
+{
+    const Frustum frustum = cullCamera_->GetFrustum();
+
+    sceneGrid->QueryCellsInFrustum(frustum, frustumQueryThreadingThreshold_, numThreads_, zonesAndOccludersQuery_);
+    ClearVector(zonesAndOccluders_);
+
+    zonesAndOccludersQuery_.ScheduleWork(workQueue_,
+        [=](SceneGridCellRef& cellRef, unsigned threadIndex)
+    {
+        SceneGridCellDrawableSoA& cell = *cellRef.data_;
+        SceneQueryZonesAndOccludersResult& result = zonesAndOccluders_[threadIndex];
+        for (unsigned index = cellRef.beginIndex_; index < cellRef.endIndex_; ++index)
+        {
+            if (!cell.MatchViewMask(index, viewMask_))
+                continue;
+
+            Drawable* drawable = cell.drawable_[index];
+
+            // TODO(eugeneko) Get rid of branching
+            if (cell.IsZone(index))
+            {
+                result.zones_.Push(static_cast<Zone*>(drawable));
+            }
+            else if (cell.IsGeometry(index) && cell.occluder_[index])
+            {
+                if (cellRef.intersection_ == INSIDE || cell.IsInFrustum(index, frustum))
+                    result.occluders_.Push(drawable);
+            }
+        }
+    });
+
+    workQueue_->Complete(M_MAX_UNSIGNED);
+    AppendVectorToFirst(zonesAndOccluders_);
+}
+
+void BatchCollector::ProcessZones()
+{
+    Zone* defaultZone = renderer_->GetDefaultZone();
+
+    ZoneVector& zones = zonesAndOccluders_[0].zones_;
+    zonesData_.cameraZoneOverride_ = false;
+    zonesData_.cameraZone_ = nullptr;
+    zonesData_.farClipZone_ = nullptr;
+
+    // Sort zones
+    Sort(zones.Begin(), zones.End(),
+        [](Zone* lhs, Zone* rhs) { return lhs->GetPriority() > rhs->GetPriority(); });
+
+    // Find camera and far clip zones
+    Node* cullCameraNode = cullCamera_->GetNode();
+    const Vector3 cameraPos = cullCameraNode->GetWorldPosition();
+    const Vector3 farClipPos = cameraPos + cullCameraNode->GetWorldDirection() * Vector3(0.0f, 0.0f, cullCamera_->GetFarClip());
+    for (Zone* zone : zones)
+    {
+        if (!zonesData_.cameraZone_ && zone->IsInside(cameraPos))
+            zonesData_.cameraZone_ = zone;
+        if (!zonesData_.farClipZone_ && zone->IsInside(farClipPos))
+            zonesData_.farClipZone_ = zone;
+        if (zonesData_.cameraZone_ && zonesData_.farClipZone_)
+            break;
+    }
+
+    if (!zonesData_.cameraZone_)
+        zonesData_.cameraZone_ = defaultZone;
+
+    if (!zonesData_.farClipZone_)
+        zonesData_.farClipZone_ = defaultZone;
+}
+
+void BatchCollector::CollectGeometriesAndLights(SceneGrid* sceneGrid, OcclusionBuffer* occlusionBuffer)
+{
+    const Frustum frustum = cullCamera_->GetFrustum();
+
+    sceneGrid->QueryCellsInFrustum(frustum, frustumQueryThreadingThreshold_, numThreads_, geometriesAndLightsQuery_);
+
+    const unsigned viewMask = cullCamera_->GetViewMask();
+    const Matrix3x4 viewMatrix = cullCamera_->GetView();
+    const Vector3 viewZ = Vector3(viewMatrix.m20_, viewMatrix.m21_, viewMatrix.m22_);
+    const Vector3 absViewZ = viewZ.Abs();
+    const unsigned cameraZoneLightMask = zonesData_.cameraZone_->GetLightMask();
+    const unsigned cameraZoneShadowMask = zonesData_.cameraZone_->GetShadowMask();
+
+    ClearVector(geometriesAndLights_);
+
+    zonesAndOccludersQuery_.ScheduleWork(workQueue_,
+        [=](SceneGridCellRef& cellRef, unsigned threadIndex)
+    {
+        SceneGridCellDrawableSoA& cell = *cellRef.data_;
+        SceneQueryGeometriesAndLightsResult& result = geometriesAndLights_[threadIndex];
+
+        // TODO(eugeneko) Process lights here
+        for (unsigned index = cellRef.beginIndex_; index < cellRef.endIndex_; ++index)
+        {
+            Vector<bool>& resultVisible = sceneGrid->GetGlobalData().visible_;
+
+            // Discard drawables from other views
+            if (!cell.MatchViewMask(index, viewMask))
+                continue;
+
+            // Discard drawables except lights and geometries
+            const bool isGeometry = cell.IsGeometry(index);
+            const bool isLigth = cell.IsLight(index);
+            if (!isGeometry && !isLigth)
+                continue;
+
+            // Discard invisible
+            if (cellRef.intersection_ == INTERSECTS && !cell.IsInFrustum(index, frustum))
+                continue;
+
+            // Calculate drawable distance
+            const float drawDistance = cell.drawDistance_[index];
+            const float distance = cullCamera_->GetDistance(cell.boundingSphere_[index].center_);
+
+            // Discard if drawable is too far
+            if (drawDistance > 0.0f && distance > drawDistance)
+                continue;
+
+            // Discard using occlusion buffer
+            if (cell.IsOccludedByBuffer(index, occlusionBuffer))
+                continue;
+
+            // Update drawable zone
+            Drawable* drawable = cell.drawable_[index];
+            if (isGeometry)
+            {
+                if (!zonesData_.cameraZoneOverride_ && HasActiveZones())
+                {
+                    UpdateDirtyZone(GetActiveZones(), cell, index, viewMask, frustum);
+                }
+
+                // Update min and max Z
+                float minZ = M_LARGE_VALUE;
+                float maxZ = M_LARGE_VALUE;
+
+                const BoundingBox& boundingBox = cell.boundingBox_[index];
+                const Vector3 center = boundingBox.Center();
+                const Vector3 edge = boundingBox.Size() * 0.5f;
+
+                // Do not add "infinite" objects like skybox to prevent shadow map focusing behaving erroneously
+                if (edge.LengthSquared() < M_LARGE_VALUE * M_LARGE_VALUE)
+                {
+                    const float viewCenterZ = viewZ.DotProduct(center) + viewMatrix.m23_;
+                    const float viewEdgeZ = absViewZ.DotProduct(edge);
+                    minZ = viewCenterZ - viewEdgeZ;
+                    maxZ = viewCenterZ + viewEdgeZ;
+                    result.minZ_ = Min(result.minZ_, minZ);
+                    result.maxZ_ = Max(result.maxZ_, maxZ);
+                }
+
+                // Get actual zone
+                Zone* cachedZone = cell.cachedZone_[index];
+                Zone* actualZone = cachedZone;
+                unsigned zoneLightMask = cell.cachedZoneLightMask_[index];
+                unsigned zoneShadowMask = cell.cachedZoneShadowMask_[index];
+
+                if (zonesData_.cameraZoneOverride_ || !cachedZone)
+                {
+                    actualZone = zonesData_.cameraZone_;
+                    zoneLightMask = cameraZoneLightMask;
+                    zoneShadowMask = cameraZoneShadowMask;
+                }
+
+                // Get masks
+                const unsigned drawableLightMask = cell.lightMask_[index];
+                const unsigned drawableShadowMask = cell.shadowMask_[index];
+
+                // Mask object as visible
+
+                const unsigned gridIndex = drawable->GetDrawableIndex().gridIndex_;
+                resultVisible[gridIndex] = true;
+                // TODO(eugeneko) Get rid of drawable access
+            }
+            else //if (isLight)
+            {
+                result.lights_.Push(static_cast<Light*>(drawable));
+            }
+        }
+    });
+
+    workQueue_->Complete(M_MAX_UNSIGNED);
+
+    AppendVectorToFirst(geometriesAndLights_);
+    if (geometriesAndLights_[0].minZ_ == M_INFINITY)
+        geometriesAndLights_[0].minZ_ = 0.0f;
 }
 
 void BatchCollector::ProcessLights(const PODVector<Light*>& lights)
@@ -502,6 +697,54 @@ void BatchCollector::FinalizeBatchGroup(BatchGroup& batchGroup, bool allowShadow
 
     // Finalize as batch
     FinalizeBatch(batchGroup, allowShadows, queue);
+}
+
+void BatchCollector::UpdateDirtyZone(const Vector<Zone*>& zones, SceneGridCellDrawableSoA& cellData, unsigned index,
+    unsigned viewMask, const Frustum& frustum)
+{
+    const Vector3 drawableCenter = cellData.boundingSphere_[index].center_;
+
+    Zone* cachedZone = cellData.cachedZone_[index];
+    const bool cachedZoneDirty = cellData.cachedZoneDirty_[index];
+    const unsigned cachedZoneViewMask = cellData.cachedZoneViewMask_[index];
+
+    // TODO(eugeneko) Is branch is not optimized for multiple zones
+    if (cachedZoneDirty || !cachedZone || !(cachedZoneViewMask & viewMask))
+    {
+        // Find new zone
+        const bool temporary = !cellData.IsCenterInFrustum(index, frustum);
+        const int highestZonePriority = zones.Empty() ? M_MIN_INT : zones[0]->GetPriority();
+
+        Zone* newZone = nullptr;
+
+        // First check if the current zone remains a conclusive result
+        if (cachedZone && (cachedZone->GetViewMask() & viewMask)
+            && cachedZone->GetPriority() >= highestZonePriority
+            && (cellData.zoneMask_[index] & cachedZone->GetZoneMask())
+            && cachedZone->IsInside(drawableCenter))
+        {
+            newZone = cachedZone;
+        }
+        else
+        {
+            // Search for appropriate zone
+            for (Zone* zone : zones)
+            {
+                if ((cellData.zoneMask_[index] & zone->GetZoneMask()) && zone->IsInside(drawableCenter))
+                {
+                    newZone = zone;
+                    break;
+                }
+            }
+        }
+
+        // Setup new zone
+        cellData.cachedZoneDirty_[index] = temporary;
+        cellData.cachedZone_[index] = newZone;
+        cellData.cachedZoneViewMask_[index] = newZone->GetViewMask();
+        cellData.cachedZoneLightMask_[index] = newZone->GetLightMask();
+        cellData.cachedZoneShadowMask_[index] = newZone->GetShadowMask();
+    }
 }
 
 }
