@@ -149,6 +149,21 @@ struct BatchGroup : public Batch
     /// Destruct.
     ~BatchGroup() = default;
 
+    /// Return whether the group is empty.
+    bool IsEmpty() const { return instances_.Empty(); }
+
+    /// Clear group data.
+    void Clear()
+    {
+        instances_.Clear();
+    }
+
+    /// Reset batch fields.
+    void ResetBatch(const Batch& batch)
+    {
+        Batch::operator =(batch);
+    }
+
     /// Add world transform(s) from a batch.
     void AddTransforms(const Batch& batch)
     {
@@ -242,7 +257,8 @@ public:
     unsigned GetNumInstances() const;
 
     /// Return whether the batch group is empty.
-    bool IsEmpty() const { return batches_.Empty() && batchGroups_.Empty(); }
+    // TODO(eugeneko) Remove this hack and split these two guys
+    bool IsEmpty() const { return batches_.Empty() && batchGroups_.Empty() && sortedBatches_.Empty() && sortedBatchGroups_.Empty(); }
 
     /// Instanced draw calls.
     HashMap<BatchGroupKey, BatchGroup> batchGroups_;

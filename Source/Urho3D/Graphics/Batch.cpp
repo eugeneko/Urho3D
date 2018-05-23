@@ -722,33 +722,45 @@ void BatchQueue::Clear(int maxSortedInstances)
     batches_.Clear();
     sortedBatches_.Clear();
     batchGroups_.Clear();
+    sortedBatchGroups_.Clear();
     maxSortedInstances_ = (unsigned)maxSortedInstances;
 }
 
 void BatchQueue::SortBackToFront()
 {
-    sortedBatches_.Resize(batches_.Size());
+    // TODO(eugeneko) Remove these hacks
+    if (sortedBatches_.Empty())
+    {
+        sortedBatches_.Resize(batches_.Size());
 
-    for (unsigned i = 0; i < batches_.Size(); ++i)
-        sortedBatches_[i] = &batches_[i];
+        for (unsigned i = 0; i < batches_.Size(); ++i)
+            sortedBatches_[i] = &batches_[i];
+    }
 
     Sort(sortedBatches_.Begin(), sortedBatches_.End(), CompareBatchesBackToFront);
 
-    sortedBatchGroups_.Resize(batchGroups_.Size());
+    // TODO(eugeneko) Remove these hacks
+    if (sortedBatchGroups_.Empty())
+    {
+        sortedBatchGroups_.Resize(batchGroups_.Size());
 
-    unsigned index = 0;
-    for (HashMap<BatchGroupKey, BatchGroup>::Iterator i = batchGroups_.Begin(); i != batchGroups_.End(); ++i)
-        sortedBatchGroups_[index++] = &i->second_;
+        unsigned index = 0;
+        for (HashMap<BatchGroupKey, BatchGroup>::Iterator i = batchGroups_.Begin(); i != batchGroups_.End(); ++i)
+            sortedBatchGroups_[index++] = &i->second_;
+    }
 
     Sort(sortedBatchGroups_.Begin(), sortedBatchGroups_.End(), CompareBatchGroupOrder);
 }
 
 void BatchQueue::SortFrontToBack()
 {
-    sortedBatches_.Clear();
+    if (sortedBatches_.Empty())
+    {
+        sortedBatches_.Clear();
 
-    for (unsigned i = 0; i < batches_.Size(); ++i)
-        sortedBatches_.Push(&batches_[i]);
+        for (unsigned i = 0; i < batches_.Size(); ++i)
+            sortedBatches_.Push(&batches_[i]);
+    }
 
     SortFrontToBack2Pass(sortedBatches_);
 
@@ -770,11 +782,14 @@ void BatchQueue::SortFrontToBack()
         }
     }
 
-    sortedBatchGroups_.Resize(batchGroups_.Size());
+    if (sortedBatchGroups_.Empty())
+    {
+        sortedBatchGroups_.Resize(batchGroups_.Size());
 
-    unsigned index = 0;
-    for (HashMap<BatchGroupKey, BatchGroup>::Iterator i = batchGroups_.Begin(); i != batchGroups_.End(); ++i)
-        sortedBatchGroups_[index++] = &i->second_;
+        unsigned index = 0;
+        for (HashMap<BatchGroupKey, BatchGroup>::Iterator i = batchGroups_.Begin(); i != batchGroups_.End(); ++i)
+            sortedBatchGroups_[index++] = &i->second_;
+    }
 
     SortFrontToBack2Pass(reinterpret_cast<PODVector<Batch*>& >(sortedBatchGroups_));
 }
@@ -841,8 +856,17 @@ void BatchQueue::SortFrontToBack2Pass(PODVector<Batch*>& batches)
 
 void BatchQueue::SetInstancingData(void* lockedData, unsigned stride, unsigned& freeIndex)
 {
-    for (HashMap<BatchGroupKey, BatchGroup>::Iterator i = batchGroups_.Begin(); i != batchGroups_.End(); ++i)
-        i->second_.SetInstancingData(lockedData, stride, freeIndex);
+    // TODO(eugeneko) Remove hack
+    if (sortedBatchGroups_.Empty())
+    {
+        for (HashMap<BatchGroupKey, BatchGroup>::Iterator i = batchGroups_.Begin(); i != batchGroups_.End(); ++i)
+            i->second_.SetInstancingData(lockedData, stride, freeIndex);
+    }
+    else
+    {
+        for (BatchGroup* group : sortedBatchGroups_)
+            group->SetInstancingData(lockedData, stride, freeIndex);
+    }
 }
 
 void BatchQueue::Draw(View* view, Camera* camera, bool markToStencil, bool usingLightOptimization, bool allowDepthWrite) const
@@ -892,10 +916,19 @@ unsigned BatchQueue::GetNumInstances() const
 {
     unsigned total = 0;
 
-    for (HashMap<BatchGroupKey, BatchGroup>::ConstIterator i = batchGroups_.Begin(); i != batchGroups_.End(); ++i)
+    // TODO(eugeneko) Remove hack
+    if (sortedBatchGroups_.Empty())
     {
-        if (i->second_.geometryType_ == GEOM_INSTANCED)
-            total += i->second_.instances_.Size();
+        for (HashMap<BatchGroupKey, BatchGroup>::ConstIterator i = batchGroups_.Begin(); i != batchGroups_.End(); ++i)
+        {
+            if (i->second_.geometryType_ == GEOM_INSTANCED)
+                total += i->second_.instances_.Size();
+        }
+    }
+    else
+    {
+        for (BatchGroup* group : sortedBatchGroups_)
+            total += group->instances_.Size();
     }
 
     return total;

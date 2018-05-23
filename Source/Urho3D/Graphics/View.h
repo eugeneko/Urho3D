@@ -36,6 +36,7 @@ namespace Urho3D
 class DrawableProcessor;
 
 class Camera;
+class BatchCollector;
 class DebugRenderer;
 class Light;
 class Drawable;
@@ -97,8 +98,7 @@ struct ScenePassInfo
     bool markToStencil_;
     /// Vertex light flag.
     bool vertexLights_;
-    /// Batch queue.
-    BatchQueue* batchQueue_;
+
 };
 
 /// Per-thread geometry, light and scene range collection structure.
@@ -179,7 +179,8 @@ public:
     const PODVector<Light*>& GetLights() const { return lights_; }
 
     /// Return light batch queues.
-    const Vector<LightBatchQueue>& GetLightQueues() const { return lightQueues_; }
+    // TODO(eugeneko) Fix me
+//     const Vector<LightBatchQueue*>& GetLightQueues() const { return lightQueues_; }
 
     /// Return the last used software occlusion buffer.
     OcclusionBuffer* GetOcclusionBuffer() const { return occlusionBuffer_; }
@@ -212,10 +213,12 @@ private:
     void GetBatches();
     /// Get lit geometries and shadowcasters for visible lights.
     void ProcessLights();
+    /// Cook batches.
+    void CookBatches();
     /// Get batches from lit geometries and shadowcasters.
-    void GetLightBatches();
+    void GetLightBatches(bool stripped = false);
     /// Get unlit batches.
-    void GetBaseBatches();
+    void GetBaseBatches(bool stripped = false);
     /// Update geometries and sort batches.
     void UpdateGeometries();
     /// Get pixel lit batches for a certain light and drawable.
@@ -406,12 +409,8 @@ private:
     HashMap<StringHash, Texture*> renderTargets_;
     /// Info for scene render passes defined by the renderpath.
     PODVector<ScenePassInfo> scenePasses_;
-    /// Per-pixel light queues.
-    Vector<LightBatchQueue> lightQueues_;
     /// Per-vertex light queues.
     HashMap<unsigned long long, LightBatchQueue> vertexLightQueues_;
-    /// Batch queues by pass index.
-    HashMap<unsigned, BatchQueue> batchQueues_;
     /// Index of the GBuffer pass.
     unsigned gBufferPassIndex_{};
     /// Index of the opaque forward base pass.
@@ -432,6 +431,9 @@ private:
     const RenderPathCommand* passCommand_{};
     /// Flag for scene being resolved from the backbuffer.
     bool usedResolve_{};
+
+    /// Batch collector.
+    SharedPtr<BatchCollector> batchCollector_;
 };
 
 }

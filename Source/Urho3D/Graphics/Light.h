@@ -304,13 +304,8 @@ public:
     void SetIntensitySortValue(float distance);
     /// Set sort value based on overall intensity over a bounding box.
     void SetIntensitySortValue(const BoundingBox& box);
-    /// Set light queue used for this light. Called by View.
-    void SetLightQueue(LightBatchQueue* queue);
     /// Return light volume model transform.
     const Matrix3x4& GetVolumeTransform(Camera* camera);
-
-    /// Return light queue. Called by View.
-    LightBatchQueue* GetLightQueue() const { return lightQueue_; }
 
     /// Return a divisor value based on intensity for calculating the sort value.
     float GetIntensityDivisor(float attenuation = 1.0f) const
@@ -363,8 +358,6 @@ private:
     SharedPtr<Texture> rampTexture_;
     /// Spotlight attenuation texture.
     SharedPtr<Texture> shapeTexture_;
-    /// Light queue.
-    LightBatchQueue* lightQueue_;
     /// Specular intensity.
     float specularIntensity_;
     /// Brightness multiplier.

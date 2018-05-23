@@ -25,6 +25,7 @@
 #include "../Core/Profiler.h"
 #include "../Core/WorkQueue.h"
 #include "../Graphics/Camera.h"
+#include "../Graphics/BatchCollector.h"
 #include "../Graphics/DebugRenderer.h"
 #include "../Graphics/DrawableProcessor.h"
 #include "../Graphics/Geometry.h"
@@ -52,6 +53,8 @@
 #include "../UI/UI.h"
 
 #include "../DebugNew.h"
+
+static const bool LEGACY_PROCESSING = false;
 
 namespace Urho3D
 {
@@ -293,11 +296,8 @@ bool View::Define(RenderSurface* renderTarget, Viewport* viewport)
                 }
             }
 
-            HashMap<unsigned, BatchQueue>::Iterator j = batchQueues_.Find(info.passIndex_);
-            if (j == batchQueues_.End())
-                j = batchQueues_.Insert(Pair<unsigned, BatchQueue>(info.passIndex_, BatchQueue()));
-            info.batchQueue_ = &j->second_;
-            SetQueueShaderDefines(*info.batchQueue_, command);
+            // TODO(eugeneko) Implement me
+            //SetQueueShaderDefines(*info.batchQueue_, command);
 
             scenePasses_.Push(info);
         }
@@ -374,6 +374,13 @@ bool View::Define(RenderSurface* renderTarget, Viewport* viewport)
 
     // Initialize drawable processor
     drawableProcessor_ = octree_->drawableProcessor_.Get();
+    // TODO(eugeneko) This re-creation sucks
+    if (!batchCollector_)
+    {
+        batchCollector_ = MakeShared<BatchCollector>(context_);
+        batchCollector_->Initialize(true, scenePasses_);
+    }
+
     return true;
 }
 
@@ -392,9 +399,8 @@ void View::Update(const FrameInfo& frame)
 
     SendViewEvent(E_BEGINVIEWUPDATE);
 
-    int maxSortedInstances = renderer_->GetMaxSortedInstances();
-
     // Clear buffers, geometry, light, occluder & batch list
+    batchCollector_->Clear(frame_.frameNumber_);
     renderTargets_.Clear();
     geometries_.Clear();
     lights_.Clear();
@@ -402,8 +408,6 @@ void View::Update(const FrameInfo& frame)
     occluders_.Clear();
     activeOccluders_ = 0;
     vertexLightQueues_.Clear();
-    for (HashMap<unsigned, BatchQueue>::Iterator i = batchQueues_.Begin(); i != batchQueues_.End(); ++i)
-        i->second_.Clear(maxSortedInstances);
 
     if (hasScenePasses_ && (!cullCamera_ || !octree_))
     {
@@ -698,8 +702,18 @@ void View::GetBatches()
     threadedGeometries_.Clear();
 
     ProcessLights();
-    GetLightBatches();
-    GetBaseBatches();
+
+    if (LEGACY_PROCESSING)
+    {
+        GetLightBatches();
+        GetBaseBatches();
+    }
+    else
+    {
+        GetLightBatches(true);
+        GetBaseBatches(true);
+        CookBatches();
+    }
 }
 
 void View::ProcessLights()
@@ -729,7 +743,8 @@ void View::ProcessLights()
 //             }
 //         default:
 //             assert(0);
-//             break;
+//             break;
+
 //         }
 //     }
 //     for (unsigned i = 0; i < lightQueryResults_.Size(); ++i)
@@ -750,10 +765,359 @@ void View::ProcessLights()
 //     queue->Complete(M_MAX_UNSIGNED);
 }
 
-void View::GetLightBatches()
+#if 0
+struct LitGeometry
 {
-    BatchQueue* alphaQueue = batchQueues_.Contains(alphaPassIndex_) ? &batchQueues_[alphaPassIndex_] : nullptr;
-    const Vector<LightProcessingResult>& lightQueryResults = drawableProcessor_->lightProcessor_->GetProcessedLights();
+    Drawable* drawable_{};
+    float sortValue_{};
+    unsigned short lightIndex_{};
+    bool perVertex_{};
+    bool negativeLight_{};
+    bool operator < (const LitGeometry& rhs) const
+    {
+        if (drawable_ != rhs.drawable_)
+            return drawable_ < rhs.drawable_;
+        if (perVertex_ != rhs.perVertex_)
+            return perVertex_ < rhs.perVertex_;
+        return sortValue_ < rhs.sortValue_;
+    }
+};
+#endif // 0
+
+struct BatchDestinationInfo
+{
+    BatchQueue* queue_{};
+    Technique* technique_{};
+    bool allowInstancing_{};
+};
+
+struct BatchVectorSoA
+{
+    Vector<Batch> batches_;
+    Vector<BatchDestinationInfo> dest_;
+    unsigned Size() const { return batches_.Size(); }
+    void Clear()
+    {
+        batches_.Clear();
+        dest_.Clear();
+    }
+    void Push(const Batch& batch, BatchDestinationInfo& destInfo)
+    {
+        batches_.Push(batch);
+        dest_.Push(destInfo);
+    }
+};
+
+static const unsigned maxPixelLights_ = 4;
+// #if 0
+SceneGridDrawableSoA globalSceneData_;
+static HashMap<Drawable*, unsigned> globalGeometriesIndex_;
+void _passDrawable(Drawable* drawable)
+{
+    if (globalGeometriesIndex_.Contains(drawable))
+        return;
+    globalGeometriesIndex_[drawable] = globalSceneData_.size_;
+    globalSceneData_.Push(drawable);
+}
+// #endif
+
+static Vector<LitGeometryDescIdx> litGeometries_;
+
+float CalculateSortValue(Light* light, const BoundingBox& box)
+{
+    light->SetIntensitySortValue(box);
+    return light->GetSortValue();
+}
+
+void View::CookBatches()
+{
+    URHO3D_PROFILE(CookBatches);
+
+    {
+        URHO3D_PROFILE(TEMP_CollectArrays);
+
+        litGeometries_.Clear();
+        globalSceneData_.ClearVisible();
+        for (Drawable* drawable : geometries_)
+        {
+            _passDrawable(drawable);
+            globalSceneData_.visible_[globalGeometriesIndex_[drawable]] = true;
+        }
+
+        for (unsigned lightIndex = 0; lightIndex < lightQueryResults_.Size(); ++lightIndex)
+        {
+            Light* light = lights_[lightIndex];
+            const PODVector<Drawable*>& litGeometries = lightQueryResults_[lightIndex].litGeometries_;
+            for (unsigned i = 0; i < litGeometries.Size(); ++i)
+            {
+                Drawable* drawable = litGeometries[i];
+                LitGeometryDescIdx dest;
+                dest.drawableIndex_ = globalGeometriesIndex_[drawable];
+                dest.lightIndex_ = static_cast<unsigned short>(lightIndex);
+                // TODO(eugeneko) Use real sort value here
+                dest.sortValue_ = light->GetSortValue(); //CalculateSortValue(light, drawable->GetWorldBoundingBox());
+                dest.perVertex_ = light->GetPerVertex();
+                dest.negativeLight_ = light->IsNegative();
+                litGeometries_.Push(dest);
+            }
+        }
+    }
+
+    {
+        URHO3D_PROFILE(SortGeometries);
+        batchCollector_->ProcessLights(lights_);
+        batchCollector_->CollectVisibleGeometry(globalSceneData_);
+        batchCollector_->CollectLitGeometries(litGeometries_, globalSceneData_);
+    }
+
+    const bool hasAlphaPass = !!batchCollector_->GetScenePassQueue(alphaPassIndex_);
+    const bool allowAlphaShadows = !renderer_->GetReuseShadowMaps();
+
+    ScenePassInfo* basePassInfo = nullptr;
+    ScenePassInfo* alphaPassInfo = nullptr;
+    for (ScenePassInfo& info : scenePasses_)
+    {
+        if (info.passIndex_ == basePassIndex_)
+            basePassInfo = &info;
+        if (info.passIndex_ == alphaPassIndex_)
+            alphaPassInfo = &info;
+    }
+
+    {
+        URHO3D_PROFILE(GetBatches);
+
+        auto& visibleGeometriesArray = batchCollector_->GetVisibleGeometries();
+        auto& numLightsArray = batchCollector_->GetVisibleGeometriesNumLights();
+        auto& litGeometriesArray = batchCollector_->GetLitGeometries();
+
+        auto beginLitGeometry = litGeometriesArray.Begin();
+        for (unsigned i = 0; i < visibleGeometriesArray.Size(); ++i)
+        {
+            const unsigned threadIndex = batchCollector_->IsThreaded() ? ((unsigned)(void*)(visibleGeometriesArray[i]) >> 4) % 4 : 0;
+
+            const unsigned numLights = numLightsArray[i];
+            auto endLitGeometry = beginLitGeometry + numLights;
+            Drawable* drawable = visibleGeometriesArray[i];
+            Zone* zone = GetZone(drawable);
+            //const float lodDistance = geometry->GetLodDistance();
+            const unsigned cutLightMask = GetLightMask(drawable) & 0xff;
+
+            const bool drawableHasSimpleMask = cutLightMask == (zone->GetLightMask() & 0xffu);
+
+            // Get pixel lights
+            unsigned numPixelLights = 0;
+            auto beginPixelLight = beginLitGeometry;
+            auto endPixelLight = beginPixelLight;
+            while (endPixelLight != endLitGeometry && numPixelLights < maxPixelLights_ && !endPixelLight->perVertex_)
+            {
+                ++numPixelLights;
+                ++endPixelLight;
+            }
+
+            // Get vertex lights
+            unsigned numVertexLights = 0;
+            auto beginVertexLight = endPixelLight;
+            auto endVertexLight = beginVertexLight;
+            while (endVertexLight != endLitGeometry && numVertexLights < MAX_VERTEX_LIGHTS)
+            {
+                ++numVertexLights;
+                ++endVertexLight;
+            }
+
+            // Skip other lights
+            beginLitGeometry = endLitGeometry;
+
+            // Check if lit base optimization allowed
+            const bool allowLitBase = useLitBase_ && numVertexLights == 0 && numPixelLights > 0
+                && !beginPixelLight->negativeLight_ && !zone->GetAmbientGradient();
+
+            // Collect batches
+            for (const SourceBatch& sourceBatch : drawable->GetBatches())
+            {
+                // Skip malformed batches
+                if (!sourceBatch.geometry_ || !sourceBatch.worldTransform_)
+                    continue;
+
+                // Find technique
+                // TODO(eugeneko) Change signature to accept LOD distance
+                Technique* tech = GetTechnique(drawable, sourceBatch.material_);
+                if (!tech)
+                    continue;
+
+                Batch destBatch(sourceBatch);
+                destBatch.zone_ = zone;
+
+                // Collect batches for all passes except base and alpha
+                for (ScenePassInfo& info : scenePasses_)
+                {
+                    // Skip base and alpha pass
+                    if (info.passIndex_ == basePassIndex_ || info.passIndex_ == alphaPassIndex_)
+                        continue;
+
+                    destBatch.isBase_ = false;
+                    destBatch.lightQueue_ = nullptr;
+                    destBatch.pass_ = tech->GetSupportedPass(info.passIndex_);
+                    destBatch.lightMask_ = cutLightMask;
+
+                    // Skip if not needed
+                    if (!destBatch.pass_)
+                        continue;
+
+                    // Apply vertex lights
+                    if (info.vertexLights_ && numVertexLights)
+                    {
+                        // TODO(eugeneko) Implement it
+                        assert(0);
+                    }
+
+                    const bool allowInstancing = info.allowInstancing_ && (!info.markToStencil_ || drawableHasSimpleMask);
+                    batchCollector_->AddScenePassBatch(threadIndex, info.passIndex_, destBatch, allowInstancing);
+                }
+
+                // Do not create pixel lit forward passes for materials that render into the G-buffer
+                const bool hasGBufferPass = tech->HasPass(gBufferPassIndex_);
+                if (gBufferPassIndex_ != M_MAX_UNSIGNED && tech->HasPass(gBufferPassIndex_))
+                    continue;
+
+                // Find either base or alpha pass
+                bool isAlpha = false;
+                Pass* baseOrAlphaPass = tech->GetSupportedPass(basePassIndex_);
+                if (!baseOrAlphaPass && hasAlphaPass)
+                {
+                    isAlpha = true;
+                    baseOrAlphaPass = tech->GetSupportedPass(alphaPassIndex_);
+                }
+
+                // Check if litbase is allowed
+                Pass* litBaseOrAlphaPass = nullptr;
+                bool allowLitBaseForBatch = false;
+                if (allowLitBase)
+                {
+                    litBaseOrAlphaPass = isAlpha
+                        ? tech->GetSupportedPass(litAlphaPassIndex_)
+                        : tech->GetSupportedPass(litBasePassIndex_);
+                    if (litBaseOrAlphaPass)
+                    {
+                        allowLitBaseForBatch = true;
+                    }
+                }
+
+                if (!isAlpha)
+                {
+                    // Add base or litbase batch
+                    if (allowLitBaseForBatch)
+                    {
+                        assert(numPixelLights > 0);
+                        const LitGeometryDescPacked& lightData = *beginPixelLight;
+
+                        destBatch.isBase_ = false;
+                        destBatch.lightQueue_ = batchCollector_->GetLightBatchQueue(lightData.lightIndex_);
+                        destBatch.lightMask_ = 0;
+                        destBatch.pass_ = litBaseOrAlphaPass;
+
+                        // TODO(eugeneko) Why it doesn't ask base pass for intancing support?
+                        batchCollector_->AddLitBaseBatch(threadIndex, lightData.lightIndex_, destBatch, true);
+                    }
+                    else
+                    {
+                        const LitGeometryDescPacked& lightData = *beginPixelLight;
+
+                        destBatch.isBase_ = true;
+                        destBatch.lightQueue_ = nullptr; // TODO(eugeneko) Vertex lights here
+                        destBatch.lightMask_ = cutLightMask;
+                        destBatch.pass_ = baseOrAlphaPass;
+
+                        const bool allowInstancing = basePassInfo->allowInstancing_
+                            && (!basePassInfo->markToStencil_ || drawableHasSimpleMask);
+                        batchCollector_->AddScenePassBatch(threadIndex, basePassIndex_, destBatch, allowInstancing);
+                    }
+
+                    // Apply other lights
+                    const unsigned startPixelLight = allowLitBaseForBatch ? 1 : 0;
+                    if (numPixelLights > startPixelLight)
+                    {
+                        Pass* lightPass = tech->GetSupportedPass(lightPassIndex_);
+                        for (unsigned j = startPixelLight; j < numPixelLights; ++j)
+                        {
+                            const LitGeometryDescPacked& lightData = *(beginPixelLight + j);
+
+                            destBatch.isBase_ = false;
+                            destBatch.lightQueue_ = batchCollector_->GetLightBatchQueue(lightData.lightIndex_);
+                            destBatch.lightMask_ = 0;
+                            destBatch.pass_ = lightPass;
+
+                            batchCollector_->AddLightBatch(threadIndex, lightData.lightIndex_, destBatch, true);
+                        }
+                    }
+                }
+                else if (hasAlphaPass)
+                {
+                    // Add base or litbase batch
+                    // TODO(eugeneko) Why isBase is true for "alpha", but false for "litbase"? Same for light mask.
+                    if (allowLitBaseForBatch)
+                    {
+                        assert(numPixelLights > 0);
+                        const LitGeometryDescPacked& lightData = *beginPixelLight;
+
+                        destBatch.isBase_ = false;
+                        destBatch.lightQueue_ = batchCollector_->GetLightBatchQueue(lightData.lightIndex_);
+                        destBatch.lightMask_ = 0;
+                        destBatch.pass_ = litBaseOrAlphaPass;
+
+                        batchCollector_->AddScenePassBatch(threadIndex, alphaPassIndex_, destBatch, false);
+                    }
+                    else
+                    {
+                        const LitGeometryDescPacked& lightData = *beginPixelLight;
+
+                        destBatch.isBase_ = true;
+                        destBatch.lightQueue_ = nullptr; // TODO(eugeneko) Vertex lights here
+                        destBatch.lightMask_ = cutLightMask;
+                        destBatch.pass_ = baseOrAlphaPass;
+
+                        batchCollector_->AddScenePassBatch(threadIndex, alphaPassIndex_, destBatch, false);
+                    }
+
+                    // Apply other lights
+                    const unsigned startPixelLight = allowLitBaseForBatch ? 1 : 0;
+                    if (numPixelLights > startPixelLight)
+                    {
+                        Pass* lightPass = tech->GetSupportedPass(lightPassIndex_);
+                        for (unsigned j = startPixelLight; j < numPixelLights; ++j)
+                        {
+                            const LitGeometryDescPacked& lightData = *(beginPixelLight + j);
+
+                            destBatch.isBase_ = false;
+                            destBatch.lightQueue_ = batchCollector_->GetLightBatchQueue(lightData.lightIndex_);
+                            destBatch.lightMask_ = 0;
+                            destBatch.pass_ = lightPass;
+
+                            batchCollector_->AddScenePassBatch(threadIndex, alphaPassIndex_, destBatch, false);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    {
+        URHO3D_PROFILE(ComposeBatches);
+        batchCollector_->MergeThreadedResults();
+        batchCollector_->FillBatchQueues();
+    }
+
+    {
+        URHO3D_PROFILE(FinalizeBatches);
+        batchCollector_->FinalizeBatches(alphaPassIndex_);
+    }
+}
+
+void View::GetLightBatches(bool stripped)
+{
+#if 0
+    if (stripped)
+        return;
+    BatchQueue* alphaQueue = batchCollector_->GetScenePassQueue(alphaPassIndex_);
 
     // Build light queues and lit batches
     {
@@ -938,10 +1302,13 @@ void View::GetLightBatches()
             }
         }
     }
+#endif
 }
 
-void View::GetBaseBatches()
+void View::GetBaseBatches(bool stripped)
 {
+    if (stripped)
+        return;
     URHO3D_PROFILE(GetBaseBatches);
 
     for (PODVector<Drawable*>::ConstIterator i = geometries_.Begin(); i != geometries_.End(); ++i)
@@ -1022,7 +1389,7 @@ void View::GetBaseBatches()
                 if (allowInstancing && info.markToStencil_ && destBatch.lightMask_ != (destBatch.zone_->GetLightMask() & 0xffu))
                     allowInstancing = false;
 
-                AddBatchToQueue(*info.batchQueue_, destBatch, tech, allowInstancing);
+                AddBatchToQueue(*batchCollector_->GetScenePassQueue(info.passIndex_), destBatch, tech, allowInstancing);
             }
         }
     }
@@ -1055,25 +1422,25 @@ void View::UpdateGeometries()
                 item->priority_ = M_MAX_UNSIGNED;
                 item->workFunction_ =
                     command.sortMode_ == SORT_FRONTTOBACK ? SortBatchQueueFrontToBackWork : SortBatchQueueBackToFrontWork;
-                item->start_ = &batchQueues_[command.passIndex_];
+                item->start_ = batchCollector_->GetScenePassQueue(command.passIndex_);
                 queue->AddWorkItem(item);
             }
         }
 
-        for (Vector<LightBatchQueue>::Iterator i = lightQueues_.Begin(); i != lightQueues_.End(); ++i)
+        for (LightBatchQueue* lightBatchQueue : batchCollector_->GetLightBatchQueues())
         {
             SharedPtr<WorkItem> lightItem = queue->GetFreeItem();
             lightItem->priority_ = M_MAX_UNSIGNED;
             lightItem->workFunction_ = SortLightQueueWork;
-            lightItem->start_ = &(*i);
+            lightItem->start_ = lightBatchQueue;
             queue->AddWorkItem(lightItem);
 
-            if (i->shadowSplits_.Size())
+            if (lightBatchQueue->shadowSplits_.Size())
             {
                 SharedPtr<WorkItem> shadowItem = queue->GetFreeItem();
                 shadowItem->priority_ = M_MAX_UNSIGNED;
                 shadowItem->workFunction_ = SortShadowQueueWork;
-                shadowItem->start_ = &(*i);
+                shadowItem->start_ = lightBatchQueue;
                 queue->AddWorkItem(shadowItem);
             }
         }
@@ -1203,14 +1570,14 @@ void View::ExecuteRenderPathCommands()
     View* actualView = sourceView_ ? sourceView_ : this;
 
     // If not reusing shadowmaps, render all of them first
-    if (!renderer_->GetReuseShadowMaps() && renderer_->GetDrawShadows() && !actualView->lightQueues_.Empty())
+    if (!renderer_->GetReuseShadowMaps() && renderer_->GetDrawShadows() && actualView->batchCollector_->HasLightBatchQueues())
     {
         URHO3D_PROFILE(RenderShadowMaps);
 
-        for (Vector<LightBatchQueue>::Iterator i = actualView->lightQueues_.Begin(); i != actualView->lightQueues_.End(); ++i)
+        for (LightBatchQueue* lightBatchQueue : actualView->batchCollector_->GetLightBatchQueues())
         {
-            if (NeedRenderShadowMap(*i))
-                RenderShadowMap(*i);
+            if (NeedRenderShadowMap(*lightBatchQueue))
+                RenderShadowMap(*lightBatchQueue);
         }
     }
 
@@ -1329,7 +1696,7 @@ void View::ExecuteRenderPathCommands()
 
             case CMD_SCENEPASS:
                 {
-                    BatchQueue& queue = actualView->batchQueues_[command.passIndex_];
+                    BatchQueue& queue = *actualView->batchCollector_->GetScenePassQueue(command.passIndex_);
                     if (!queue.IsEmpty())
                     {
                         URHO3D_PROFILE(RenderScenePass);
@@ -1366,18 +1733,18 @@ void View::ExecuteRenderPathCommands()
 
             case CMD_FORWARDLIGHTS:
                 // Render shadow maps + opaque objects' additive lighting
-                if (!actualView->lightQueues_.Empty())
+                if (actualView->batchCollector_->HasLightBatchQueues())
                 {
                     URHO3D_PROFILE(RenderLights);
 
                     SetRenderTargets(command);
 
-                    for (Vector<LightBatchQueue>::Iterator i = actualView->lightQueues_.Begin(); i != actualView->lightQueues_.End(); ++i)
+                    for (LightBatchQueue* lightBatchQueue : actualView->batchCollector_->GetLightBatchQueues())
                     {
                         // If reusing shadowmaps, render each of them before the lit batches
-                        if (renderer_->GetReuseShadowMaps() && NeedRenderShadowMap(*i))
+                        if (renderer_->GetReuseShadowMaps() && NeedRenderShadowMap(*lightBatchQueue))
                         {
-                            RenderShadowMap(*i);
+                            RenderShadowMap(*lightBatchQueue);
                             SetRenderTargets(command);
                         }
 
@@ -1392,15 +1759,15 @@ void View::ExecuteRenderPathCommands()
                         }
 
                         // Draw base (replace blend) batches first
-                        i->litBaseBatches_.Draw(this, camera_, false, false, allowDepthWrite);
+                        lightBatchQueue->litBaseBatches_.Draw(this, camera_, false, false, allowDepthWrite);
 
                         // Then, if there are additive passes, optimize the light and draw them
-                        if (!i->litBatches_.IsEmpty())
+                        if (!lightBatchQueue->litBatches_.IsEmpty())
                         {
-                            renderer_->OptimizeLightByScissor(i->light_, camera_);
+                            renderer_->OptimizeLightByScissor(lightBatchQueue->light_, camera_);
                             if (!noStencil_)
-                                renderer_->OptimizeLightByStencil(i->light_, camera_);
-                            i->litBatches_.Draw(this, camera_, false, true, allowDepthWrite);
+                                renderer_->OptimizeLightByStencil(lightBatchQueue->light_, camera_);
+                            lightBatchQueue->litBatches_.Draw(this, camera_, false, true, allowDepthWrite);
                         }
 
                         passCommand_ = nullptr;
@@ -1413,17 +1780,17 @@ void View::ExecuteRenderPathCommands()
 
             case CMD_LIGHTVOLUMES:
                 // Render shadow maps + light volumes
-                if (!actualView->lightQueues_.Empty())
+                if (actualView->batchCollector_->HasLightBatchQueues())
                 {
                     URHO3D_PROFILE(RenderLightVolumes);
 
                     SetRenderTargets(command);
-                    for (Vector<LightBatchQueue>::Iterator i = actualView->lightQueues_.Begin(); i != actualView->lightQueues_.End(); ++i)
+                    for (LightBatchQueue* lightBatchQueue : actualView->batchCollector_->GetLightBatchQueues())
                     {
                         // If reusing shadowmaps, render each of them before the lit batches
-                        if (renderer_->GetReuseShadowMaps() && NeedRenderShadowMap(*i))
+                        if (renderer_->GetReuseShadowMaps() && NeedRenderShadowMap(*lightBatchQueue))
                         {
-                            RenderShadowMap(*i);
+                            RenderShadowMap(*lightBatchQueue);
                             SetRenderTargets(command);
                         }
 
@@ -1435,10 +1802,10 @@ void View::ExecuteRenderPathCommands()
                             passCommand_ = &command;
                         }
 
-                        for (unsigned j = 0; j < i->volumeBatches_.Size(); ++j)
+                        for (unsigned j = 0; j < lightBatchQueue->volumeBatches_.Size(); ++j)
                         {
-                            SetupLightVolumeBatch(i->volumeBatches_[j]);
-                            i->volumeBatches_[j].Draw(this, camera_, false);
+                            SetupLightVolumeBatch(lightBatchQueue->volumeBatches_[j]);
+                            lightBatchQueue->volumeBatches_[j].Draw(this, camera_, false);
                         }
 
                         passCommand_ = nullptr;
@@ -1650,7 +2017,7 @@ void View::RenderQuad(RenderPathCommand& command)
 bool View::IsNecessary(const RenderPathCommand& command)
 {
     return command.enabled_ && command.outputs_.Size() &&
-           (command.type_ != CMD_SCENEPASS || !batchQueues_[command.passIndex_].IsEmpty());
+           (command.type_ != CMD_SCENEPASS || !batchCollector_->GetScenePassQueue(command.passIndex_)->IsEmpty());
 }
 
 bool View::CheckViewportRead(const RenderPathCommand& command)
@@ -2486,15 +2853,15 @@ void View::PrepareInstancingBuffer()
 
     unsigned totalInstances = 0;
 
-    for (HashMap<unsigned, BatchQueue>::Iterator i = batchQueues_.Begin(); i != batchQueues_.End(); ++i)
-        totalInstances += i->second_.GetNumInstances();
+    for (ScenePassInfo& info : scenePasses_)
+        totalInstances += batchCollector_->GetScenePassQueue(info.passIndex_)->GetNumInstances();
 
-    for (Vector<LightBatchQueue>::Iterator i = lightQueues_.Begin(); i != lightQueues_.End(); ++i)
+    for (LightBatchQueue* lightBatchQueue : batchCollector_->GetLightBatchQueues())
     {
-        for (unsigned j = 0; j < i->shadowSplits_.Size(); ++j)
-            totalInstances += i->shadowSplits_[j].shadowBatches_.GetNumInstances();
-        totalInstances += i->litBaseBatches_.GetNumInstances();
-        totalInstances += i->litBatches_.GetNumInstances();
+        for (unsigned j = 0; j < lightBatchQueue->shadowSplits_.Size(); ++j)
+            totalInstances += lightBatchQueue->shadowSplits_[j].shadowBatches_.GetNumInstances();
+        totalInstances += lightBatchQueue->litBaseBatches_.GetNumInstances();
+        totalInstances += lightBatchQueue->litBatches_.GetNumInstances();
     }
 
     if (!totalInstances || !renderer_->ResizeInstancingBuffer(totalInstances))
@@ -2507,15 +2874,15 @@ void View::PrepareInstancingBuffer()
         return;
 
     const unsigned stride = instancingBuffer->GetVertexSize();
-    for (HashMap<unsigned, BatchQueue>::Iterator i = batchQueues_.Begin(); i != batchQueues_.End(); ++i)
-        i->second_.SetInstancingData(dest, stride, freeIndex);
+    for (ScenePassInfo& info : scenePasses_)
+        batchCollector_->GetScenePassQueue(info.passIndex_)->SetInstancingData(dest, stride, freeIndex);
 
-    for (Vector<LightBatchQueue>::Iterator i = lightQueues_.Begin(); i != lightQueues_.End(); ++i)
+    for (LightBatchQueue* lightBatchQueue : batchCollector_->GetLightBatchQueues())
     {
-        for (unsigned j = 0; j < i->shadowSplits_.Size(); ++j)
-            i->shadowSplits_[j].shadowBatches_.SetInstancingData(dest, stride, freeIndex);
-        i->litBaseBatches_.SetInstancingData(dest, stride, freeIndex);
-        i->litBatches_.SetInstancingData(dest, stride, freeIndex);
+        for (unsigned j = 0; j < lightBatchQueue->shadowSplits_.Size(); ++j)
+            lightBatchQueue->shadowSplits_[j].shadowBatches_.SetInstancingData(dest, stride, freeIndex);
+        lightBatchQueue->litBaseBatches_.SetInstancingData(dest, stride, freeIndex);
+        lightBatchQueue->litBatches_.SetInstancingData(dest, stride, freeIndex);
     }
 
     instancingBuffer->Unlock();
