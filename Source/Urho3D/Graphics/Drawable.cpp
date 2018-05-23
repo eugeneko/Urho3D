@@ -405,7 +405,7 @@ void Drawable::AddToOctree()
         auto* octree = scene->GetComponent<Octree>();
         if (octree)
         {
-            octree->AddDrawable(this);
+            octree->InsertDrawable(this);
             // TODO(eugeneko): Refactor injection
             octree->sceneGrid_->AddDrawable(this);
         }

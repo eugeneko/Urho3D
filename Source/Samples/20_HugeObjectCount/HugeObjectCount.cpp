@@ -131,7 +131,8 @@ void HugeObjectCount::CreateScene()
         light->SetColor(Color(0.5f, 0.5f, 0.5f));
 
         // Create geometries
-        auto model = cache->GetResource<Model>("Models/Sphere.mdl");
+//         auto model = cache->GetResource<Model>("Models/Sphere.mdl");
+        auto model = cache->GetResource<Model>("Models/Box.mdl");
         auto baseMaterial = cache->GetResource<Material>("Materials/StoneTiled.xml");
         Vector<SharedPtr<Material>> materials;
         for (unsigned i = 0; i < NUM_MATERIALS; ++i)
