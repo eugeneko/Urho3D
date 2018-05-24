@@ -174,6 +174,7 @@ void BatchCollector::Initialize(bool threading, const PODVector<ScenePassInfo>& 
     // Allocate query storages
     zonesAndOccluders_.Resize(numThreads_);
     geometriesAndLights_.Resize(numThreads_);
+    lightsData_.Resize(numThreads_);
 
     // Calculate max scene pass
     maxScenePassIndex_ = 0;
@@ -198,14 +199,14 @@ void BatchCollector::Initialize(bool threading, const PODVector<ScenePassInfo>& 
     }
 }
 
-void BatchCollector::Clear(Camera* cullCamera, unsigned frameNumber)
+void BatchCollector::Clear(Camera* cullCamera, const FrameInfo& frame)
 {
     cullCamera_ = cullCamera;
     viewMask_ = cullCamera->GetViewMask();
+    frame_ = frame;
 
-    lights_.Clear();
     visibleGeometries_.Clear();
-    litGeometries_.Clear();
+    sortedLitGeometries_.Clear();
     for (BatchCollectorPerThreadData& perThread : perThreadData_)
         perThread.ShallowClear();
 }
@@ -295,7 +296,7 @@ void BatchCollector::CollectGeometriesAndLights(SceneGrid* sceneGrid, OcclusionB
 
     ClearVector(geometriesAndLights_);
 
-    zonesAndOccludersQuery_.ScheduleWork(workQueue_,
+    geometriesAndLightsQuery_.ScheduleWork(workQueue_,
         [=](SceneGridCellRef& cellRef, unsigned threadIndex)
     {
         SceneGridCellDrawableSoA& cell = *cellRef.data_;
@@ -336,9 +337,9 @@ void BatchCollector::CollectGeometriesAndLights(SceneGrid* sceneGrid, OcclusionB
             Drawable* drawable = cell.drawable_[index];
             if (isGeometry)
             {
-                if (!zonesData_.cameraZoneOverride_ && HasActiveZones())
+                if (!zonesData_.cameraZoneOverride_ && HasVisibleZones())
                 {
-                    UpdateDirtyZone(GetActiveZones(), cell, index, viewMask, frustum);
+                    UpdateDirtyZone(GetVisibleZones(), cell, index, viewMask, frustum);
                 }
 
                 // Update min and max Z
@@ -377,11 +378,12 @@ void BatchCollector::CollectGeometriesAndLights(SceneGrid* sceneGrid, OcclusionB
                 const unsigned drawableLightMask = cell.lightMask_[index];
                 const unsigned drawableShadowMask = cell.shadowMask_[index];
 
-                // Mask object as visible
-
+                // Write result
                 const unsigned gridIndex = drawable->GetDrawableIndex().gridIndex_;
                 resultVisible[gridIndex] = true;
+                cell.visible_[index] = true;
                 // TODO(eugeneko) Get rid of drawable access
+                drawable->SetZone(actualZone);
             }
             else //if (isLight)
             {
@@ -395,79 +397,205 @@ void BatchCollector::CollectGeometriesAndLights(SceneGrid* sceneGrid, OcclusionB
     AppendVectorToFirst(geometriesAndLights_);
     if (geometriesAndLights_[0].minZ_ == M_INFINITY)
         geometriesAndLights_[0].minZ_ = 0.0f;
+
+    // Collect visible geometries
+    visibleGeometries_.Clear();
+    numLightsPerVisibleGeometry_.Clear();
+    SceneGridDrawableSoA& globalData = sceneGrid->GetGlobalData();
+    for (unsigned gridIndex = 0; gridIndex < globalData.size_; ++gridIndex)
+    {
+        if (globalData.visible_[gridIndex])
+            visibleGeometries_.Push(globalData.drawable_[gridIndex]);
+    }
 }
 
-void BatchCollector::ProcessLights(const PODVector<Light*>& lights)
+void BatchCollector::UpdateAndSortLights()
+{
+    // Update lights
+    workQueue_->ScheduleWork(lightUpdateThreshold_, geometriesAndLights_[0].lights_.Size(), numThreads_,
+        [=](unsigned beginIndex, unsigned endIndex, unsigned threadIndex)
+    {
+        for (unsigned index = beginIndex; index < endIndex; ++index)
+        {
+            // TODO(eugeneko) Refactor me
+            Drawable* light = geometriesAndLights_[0].lights_[index];
+            light->UpdateBatches(frame_);
+            light->MarkInView(frame_);
+        }
+    });
+
+    workQueue_->Complete(M_MAX_UNSIGNED);
+
+    // Sort the lights to brightest/closest first, and per-vertex lights first so that per-vertex base pass can be evaluated first
+    LightVector& lights = geometriesAndLights_[0].lights_;
+    for (Light* light : lights)
+    {
+        light->SetIntensitySortValue(cullCamera_->GetDistance(light->GetNode()->GetWorldPosition()));
+    }
+    Sort(lights.Begin(), lights.End(), CompareLights);
+}
+
+void BatchCollector::UpdateVisibleGeometriesAndShadowCasters()
+{
+    // TODO(eugeneko) Update shadow casters
+    workQueue_->ScheduleWork(geometryUpdateThreshold_, visibleGeometries_.Size(), numThreads_,
+        [=](unsigned beginIndex, unsigned endIndex, unsigned threadIndex)
+    {
+        for (unsigned index = beginIndex; index < endIndex; ++index)
+        {
+            Drawable* drawable = visibleGeometries_[index];
+            drawable->UpdateBatches(frame_);
+            drawable->MarkInView(frame_);
+        }
+    });
+
+    workQueue_->Complete(M_MAX_UNSIGNED);
+}
+
+void BatchCollector::ProcessLights()
 {
     // Assign lights
-    lights_.Insert(lights_.Begin(), lights.Begin(), lights.End());
-    const unsigned numLights = lights_.Size();
+    const unsigned numLights = GetVisibleLights().Size();
 
     // Resize related arrays
     lightBatchQueues_.Resize(numLights);
     for (BatchCollectorPerThreadData& perThread : perThreadData_)
         perThread.ClearLightArrays(numLights);
 
+    ClearVector(lightsData_);
+
     // Process each light individually
     for (unsigned lightIndex = 0; lightIndex < numLights; ++lightIndex)
-        ProcessLight(lightIndex);
-}
-
-void BatchCollector::CollectVisibleGeometry(SceneGridDrawableSoA& sceneData)
-{
-    assert(sceneData.IsValid());
-
-    visibleGeometries_.Clear();
-    numLightsPerVisibleGeometry_.Clear();
-
-    for (unsigned i = 0; i < sceneData.size_; ++i)
     {
-        if (sceneData.visible_[i])
-            visibleGeometries_.Push(sceneData.drawable_[i]);
+        // Setup light
+        Light* light = GetVisibleLight(lightIndex);
+        const LightType lightType = light->GetLightType();
+        const unsigned lightMask = light->GetLightMask();
+
+        LightBatchQueueEx* lightBatchQueue = GetOrCreateLightBatchQueue(light);
+        lightBatchQueues_[lightIndex] = lightBatchQueue;
+
+        lightBatchQueue->negative_ = light->IsNegative();
+        lightBatchQueue->shadowMap_ = nullptr;
+        lightBatchQueue->isShadowed_ = IsLightShadowed(light);
+        lightBatchQueue->isPerVertex_ = light->GetPerVertex();
+
+        // Process light
+        if (lightType == LIGHT_DIRECTIONAL)
+        {
+            const bool isFocused = light->GetShadowFocus().focus_;
+
+            // For directional light:
+            // 1. Process visible geometry and put it into threaded storage.
+            // 2. Calculate lit drawables volume if focused and shadowed.
+            // Reuse frustum query
+            geometriesAndLightsQuery_.ScheduleWork(workQueue_,
+                [=](SceneGridCellRef& cellRef, unsigned threadIndex)
+            {
+                SceneGridCellDrawableSoA& cell = *cellRef.data_;
+                VisibleLightsPerThreadData& result = lightsData_[threadIndex];
+
+                for (unsigned index = cellRef.beginIndex_; index < cellRef.endIndex_; ++index)
+                {
+                    // Skip non-geometries or invisible geometries
+                    if (!(cell.drawableFlag_[index] & DRAWABLE_GEOMETRY) || !cell.visible_[index])
+                        continue;
+
+                    // Filter by light mask
+                    if (!(cell.lightMask_[index] & lightMask))
+                        continue;
+
+                    // TODO(eugeneko) Get grid index w/o pointer picking
+                    Drawable* drawable = cell.drawable_[index];
+                    const unsigned gridIndex = drawable->GetDrawableIndex().gridIndex_;
+
+                    // Make and push lit geometry
+                    LitGeometryDescIdx litGeometry;
+                    litGeometry.drawableIndex_ = gridIndex;
+                    litGeometry.lightIndex_ = lightIndex;
+                    litGeometry.negativeLight_ = lightBatchQueue->negative_;
+                    litGeometry.perVertex_ = lightBatchQueue->isPerVertex_;
+                    // TODO(eugeneko) Use true sort value
+                    litGeometry.sortValue_ = light->GetSortValue();
+                    result.litGeometry_.Push(litGeometry);
+
+                    if (isFocused && lightBatchQueue->isShadowed_)
+                    {
+                        assert(0);
+                    }
+                }
+            });
+        }
+        else
+        {
+            assert(0);
+        }
+
+        // Find or create queues data for each thread
+        if (!light->GetPerVertex())
+        {
+            for (BatchCollectorPerThreadData& perThread : perThreadData_)
+            {
+                auto iterQueueData = perThread.lightBatchQueueDataMap_.Find(light);
+                if (iterQueueData == perThread.lightBatchQueueDataMap_.End())
+                {
+                    LightBatchQueueData desc;
+                    desc.lightQueueData_ = AllocateDynamicQueueData();
+                    desc.litBaseQueueData_ = AllocateDynamicQueueData();
+                    iterQueueData = perThread.lightBatchQueueDataMap_.Insert(MakePair(light, desc));
+                }
+
+                perThread.litBaseQueueData_[lightIndex] = iterQueueData->second_.litBaseQueueData_;
+                perThread.lightQueueData_[lightIndex] = iterQueueData->second_.lightQueueData_;
+            }
+        }
     }
+
+    workQueue_->Complete(M_MAX_UNSIGNED);
+    AppendVectorToFirst(lightsData_);
 }
 
-void BatchCollector::CollectLitGeometries(const Vector<LitGeometryDescIdx>& litGeometries, SceneGridDrawableSoA& sceneData)
+void BatchCollector::SortLitGeometries(SceneGrid* sceneGrid)
 {
-    litGeometries_.Clear();
-    sceneData.ClearTemporary();
+    SceneGridDrawableSoA& globalData = sceneGrid->GetGlobalData();
+    Vector<LitGeometryDescIdx>& unsortedLitGeometry = lightsData_[0].litGeometry_;
 
     // 1st pass: calculate number of lights for each geometry
-    for (const LitGeometryDescIdx& lit : litGeometries)
-        ++sceneData.numLights_[lit.drawableIndex_];
+    for (const LitGeometryDescIdx& lit : unsortedLitGeometry)
+        ++globalData.numLights_[lit.drawableIndex_];
 
     // 2nd pass: calculate ranges in destination array
     unsigned firstLight = 0;
-    for (unsigned i = 0; i < sceneData.size_; ++i)
+    for (unsigned i = 0; i < globalData.size_; ++i)
     {
-        sceneData.firstLight_[i] = firstLight;
-        firstLight += sceneData.numLights_[i];
+        globalData.firstLight_[i] = firstLight;
+        firstLight += globalData.numLights_[i];
     }
 
     // 3rd pass: reset number of lights to reuse it for filling array
-    for (unsigned i = 0; i < sceneData.size_; ++i)
-        sceneData.numLights_[i] = 0;
+    for (unsigned i = 0; i < globalData.size_; ++i)
+        globalData.numLights_[i] = 0;
 
     // 4th pass: fill destination array
-    litGeometries_.Resize(litGeometries.Size());
-    for (const LitGeometryDescIdx& lit : litGeometries)
+    sortedLitGeometries_.Resize(unsortedLitGeometry.Size());
+    for (const LitGeometryDescIdx& lit : unsortedLitGeometry)
     {
         const unsigned drawableIndex = lit.drawableIndex_;
-        const unsigned litIndex = sceneData.firstLight_[drawableIndex] + sceneData.numLights_[drawableIndex];
-        litGeometries_[litIndex] = LitGeometryDescPacked(lit);
-        ++sceneData.numLights_[drawableIndex];
+        const unsigned litIndex = globalData.firstLight_[drawableIndex] + globalData.numLights_[drawableIndex];
+        sortedLitGeometries_[litIndex] = LitGeometryDescPacked(lit);
+        ++globalData.numLights_[drawableIndex];
     }
 
     // 5th pass: partially sort lit geometries
-    for (unsigned i = 0; i < sceneData.size_; ++i)
+    for (unsigned i = 0; i < globalData.size_; ++i)
     {
-        if (sceneData.visible_[i])
+        if (globalData.visible_[i])
         {
-            const unsigned numLights = sceneData.numLights_[i];
+            const unsigned numLights = globalData.numLights_[i];
             numLightsPerVisibleGeometry_.Push(numLights);
             if (numLights > 1)
             {
-                auto begin = litGeometries_.Begin() + sceneData.firstLight_[i];
+                auto begin = sortedLitGeometries_.Begin() + globalData.firstLight_[i];
                 auto end = begin + numLights;
                 Sort(begin, end);
             }
@@ -517,7 +645,7 @@ void BatchCollector::MergeThreadedResults()
     }
 
     // Append all batch groups for light passes.
-    for (unsigned lightIndex = 0; lightIndex < lights_.Size(); ++lightIndex)
+    for (unsigned lightIndex = 0; lightIndex < GetVisibleLights().Size(); ++lightIndex)
     {
         BatchQueueData* destLitBaseData = perThreadData_[0].litBaseQueueData_[lightIndex];
         BatchQueueData* destLightData = perThreadData_[0].lightQueueData_[lightIndex];
@@ -563,13 +691,14 @@ void BatchCollector::FillBatchQueues()
     }
 
     // Fill batch queues for lights
-    for (unsigned lightIndex = 0; lightIndex < lights_.Size(); ++lightIndex)
+    const unsigned numLights = GetVisibleLights().Size();
+    for (unsigned lightIndex = 0; lightIndex < numLights; ++lightIndex)
     {
-        Light* light = lights_[lightIndex];
+        Light* light = GetVisibleLight(lightIndex);
         if (light->GetPerVertex())
             continue;
 
-        LightBatchQueue* lightBatchQueue = lightBatchQueues_[lightIndex];
+        LightBatchQueueEx* lightBatchQueue = lightBatchQueues_[lightIndex];
         assert(lightBatchQueue);
 
         BatchQueue& lightQueue = lightBatchQueue->litBatches_;
@@ -616,55 +745,35 @@ void BatchCollector::FinalizeBatches(unsigned alphaPassIndex)
     // Update batch queues for lights
     for (unsigned lightIndex = 0; lightIndex < lightBatchQueues_.Size(); ++lightIndex)
     {
-        Light* light = lights_[lightIndex];
+        Light* light = GetVisibleLight(lightIndex);
         if (light->GetPerVertex())
             continue;
 
-        LightBatchQueue* lightBatchQueue = lightBatchQueues_[lightIndex];
+        LightBatchQueueEx* lightBatchQueue = lightBatchQueues_[lightIndex];
         assert(lightBatchQueue);
         FinalizeBatchQueue(lightBatchQueue->litBatches_, true);
         FinalizeBatchQueue(lightBatchQueue->litBaseBatches_, true);
     }
 }
 
-void BatchCollector::ProcessLight(unsigned lightIndex)
+Zone* BatchCollector::GetDrawableZone(Drawable* drawable) const
 {
-    Light* light = lights_[lightIndex];
+    if (zonesData_.cameraZoneOverride_)
+        return zonesData_.cameraZone_;
+    Zone* drawableZone = drawable->GetZone();
+    return drawableZone ? drawableZone : zonesData_.cameraZone_;
+}
 
-    // Find or create light batch queue
+LightBatchQueueEx* BatchCollector::GetOrCreateLightBatchQueue(Light* light)
+{
     auto iterLightBatchQueue = lightBatchQueueMap_.Find(light);
     if (iterLightBatchQueue == lightBatchQueueMap_.End())
     {
-        LightBatchQueue* queue = AllocateLightBatchQueue();
-
+        LightBatchQueueEx* queue = AllocateLightBatchQueue();
         queue->light_ = light;
-        queue->negative_ = light->IsNegative();
-        queue->shadowMap_ = nullptr;
-
         iterLightBatchQueue = lightBatchQueueMap_.Insert(MakePair(light, queue));
     }
-
-    // Assign queue
-    lightBatchQueues_[lightIndex] = iterLightBatchQueue->second_;
-
-    // Find or create queues data for each thread
-    if (!light->GetPerVertex())
-    {
-        for (BatchCollectorPerThreadData& perThread : perThreadData_)
-        {
-            auto iterQueueData = perThread.lightBatchQueueDataMap_.Find(light);
-            if (iterQueueData == perThread.lightBatchQueueDataMap_.End())
-            {
-                LightBatchQueueData desc;
-                desc.lightQueueData_ = AllocateDynamicQueueData();
-                desc.litBaseQueueData_ = AllocateDynamicQueueData();
-                iterQueueData = perThread.lightBatchQueueDataMap_.Insert(MakePair(light, desc));
-            }
-
-            perThread.litBaseQueueData_[lightIndex] = iterQueueData->second_.litBaseQueueData_;
-            perThread.lightQueueData_[lightIndex] = iterQueueData->second_.lightQueueData_;
-        }
-    }
+    return iterLightBatchQueue->second_;
 }
 
 void BatchCollector::FinalizeBatchQueue(BatchQueue& queue, bool allowShadows)
@@ -745,6 +854,21 @@ void BatchCollector::UpdateDirtyZone(const Vector<Zone*>& zones, SceneGridCellDr
         cellData.cachedZoneLightMask_[index] = newZone->GetLightMask();
         cellData.cachedZoneShadowMask_[index] = newZone->GetShadowMask();
     }
+}
+
+bool BatchCollector::IsLightShadowed(Light* light)
+{
+    // Check if light should be shadowed
+    bool isShadowed = light->GetCastShadows() && !light->GetPerVertex() && light->GetShadowIntensity() < 1.0f;
+    // If shadow distance non-zero, check it
+    if (isShadowed && light->GetShadowDistance() > 0.0f && light->GetDistance() > light->GetShadowDistance())
+        isShadowed = false;
+    // OpenGL ES can not support point light shadows
+#ifdef GL_ES_VERSION_2_0
+    if (isShadowed && light->GetLightType() == LIGHT_POINT)
+        isShadowed = false;
+#endif
+    return isShadowed;
 }
 
 }

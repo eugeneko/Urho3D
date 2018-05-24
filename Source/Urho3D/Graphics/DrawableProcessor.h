@@ -92,9 +92,12 @@ struct SceneGridCellDrawableSoA
 
     ZoneVector cachedZone_;
     Vector<bool> cachedZoneDirty_;
+    // TODO(eugeneko) Worth removing
     Vector<unsigned> cachedZoneViewMask_;
     Vector<unsigned> cachedZoneLightMask_;
     Vector<unsigned> cachedZoneShadowMask_;
+
+    Vector<bool> visible_;
 
     bool IsValid() const
     {
@@ -121,6 +124,8 @@ struct SceneGridCellDrawableSoA
             && size_ == cachedZoneViewMask_.Size()
             && size_ == cachedZoneLightMask_.Size()
             && size_ == cachedZoneShadowMask_.Size()
+
+            && size_ == visible_.Size()
             ;
     }
     void Push(Drawable* drawable)
@@ -150,6 +155,8 @@ struct SceneGridCellDrawableSoA
         cachedZoneViewMask_.Push(0);
         cachedZoneLightMask_.Push(0);
         cachedZoneShadowMask_.Push(0);
+
+        visible_.Push(false);
 
         ++size_;
         assert(IsValid());
@@ -190,6 +197,8 @@ struct SceneGridCellDrawableSoA
         cachedZoneLightMask_.EraseSwap(index);
         cachedZoneShadowMask_.EraseSwap(index);
 
+        visible_.EraseSwap(index);
+
         assert(IsValid());
     }
     void Clear()
@@ -221,9 +230,19 @@ struct SceneGridCellDrawableSoA
         cachedZoneLightMask_.Clear();
         cachedZoneShadowMask_.Clear();
 
+        visible_.Clear();
+
         assert(IsValid());
     }
 
+    /// Clear temporary data.
+    void ClearTemporary()
+    {
+        for (unsigned i = 0; i < size_; ++i)
+        {
+            visible_[i] = false;
+        }
+    }
     /// Update drawable data.
     void UpdateDrawable(unsigned index, Drawable* drawable)
     {
@@ -456,9 +475,11 @@ public:
             UpdateDirtyDrawablesInCell(cell);
     }
     /// Reset all temporary marks.
-    void ClearTemporaryData()
+    void ClearTemporary()
     {
         drawablesData_.ClearTemporary();
+        for (SceneGridCell& cell : cells_)
+            cell.data_.ClearTemporary();
     }
     /// Remove all drawables.
     void RemoveAllDrawables()

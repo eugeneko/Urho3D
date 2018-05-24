@@ -119,6 +119,7 @@ SharedPtr<WorkItem> WorkQueue::GetFreeItem()
         SharedPtr<WorkItem> item = poolItems_.Front();
         poolItems_.PopFront();
         item->function_ = nullptr;
+        item->priority_ = M_MAX_UNSIGNED;
         return item;
     }
     else
@@ -126,6 +127,7 @@ SharedPtr<WorkItem> WorkQueue::GetFreeItem()
         // No usable items found, create a new one set it as pooled and return it.
         SharedPtr<WorkItem> item(new WorkItem());
         item->pooled_ = true;
+        item->priority_ = M_MAX_UNSIGNED;
         return item;
     }
 }

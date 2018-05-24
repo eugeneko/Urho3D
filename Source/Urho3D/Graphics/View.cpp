@@ -401,7 +401,7 @@ void View::Update(const FrameInfo& frame)
     SendViewEvent(E_BEGINVIEWUPDATE);
 
     // Clear buffers, geometry, light, occluder & batch list
-    batchCollector_->Clear(cullCamera_, frame_.frameNumber_);
+    batchCollector_->Clear(cullCamera_, frame_);
     renderTargets_.Clear();
     geometries_.Clear();
     lights_.Clear();
@@ -430,7 +430,7 @@ void View::Update(const FrameInfo& frame)
     {
         URHO3D_PROFILE(UpdateDirtyDrawables);
         sceneGrid_->UpdateDirtyDrawables();
-        sceneGrid_->ClearTemporaryData();
+        sceneGrid_->ClearTemporary();
     }
 
     {
@@ -438,8 +438,20 @@ void View::Update(const FrameInfo& frame)
         batchCollector_->CollectZonesAndOccluders(sceneGrid_);
         batchCollector_->ProcessZones();
         batchCollector_->CollectGeometriesAndLights(sceneGrid_, nullptr);
+        batchCollector_->UpdateAndSortLights();
+        // TODO(eugeneko) Move this below ProcessLights
+        batchCollector_->UpdateVisibleGeometriesAndShadowCasters();
     }
 
+    {
+        URHO3D_PROFILE(ProcessLights);
+        batchCollector_->ProcessLights();
+    }
+
+    {
+        URHO3D_PROFILE(CookBatches);
+        CookBatches();
+    }
 
 
     renderer_->StorePreparedView(this, cullCamera_);
@@ -848,8 +860,6 @@ float CalculateSortValue(Light* light, const BoundingBox& box)
 
 void View::CookBatches()
 {
-    URHO3D_PROFILE(CookBatches);
-
 #if 0
     {
         URHO3D_PROFILE(TEMP_CollectArrays);
@@ -883,10 +893,8 @@ void View::CookBatches()
 #endif
 
     {
-        URHO3D_PROFILE(SortGeometries);
-        batchCollector_->ProcessLights(lights_);
-        batchCollector_->CollectVisibleGeometry(globalSceneData_);
-        batchCollector_->CollectLitGeometries(litGeometries_, globalSceneData_);
+        URHO3D_PROFILE(SortLitGeometries);
+        batchCollector_->SortLitGeometries(sceneGrid_);
     }
 
     const bool hasAlphaPass = !!batchCollector_->GetScenePassQueue(alphaPassIndex_);
@@ -917,9 +925,9 @@ void View::CookBatches()
             const unsigned numLights = numLightsArray[i];
             auto endLitGeometry = beginLitGeometry + numLights;
             Drawable* drawable = visibleGeometriesArray[i];
-            Zone* zone = GetZone(drawable);
+            Zone* zone = batchCollector_->GetDrawableZone(drawable);
             //const float lodDistance = geometry->GetLodDistance();
-            const unsigned cutLightMask = GetLightMask(drawable) & 0xff;
+            const unsigned cutLightMask = drawable->GetLightMask() & zone->GetLightMask() & 0xff;
 
             const bool drawableHasSimpleMask = cutLightMask == (zone->GetLightMask() & 0xffu);
 
@@ -1706,7 +1714,7 @@ void View::ExecuteRenderPathCommands()
 
                     Color clearColor = command.clearColor_;
                     if (command.useFogColor_)
-                        clearColor = actualView->farClipZone_->GetFogColor();
+                        clearColor = actualView->batchCollector_->GetFarClipZone()->GetFogColor();
 
                     SetRenderTargets(command);
                     graphics_->Clear(command.clearFlags_, clearColor, command.clearDepth_, command.clearStencil_);

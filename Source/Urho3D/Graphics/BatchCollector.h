@@ -48,6 +48,30 @@ struct LitGeometryDescIdx
     bool negativeLight_{};
 };
 
+struct VisibleLightsPerThreadData
+{
+    /// Lit geometry.
+    Vector<LitGeometryDescIdx> litGeometry_;
+    /// Clear.
+    void Clear()
+    {
+        litGeometry_.Clear();
+    }
+    /// Append.
+    void Append(const VisibleLightsPerThreadData& other)
+    {
+        litGeometry_.Push(other.litGeometry_);
+    }
+};
+
+struct LightBatchQueueEx : LightBatchQueue
+{
+    /// Whether the light is per-vertex.
+    bool isPerVertex_{};
+    /// Whether the light is shadowed.
+    bool isShadowed_{};
+};
+
 struct LitGeometryDescPacked
 {
     LitGeometryDescPacked() = default;
@@ -127,19 +151,21 @@ public:
     void Initialize(bool threading, const PODVector<ScenePassInfo>& scenePasses);
 
     /// Clear the state before processing the frame.
-    void Clear(Camera* cullCamera, unsigned frameNumber);
+    void Clear(Camera* cullCamera, const FrameInfo& frame);
     /// Collect zones and occluders.
     void CollectZonesAndOccluders(SceneGrid* sceneGrid);
     /// Process zones.
     void ProcessZones();
     /// Collect geometries and lights.
     void CollectGeometriesAndLights(SceneGrid* sceneGrid, OcclusionBuffer* occlusionBuffer);
-    /// Process lights. Lights shall be ordered according to lightIndex.
-    void ProcessLights(const PODVector<Light*>& lights);
-    /// Collect visible geometries.
-    void CollectVisibleGeometry(SceneGridDrawableSoA& sceneData);
-    /// Collect lit geometries from given unsorted array of lit geometries.
-    void CollectLitGeometries(const Vector<LitGeometryDescIdx>& litGeometries, SceneGridDrawableSoA& sceneData);
+    /// Update lights.
+    void UpdateAndSortLights();
+    /// Update visible geometries and shadow casters.
+    void UpdateVisibleGeometriesAndShadowCasters();
+    /// Process lights.
+    void ProcessLights();
+    /// Sort lit geometries.
+    void SortLitGeometries(SceneGrid* sceneGrid);
 
     /// Add scene pass batch.
     void AddScenePassBatch(unsigned threadIndex, unsigned passIndex, const Batch& batch, bool grouped);
@@ -158,25 +184,34 @@ public:
 
     const Vector<Drawable*>& GetVisibleGeometries() const { return visibleGeometries_; }
     const Vector<unsigned>& GetVisibleGeometriesNumLights() const { return numLightsPerVisibleGeometry_; }
-    const Vector<LitGeometryDescPacked>& GetLitGeometries() const { return litGeometries_; }
+    const Vector<LitGeometryDescPacked>& GetLitGeometries() const { return sortedLitGeometries_; }
 
     BatchQueue* GetScenePassQueue(unsigned passIndex)
     {
         return scenePassQueues_[passIndex].Get();
     }
-    LightBatchQueue* GetLightBatchQueue(unsigned lightIndex)
+    LightBatchQueueEx* GetLightBatchQueue(unsigned lightIndex)
     {
         return lightBatchQueues_[lightIndex];
     }
 
     /// Return whether the calculations are threaded.
     bool IsThreaded() const { return threading_; }
-    /// Return whether there are active zones.
-    bool HasActiveZones() const { return !zonesAndOccluders_[0].zones_.Empty(); }
-    /// Get all active zones.
-    const Vector<Zone*>& GetActiveZones() const { return zonesAndOccluders_[0].zones_; }
+    /// Return whether there are visible zones.
+    bool HasVisibleZones() const { return !zonesAndOccluders_[0].zones_.Empty(); }
+    /// Return all visible zones.
+    const Vector<Zone*>& GetVisibleZones() const { return zonesAndOccluders_[0].zones_; }
+    /// Return all visible lights.
+    const Vector<Light*>& GetVisibleLights() const { return geometriesAndLights_[0].lights_; }
+    /// Return visible light.
+    Light* GetVisibleLight(unsigned lightIndex) const { return geometriesAndLights_[0].lights_[lightIndex]; }
+    /// Return zone for specified drawable.
+    Zone* GetDrawableZone(Drawable* drawable) const;
+    /// Return far clip zone.
+    Zone* GetFarClipZone() const { return zonesData_.farClipZone_; }
+
     /// Get all light batch queues. Indexed via lightIndex. Not null.
-    const Vector<LightBatchQueue*>& GetLightBatchQueues() const { return lightBatchQueues_; }
+    const Vector<LightBatchQueueEx*>& GetLightBatchQueues() const { return lightBatchQueues_; }
     /// Return whether there is any light batch queue.
     bool HasLightBatchQueues() const { return !lightBatchQueues_.Empty(); }
 
@@ -191,30 +226,36 @@ private:
         dynamicQueueDataPool_.Emplace(MakeUnique<BatchQueueData>());
         return dynamicQueueDataPool_.Back().Get();
     }
-    LightBatchQueue* AllocateLightBatchQueue()
+    LightBatchQueueEx* AllocateLightBatchQueue()
     {
-        lightBatchQueuePool_.Emplace(MakeUnique<LightBatchQueue>());
+        lightBatchQueuePool_.Emplace(MakeUnique<LightBatchQueueEx>());
         return lightBatchQueuePool_.Back().Get();
     }
-    template <class T> void ClearVector(T& vector)
-    {
-        for (auto& item : vector)
-            item.Clear();
-    }
-    template <class T> void AppendVectorToFirst(T& vector)
-    {
-        for (unsigned i = 1; i < vector.Size(); ++i)
-            vector[0].Append(vector[i]);
-    }
-    void ProcessLight(unsigned lightIndex);
+    /// Get or create light batch queue.
+    LightBatchQueueEx* GetOrCreateLightBatchQueue(Light* light);
+
     void FinalizeBatchQueue(BatchQueue& queue, bool allowShadows);
     void FinalizeBatch(Batch& batch, bool allowShadows, const BatchQueue& queue);
     void FinalizeBatchGroup(BatchGroup& batchGroup, bool allowShadows, const BatchQueue& queue);
 
 private:
+    /// Clear vector per-element.
+    template <class T> static void ClearVector(T& vector)
+    {
+        for (auto& item : vector)
+            item.Clear();
+    }
+    /// Append all array elements to the first one.
+    template <class T> static void AppendVectorToFirst(T& vector)
+    {
+        for (unsigned i = 1; i < vector.Size(); ++i)
+            vector[0].Append(vector[i]);
+    }
     /// Update drawable zone
     static void UpdateDirtyZone(const Vector<Zone*>& zones, SceneGridCellDrawableSoA& cellData, unsigned index,
         unsigned viewMask, const Frustum& frustum);
+    /// Check whether the light has shadow.
+    static bool IsLightShadowed(Light* light);
 
 private:
     /// @name Constants since initialization
@@ -235,7 +276,10 @@ private:
 
     Camera* cullCamera_{};
     unsigned viewMask_{};
+    FrameInfo frame_{};
     unsigned frustumQueryThreadingThreshold_{ 32 };
+    unsigned lightUpdateThreshold_{ 16 };
+    unsigned geometryUpdateThreshold_{ 16 };
 
     /// @}
 
@@ -247,20 +291,21 @@ private:
     ViewCookedZonesData zonesData_;
     /// Scene query for geometries and lights.
     SceneGridQueryResult geometriesAndLightsQuery_;
-    /// Temporary buffer for visible geometries and lights. Size is equal to number of threads.
+    /// Temporary buffer for visible geometries and lights. Size is equal to number of threads. Defines lightIndex.
     Vector<SceneQueryGeometriesAndLightsResult> geometriesAndLights_;
+    /// Visible geometries. Ordered by gridIndex.
+    Vector<Drawable*> visibleGeometries_;
+    /// Temporary buffer for visible lights data. Size is equal to number of threads.
+    Vector<VisibleLightsPerThreadData> lightsData_;
 
     /// Persistent mapping for light batch queues.
-    HashMap<Light*, LightBatchQueue*> lightBatchQueueMap_;
+    HashMap<Light*, LightBatchQueueEx*> lightBatchQueueMap_;
 
-    /// Currently visible lights. Indexed via lightIndex. Not null.
-    Vector<Light*> lights_;
     /// Light batch queues. Indexed via lightIndex. Not null.
-    Vector<LightBatchQueue*> lightBatchQueues_;
+    Vector<LightBatchQueueEx*> lightBatchQueues_;
 
-    Vector<Drawable*> visibleGeometries_;
     Vector<unsigned> numLightsPerVisibleGeometry_;
-    Vector<LitGeometryDescPacked> litGeometries_;
+    Vector<LitGeometryDescPacked> sortedLitGeometries_;
 
     Vector<BatchCollectorPerThreadData> perThreadData_;
 
@@ -268,7 +313,7 @@ private:
 
     Vector<UniquePtr<BatchQueueData>> staticQueueDataPool_;
     Vector<UniquePtr<BatchQueueData>> dynamicQueueDataPool_;
-    Vector<UniquePtr<LightBatchQueue>> lightBatchQueuePool_;
+    Vector<UniquePtr<LightBatchQueueEx>> lightBatchQueuePool_;
 };
 
 }
