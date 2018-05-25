@@ -281,11 +281,19 @@ struct SceneGridCellDrawableSoA
     bool IsGeometry(unsigned index) const { return !!(drawableFlag_[index] & DRAWABLE_GEOMETRY); }
     Intersection IntersectSphereFrustum(unsigned index, const Frustum& frustum) const { return frustum.IsInside(boundingSphere_[index]); }
     Intersection IntersectBoxFrustum(unsigned index, const Frustum& frustum) const { return frustum.IsInside(boundingBox_[index]); }
+    Intersection IntersectSphereSphere(unsigned index, const Sphere& sphere) const { return sphere.IsInside(boundingSphere_[index]); }
+    Intersection IntersectBoxSphere(unsigned index, const Sphere& sphere) const { return sphere.IsInside(boundingBox_[index]); }
     bool IsInFrustum(unsigned index, const Frustum& frustum) const
     {
         const Intersection sphereIntersection = IntersectSphereFrustum(index, frustum);
         return sphereIntersection != OUTSIDE
             && (sphereIntersection == INSIDE || IntersectBoxFrustum(index, frustum) != OUTSIDE);
+    }
+    bool IsInSphere(unsigned index, const Sphere& sphere) const
+    {
+        const Intersection sphereIntersection = IntersectSphereSphere(index, sphere);
+        return sphereIntersection != OUTSIDE
+            && (sphereIntersection == INSIDE || IntersectBoxSphere(index, sphere) != OUTSIDE);
     }
     bool IsCenterInFrustum(unsigned index, const Frustum& frustum) const { return frustum.IsInside(boundingSphere_[index].center_) != OUTSIDE; }
     bool IsOccludedByBuffer(unsigned index, OcclusionBuffer* buffer) const
@@ -498,15 +506,15 @@ public:
 
         // Test intersection and count all drawables inside
         unsigned numDrawables = 0;
-        for (unsigned threadIndex = 0; threadIndex < numCells_; ++threadIndex)
+        for (unsigned cellIndex = 0; cellIndex < numCells_; ++cellIndex)
         {
-            result.cellMasks_[threadIndex] = OUTSIDE;
-            if (cells_[threadIndex].data_.size_ > 0)
+            result.cellMasks_[cellIndex] = OUTSIDE;
+            if (cells_[cellIndex].data_.size_ > 0)
             {
-                const Intersection intersection = frustum.IsInside(cells_[threadIndex].boundingBox_);
-                result.cellMasks_[threadIndex] = intersection;
+                const Intersection intersection = frustum.IsInside(cells_[cellIndex].boundingBox_);
+                result.cellMasks_[cellIndex] = intersection;
                 if (intersection != OUTSIDE)
-                    numDrawables += cells_[threadIndex].data_.size_;
+                    numDrawables += cells_[cellIndex].data_.size_;
             }
         }
 
@@ -552,6 +560,21 @@ public:
 
             result.threadRanges_.Push({ rangeBegin, result.cells_.Size() });
             rangeBegin = result.cells_.Size();
+        }
+    }
+    /// Process cells in sphere. Expected signature is `function(cell, isInside)`.
+    template <class T>
+    void ProcessCellsInSphere(const Sphere& sphere, T function)
+    {
+        for (unsigned cellIndex = 0; cellIndex < numCells_; ++cellIndex)
+        {
+            SceneGridCell& cell = cells_[cellIndex];
+            if (cell.data_.size_ > 0)
+            {
+                const Intersection intersection = sphere.IsInside(cell.boundingBox_);
+                if (intersection != OUTSIDE)
+                    function(cell.data_, intersection == INSIDE);
+            }
         }
     }
 

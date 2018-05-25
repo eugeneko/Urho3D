@@ -151,6 +151,7 @@ public:
     void Initialize(bool threading, const PODVector<ScenePassInfo>& scenePasses);
 
     /// Clear the state before processing the frame.
+    // TODO(eugeneko) Pass sceneGrid here
     void Clear(Camera* cullCamera, const FrameInfo& frame);
     /// Collect zones and occluders.
     void CollectZonesAndOccluders(SceneGrid* sceneGrid);
@@ -163,7 +164,7 @@ public:
     /// Update visible geometries and shadow casters.
     void UpdateVisibleGeometriesAndShadowCasters();
     /// Process lights.
-    void ProcessLights();
+    void ProcessLights(SceneGrid* sceneGrid);
     /// Sort lit geometries.
     void SortLitGeometries(SceneGrid* sceneGrid);
 

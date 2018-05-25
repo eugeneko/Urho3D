@@ -316,7 +316,9 @@ Octree::Octree(Context* context) :
 {
     sceneGrid_ = MakeUnique<SceneGrid>();
 //     sceneGrid_->Reset(worldBoundingBox_, IntVector3(1, 1, 1));
-    sceneGrid_->Reset(BoundingBox(-200, 200), IntVector3(16, 1, 16));
+//     sceneGrid_->Reset(BoundingBox(-200, 200), IntVector3(16, 1, 16));
+    sceneGrid_->Reset(BoundingBox(-1000, 1000), IntVector3(16, 1, 16));
+//     sceneGrid_->Reset(BoundingBox(Vector3(0.0f, -1000.0f, 0.0f), Vector3(800.0f, 1000.0f, 800.0f)), IntVector3(8, 1, 8));
     drawableProcessor_ = MakeUnique<DrawableProcessor>(context);
     drawableProcessor_->sceneGrid_ = sceneGrid_.Get();
     // If the engine is running headless, subscribe to RenderUpdate events for manually updating the octree

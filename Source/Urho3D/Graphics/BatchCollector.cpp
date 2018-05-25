@@ -452,7 +452,7 @@ void BatchCollector::UpdateVisibleGeometriesAndShadowCasters()
     workQueue_->Complete(M_MAX_UNSIGNED);
 }
 
-void BatchCollector::ProcessLights()
+void BatchCollector::ProcessLights(SceneGrid* sceneGrid)
 {
     // Assign lights
     const unsigned numLights = GetVisibleLights().Size();
@@ -486,8 +486,9 @@ void BatchCollector::ProcessLights()
             const bool isFocused = light->GetShadowFocus().focus_;
 
             // For directional light:
-            // 1. Process visible geometry and put it into threaded storage.
-            // 2. Calculate lit drawables volume if focused and shadowed.
+            // 1. Iterate over visible geometry;
+            // 2. Collect lit geometry;
+            // 3. Calculate lit drawables volume if focused and shadowed.
             // Reuse frustum query
             geometriesAndLightsQuery_.ScheduleWork(workQueue_,
                 [=](SceneGridCellRef& cellRef, unsigned threadIndex)
@@ -526,9 +527,44 @@ void BatchCollector::ProcessLights()
                 }
             });
         }
-        else
+        else if (lightType == LIGHT_POINT)
         {
-            assert(0);
+            const Sphere lightSphere(light->GetNode()->GetWorldPosition(), light->GetRange());
+            // For point light:
+            // 1. Query cells in sphere;
+            // 2. Iterate over objects in cells;
+            // 3. Collect lit geometry;
+            workQueue_->ScheduleWork([=](unsigned threadIndex)
+            {
+                sceneGrid->ProcessCellsInSphere(lightSphere,
+                    [=](SceneGridCellDrawableSoA& cell, bool isInside)
+                {
+                    VisibleLightsPerThreadData& result = lightsData_[threadIndex];
+                    for (unsigned index = 0; index < cell.size_; ++index)
+                    {
+                        // Skip drawables outside the sphere
+                        if (!isInside && !cell.IsInSphere(index, lightSphere))
+                            continue;
+
+                        // Add visible to lit geometry
+                        if (cell.visible_[index])
+                        {
+                            // TODO(eugeneko) Get grid index w/o pointer picking
+                            Drawable* drawable = cell.drawable_[index];
+                            const unsigned gridIndex = drawable->GetDrawableIndex().gridIndex_;
+
+                            LitGeometryDescIdx litGeometry;
+                            litGeometry.drawableIndex_ = gridIndex;
+                            litGeometry.lightIndex_ = lightIndex;
+                            litGeometry.negativeLight_ = lightBatchQueue->negative_;
+                            litGeometry.perVertex_ = lightBatchQueue->isPerVertex_;
+                            // TODO(eugeneko) Use true sort value
+                            litGeometry.sortValue_ = light->GetSortValue();
+                            result.litGeometry_.Push(litGeometry);
+                        }
+                    }
+                });
+            });
         }
 
         // Find or create queues data for each thread

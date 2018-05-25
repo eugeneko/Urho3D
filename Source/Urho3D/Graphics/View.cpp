@@ -445,7 +445,7 @@ void View::Update(const FrameInfo& frame)
 
     {
         URHO3D_PROFILE(ProcessLights);
-        batchCollector_->ProcessLights();
+        batchCollector_->ProcessLights(sceneGrid_);
     }
 
     {
