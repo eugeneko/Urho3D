@@ -913,6 +913,10 @@ void View::CookBatches()
     {
         URHO3D_PROFILE(GetBatches);
 
+        // Get shadow batches
+        batchCollector_->CollectShadowBatches(viewSize_, materialQuality_);
+
+        // Get light batches
         auto& visibleGeometriesArray = batchCollector_->GetVisibleGeometries();
         auto& numLightsArray = batchCollector_->GetVisibleGeometriesNumLights();
         auto& litGeometriesArray = batchCollector_->GetLitGeometries();

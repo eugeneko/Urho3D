@@ -98,6 +98,7 @@ struct SceneGridCellDrawableSoA
     Vector<unsigned> cachedZoneShadowMask_;
 
     Vector<bool> visible_;
+    Vector<Vector2> minmaxZ_;
 
     bool IsValid() const
     {
@@ -126,6 +127,7 @@ struct SceneGridCellDrawableSoA
             && size_ == cachedZoneShadowMask_.Size()
 
             && size_ == visible_.Size()
+            && size_ == minmaxZ_.Size()
             ;
     }
     void Push(Drawable* drawable)
@@ -157,6 +159,7 @@ struct SceneGridCellDrawableSoA
         cachedZoneShadowMask_.Push(0);
 
         visible_.Push(false);
+        minmaxZ_.Push(Vector2::ZERO);
 
         ++size_;
         assert(IsValid());
@@ -198,6 +201,7 @@ struct SceneGridCellDrawableSoA
         cachedZoneShadowMask_.EraseSwap(index);
 
         visible_.EraseSwap(index);
+        minmaxZ_.EraseSwap(index);
 
         assert(IsValid());
     }
@@ -231,6 +235,7 @@ struct SceneGridCellDrawableSoA
         cachedZoneShadowMask_.Clear();
 
         visible_.Clear();
+        minmaxZ_.Clear();
 
         assert(IsValid());
     }
@@ -572,6 +577,21 @@ public:
             if (cell.data_.size_ > 0)
             {
                 const Intersection intersection = sphere.IsInside(cell.boundingBox_);
+                if (intersection != OUTSIDE)
+                    function(cell.data_, intersection == INSIDE);
+            }
+        }
+    }
+    /// Process cells in frustum. Expected signature is `function(cell, isInside)`.
+    template <class T>
+    void ProcessCellsInFrustum(const Frustum& frustum, T function)
+    {
+        for (unsigned cellIndex = 0; cellIndex < numCells_; ++cellIndex)
+        {
+            SceneGridCell& cell = cells_[cellIndex];
+            if (cell.data_.size_ > 0)
+            {
+                const Intersection intersection = frustum.IsInside(cell.boundingBox_);
                 if (intersection != OUTSIDE)
                     function(cell.data_, intersection == INSIDE);
             }

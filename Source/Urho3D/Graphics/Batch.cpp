@@ -928,7 +928,8 @@ unsigned BatchQueue::GetNumInstances() const
     else
     {
         for (BatchGroup* group : sortedBatchGroups_)
-            total += group->instances_.Size();
+            if (group->geometryType_ == GEOM_INSTANCED)
+                total += group->instances_.Size();
     }
 
     return total;
