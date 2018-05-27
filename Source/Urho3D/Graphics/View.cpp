@@ -837,7 +837,7 @@ struct BatchVectorSoA
     }
 };
 
-static const unsigned maxPixelLights_ = 4;
+static const unsigned maxPixelLights_ = M_MAX_UNSIGNED;
 // #if 0
 SceneGridDrawableSoA globalSceneData_;
 static HashMap<Drawable*, unsigned> globalGeometriesIndex_;

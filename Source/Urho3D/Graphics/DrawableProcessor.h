@@ -312,11 +312,13 @@ struct SceneGridCellDrawableSoA
 struct SceneGridCell
 {
     IntVector3 index_;
-    BoundingBox boundingBox_;
+    BoundingBox innerBoundingBox_;
+    BoundingBox outerBoundingBox_;
     SceneGridCellDrawableSoA data_;
     bool IsInside(const BoundingBox& boundingBox) const
     {
-        return boundingBox_.IsInside(boundingBox) == INSIDE;
+        return innerBoundingBox_.IsInside(boundingBox.Center()) == INSIDE
+            && outerBoundingBox_.IsInside(boundingBox) == INSIDE;
     }
 };
 
@@ -445,7 +447,7 @@ public:
         RemoveAllDrawables();
     }
     /// Reset scene grid.
-    void Reset(const BoundingBox& boundingBox, const IntVector3& numCellsXYZ)
+    void Reset(const BoundingBox& boundingBox, const IntVector3& numCellsXYZ, float pad)
     {
         boundingBox_ = boundingBox;
         numCellsXYZ_ = numCellsXYZ;
@@ -459,7 +461,8 @@ public:
         // Reset default cell
         SceneGridCell* defaultCell = GetDefaultCell();
         defaultCell->index_ = IntVector3::ONE * -1;
-        defaultCell->boundingBox_ = BoundingBox(-M_LARGE_VALUE, M_LARGE_VALUE);
+        defaultCell->innerBoundingBox_ = BoundingBox(-M_LARGE_VALUE, M_LARGE_VALUE);
+        defaultCell->outerBoundingBox_ = BoundingBox(-M_LARGE_VALUE, M_LARGE_VALUE);
         defaultCell->data_.Clear();
 
         // Reset cells
@@ -473,8 +476,10 @@ public:
                     Vector3 floatIndex(static_cast<float>(x), static_cast<float>(y), static_cast<float>(z));
                     SceneGridCell& cell = cells_[index];
                     cell.index_ = IntVector3(x, y, z);
-                    cell.boundingBox_.min_ = boundingBox_.min_ + floatIndex * cellSize_;
-                    cell.boundingBox_.max_ = cell.boundingBox_.min_ + Vector3::ONE * cellSize_;
+                    cell.innerBoundingBox_.min_ = boundingBox_.min_ + floatIndex * cellSize_;
+                    cell.innerBoundingBox_.max_ = cell.innerBoundingBox_.min_ + Vector3::ONE * cellSize_;
+                    cell.outerBoundingBox_.min_ = cell.innerBoundingBox_.min_ - Vector3::ONE * pad;
+                    cell.outerBoundingBox_.max_ = cell.innerBoundingBox_.max_ + Vector3::ONE * pad;
                     cell.data_.Clear();
                     ++index;
                 }
@@ -516,7 +521,7 @@ public:
             result.cellMasks_[cellIndex] = OUTSIDE;
             if (cells_[cellIndex].data_.size_ > 0)
             {
-                const Intersection intersection = frustum.IsInside(cells_[cellIndex].boundingBox_);
+                const Intersection intersection = frustum.IsInside(cells_[cellIndex].outerBoundingBox_);
                 result.cellMasks_[cellIndex] = intersection;
                 if (intersection != OUTSIDE)
                     numDrawables += cells_[cellIndex].data_.size_;
@@ -576,7 +581,7 @@ public:
             SceneGridCell& cell = cells_[cellIndex];
             if (cell.data_.size_ > 0)
             {
-                const Intersection intersection = sphere.IsInside(cell.boundingBox_);
+                const Intersection intersection = sphere.IsInside(cell.outerBoundingBox_);
                 if (intersection != OUTSIDE)
                     function(cell.data_, intersection == INSIDE);
             }
@@ -591,7 +596,7 @@ public:
             SceneGridCell& cell = cells_[cellIndex];
             if (cell.data_.size_ > 0)
             {
-                const Intersection intersection = frustum.IsInside(cell.boundingBox_);
+                const Intersection intersection = frustum.IsInside(cell.outerBoundingBox_);
                 if (intersection != OUTSIDE)
                     function(cell.data_, intersection == INSIDE);
             }

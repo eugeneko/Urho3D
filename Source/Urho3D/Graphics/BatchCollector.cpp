@@ -570,6 +570,61 @@ void BatchCollector::ProcessLights(SceneGrid* sceneGrid)
                         if (!isInside && !cell.IsInSphere(index, lightSphere))
                             continue;
 
+                        // Filter by light mask
+                        // TODO(eugeneko) Optimize it?
+                        const unsigned zoneLightMask = GetActualZone(cell.cachedZone_[index])->GetLightMask();
+                        if (!(cell.lightMask_[index] & zoneLightMask & lightMask))
+                            continue;
+
+                        // Add visible to lit geometry
+                        if (cell.visible_[index])
+                        {
+                            // TODO(eugeneko) Get grid index w/o pointer picking
+                            Drawable* drawable = cell.drawable_[index];
+                            const unsigned gridIndex = drawable->GetDrawableIndex().gridIndex_;
+
+                            LitGeometryDescIdx litGeometry;
+                            litGeometry.drawableIndex_ = gridIndex;
+                            litGeometry.lightIndex_ = lightIndex;
+                            litGeometry.negativeLight_ = lightBatchQueue->negative_;
+                            litGeometry.perVertex_ = lightBatchQueue->isPerVertex_;
+                            // TODO(eugeneko) Use true sort value
+                            litGeometry.sortValue_ = light->GetSortValue();
+                            result.litGeometry_.Push(litGeometry);
+                        }
+                    }
+                });
+            });
+        }
+        else if (lightType == LIGHT_SPOT)
+        {
+            const Frustum lightFrustum = light->GetFrustum();
+            const Sphere lightSphere(light->GetNode()->GetWorldPosition(), light->GetRange());
+            // For spot lights:
+            // 1. Query cells in frustum;
+            // 2. Iterate over objects in cells;
+            // 3. Collect lit geometry;
+            workQueue_->ScheduleWork([=](unsigned threadIndex)
+            {
+                sceneGrid->ProcessCellsInFrustum(lightFrustum,
+                    [=](SceneGridCellDrawableSoA& cell, bool isInside)
+                {
+                    VisibleLightsPerThreadData& result = lightsData_[threadIndex];
+                    for (unsigned index = 0; index < cell.size_; ++index)
+                    {
+                        if (!isInside && !cell.IsInSphere(index, lightSphere))
+                            continue;
+
+                        // Skip drawables outside the sphere
+                        if (!isInside && !cell.IsInFrustum(index, lightFrustum))
+                            continue;
+
+                        // Filter by light mask
+                        // TODO(eugeneko) Optimize it?
+                        const unsigned zoneLightMask = GetActualZone(cell.cachedZone_[index])->GetLightMask();
+                        if (!(cell.lightMask_[index] & zoneLightMask & lightMask))
+                            continue;
+
                         // Add visible to lit geometry
                         if (cell.visible_[index])
                         {
