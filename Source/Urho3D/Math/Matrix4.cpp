@@ -42,7 +42,7 @@ const Matrix4 Matrix4::IDENTITY;
 
 Matrix4 Matrix4::operator *(const Matrix3x4& rhs) const
 {
-    return Matrix4(
+    Matrix4 result(
         m00_ * rhs.m00_ + m01_ * rhs.m10_ + m02_ * rhs.m20_,
         m00_ * rhs.m01_ + m01_ * rhs.m11_ + m02_ * rhs.m21_,
         m00_ * rhs.m02_ + m01_ * rhs.m12_ + m02_ * rhs.m22_,
@@ -60,6 +60,8 @@ Matrix4 Matrix4::operator *(const Matrix3x4& rhs) const
         m30_ * rhs.m02_ + m31_ * rhs.m12_ + m32_ * rhs.m22_,
         m30_ * rhs.m03_ + m31_ * rhs.m13_ + m32_ * rhs.m23_ + m33_
     );
+    result.m33_ = m30_ * rhs.m03_ + m31_ * rhs.m13_ + m32_ * rhs.m23_ + m33_;
+    return result;
 }
 
 void Matrix4::Decompose(Vector3& translation, Quaternion& rotation, Vector3& scale) const
