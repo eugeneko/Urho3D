@@ -1458,8 +1458,10 @@ void View::UpdateGeometries()
             }
         }
 
-        for (LightBatchQueue* lightBatchQueue : batchCollector_->GetLightBatchQueues())
+        for (LightView* lightView : batchCollector_->GetLightViews())
         {
+            LightBatchQueue* lightBatchQueue = lightView->GetLigthBatchQueue();
+
             SharedPtr<WorkItem> lightItem = queue->GetFreeItem();
             lightItem->priority_ = M_MAX_UNSIGNED;
             lightItem->workFunction_ = SortLightQueueWork;
@@ -1605,8 +1607,9 @@ void View::ExecuteRenderPathCommands()
     {
         URHO3D_PROFILE(RenderShadowMaps);
 
-        for (LightBatchQueue* lightBatchQueue : actualView->batchCollector_->GetLightBatchQueues())
+        for (LightView* lightView : actualView->batchCollector_->GetLightViews())
         {
+            LightBatchQueue* lightBatchQueue = lightView->GetLigthBatchQueue();
             if (NeedRenderShadowMap(*lightBatchQueue))
                 RenderShadowMap(*lightBatchQueue);
         }
@@ -1770,8 +1773,9 @@ void View::ExecuteRenderPathCommands()
 
                     SetRenderTargets(command);
 
-                    for (LightBatchQueue* lightBatchQueue : actualView->batchCollector_->GetLightBatchQueues())
+                    for (LightView* lightView : actualView->batchCollector_->GetLightViews())
                     {
+                        LightBatchQueue* lightBatchQueue = lightView->GetLigthBatchQueue();
                         // If reusing shadowmaps, render each of them before the lit batches
                         if (renderer_->GetReuseShadowMaps() && NeedRenderShadowMap(*lightBatchQueue))
                         {
@@ -1816,8 +1820,9 @@ void View::ExecuteRenderPathCommands()
                     URHO3D_PROFILE(RenderLightVolumes);
 
                     SetRenderTargets(command);
-                    for (LightBatchQueue* lightBatchQueue : actualView->batchCollector_->GetLightBatchQueues())
+                    for (LightView* lightView : actualView->batchCollector_->GetLightViews())
                     {
+                        LightBatchQueue* lightBatchQueue = lightView->GetLigthBatchQueue();
                         // If reusing shadowmaps, render each of them before the lit batches
                         if (renderer_->GetReuseShadowMaps() && NeedRenderShadowMap(*lightBatchQueue))
                         {
@@ -2887,8 +2892,9 @@ void View::PrepareInstancingBuffer()
     for (ScenePassInfo& info : scenePasses_)
         totalInstances += batchCollector_->GetScenePassQueue(info.passIndex_)->GetNumInstances();
 
-    for (LightBatchQueue* lightBatchQueue : batchCollector_->GetLightBatchQueues())
+    for (LightView* lightView : batchCollector_->GetLightViews())
     {
+        LightBatchQueue* lightBatchQueue = lightView->GetLigthBatchQueue();
         for (unsigned j = 0; j < lightBatchQueue->shadowSplits_.Size(); ++j)
             totalInstances += lightBatchQueue->shadowSplits_[j].shadowBatches_.GetNumInstances();
         totalInstances += lightBatchQueue->litBaseBatches_.GetNumInstances();
@@ -2908,8 +2914,9 @@ void View::PrepareInstancingBuffer()
     for (ScenePassInfo& info : scenePasses_)
         batchCollector_->GetScenePassQueue(info.passIndex_)->SetInstancingData(dest, stride, freeIndex);
 
-    for (LightBatchQueue* lightBatchQueue : batchCollector_->GetLightBatchQueues())
+    for (LightView* lightView : batchCollector_->GetLightViews())
     {
+        LightBatchQueue* lightBatchQueue = lightView->GetLigthBatchQueue();
         for (unsigned j = 0; j < lightBatchQueue->shadowSplits_.Size(); ++j)
             lightBatchQueue->shadowSplits_[j].shadowBatches_.SetInstancingData(dest, stride, freeIndex);
         lightBatchQueue->litBaseBatches_.SetInstancingData(dest, stride, freeIndex);

@@ -62,6 +62,417 @@
 namespace Urho3D
 {
 
+namespace
+{
+
+/// Check whether the light has shadow.
+bool IsLightShadowed(Light* light)
+{
+    // Check if light should be shadowed
+    bool isShadowed = light->GetCastShadows() && !light->GetPerVertex() && light->GetShadowIntensity() < 1.0f;
+    // If shadow distance non-zero, check it
+    if (isShadowed && light->GetShadowDistance() > 0.0f && light->GetDistance() > light->GetShadowDistance())
+        isShadowed = false;
+    // OpenGL ES can not support point light shadows
+#ifdef GL_ES_VERSION_2_0
+    if (isShadowed && light->GetLightType() == LIGHT_POINT)
+        isShadowed = false;
+#endif
+    return isShadowed;
+}
+
+/// Get effective shadow distance.
+float GetEffectiveShadowDistance(float shadowDistance, float drawDistance)
+{
+    if (drawDistance > 0.0f && (shadowDistance <= 0.0f || drawDistance < shadowDistance))
+        return drawDistance;
+    else
+        return shadowDistance;
+}
+
+/// Get material technique.
+Technique* GetTechnique(int materialQuality, float lodDistance, Material* material, Material* defaultMaterial)
+{
+    if (!material)
+        return defaultMaterial->GetTechniques()[0].technique_;
+
+    const Vector<TechniqueEntry>& techniques = material->GetTechniques();
+    // If only one technique, no choice
+    if (techniques.Size() == 1)
+        return techniques[0].technique_;
+    else
+    {
+        // Check for suitable technique. Techniques should be ordered like this:
+        // Most distant & highest quality
+        // Most distant & lowest quality
+        // Second most distant & highest quality
+        // ...
+        for (unsigned i = 0; i < techniques.Size(); ++i)
+        {
+            const TechniqueEntry& entry = techniques[i];
+            Technique* tech = entry.technique_;
+
+            if (!tech || (!tech->IsSupported()) || materialQuality < entry.qualityLevel_)
+                continue;
+            if (lodDistance >= entry.lodDistance_)
+                return tech;
+        }
+
+        // If no suitable technique found, fallback to the last
+        return techniques.Size() ? techniques.Back().technique_ : nullptr;
+    }
+}
+
+/// Check whether the drawable is lit by directional light.
+bool IsDrawableLitByDirectionalLight(SceneGridCellDrawableSoA& cell, unsigned index,
+    unsigned viewMask, const ZoneContext& zoneContext, unsigned lightMask)
+{
+    // Skip if view mask doesn't match
+    if (!(cell.viewMask_[index] & viewMask))
+        return false;
+
+    // Skip non-geometries or invisible geometries
+    if (!(cell.drawableFlag_[index] & DRAWABLE_GEOMETRY) || !cell.visible_[index])
+        return false;
+
+    // Filter by light mask
+    // TODO(eugeneko) Optimize it?
+    Zone* zone = zoneContext.GetActualZone(cell.cachedZone_[index]);
+    if (!(cell.lightMask_[index] & zone->GetLightMask() & lightMask))
+        return false;
+
+    return true;
+}
+
+/// Check whether the drawable is affected by point light.
+bool IsDrawableAffectedByPointLight(SceneGridCellDrawableSoA& cell, unsigned index, bool isInside, unsigned viewMask, const Sphere& lightSphere)
+{
+    // Skip if view mask doesn't match
+    if (!(cell.viewMask_[index] & viewMask))
+        return false;
+
+    // Skip non-geometries
+    if (!(cell.drawableFlag_[index] & DRAWABLE_GEOMETRY))
+        return false;
+
+    // Skip drawables outside the sphere
+    if (!isInside && !cell.IsInSphere(index, lightSphere))
+        return false;
+
+    return true;
+}
+
+/// Check whether the drawable is affected by spot light.
+bool IsDrawableAffectedBySpotLight(SceneGridCellDrawableSoA& cell, unsigned index, bool isInside,
+    unsigned viewMask, const Sphere& lightSphere, const Frustum& lightFrustum)
+{
+    // Skip if view mask doesn't match
+    if (!(cell.viewMask_[index] & viewMask))
+        return false;
+
+    // Skip non-geometries
+    if (!(cell.drawableFlag_[index] & DRAWABLE_GEOMETRY))
+        return false;
+
+    if (isInside)
+        return true;
+
+    if (!cell.IsInSphere(index, lightSphere))
+        return false;
+
+    // Skip drawables outside the sphere
+    if (!cell.IsInFrustum(index, lightFrustum))
+        return false;
+
+    return true;
+}
+
+/// Check whether the drawable is affected by point light.
+void CheckDrawableLitAndCastShadow(SceneGridCellDrawableSoA& cell, unsigned index,
+    Camera* cullCamera, const ZoneContext& zoneContext, unsigned lightMask, bool& lit, bool& castShadow)
+{
+    lit = false;
+    castShadow = false;
+
+    // TODO(eugeneko) Optimize it?
+    Zone* zone = zoneContext.GetActualZone(cell.cachedZone_[index]);
+
+    // Lit if visible and light mask matches
+    if (cell.visible_[index] && (cell.lightMask_[index] & zone->GetLightMask() & lightMask))
+    {
+        lit = true;
+    }
+
+    // Cast shadow if shadow caster and shadow mask match
+    if (cell.castShadows_[index] && (cell.shadowMask_[index] & zone->GetShadowMask() & lightMask))
+    {
+        // Calculate draw distance
+        const float drawDistance = cell.drawDistance_[index];
+        const float shadowDistance = GetEffectiveShadowDistance(cell.shadowDistance_[index], drawDistance);
+        const float distance = cullCamera->GetDistance(cell.boundingSphere_[index].center_);
+
+        // Cast shadow if close enough
+        if (shadowDistance == 0.0f || distance <= shadowDistance)
+        {
+            castShadow = true;
+        }
+    }
+}
+
+/// Quantize shadow camera for directional light.
+void QuantizeDirLightShadowCamera(Camera* shadowCamera, Light* light, const IntRect& shadowViewport,
+    const BoundingBox& viewBox)
+{
+    Node* shadowCameraNode = shadowCamera->GetNode();
+    const FocusParameters& parameters = light->GetShadowFocus();
+    auto shadowMapWidth = (float)(shadowViewport.Width());
+
+    float minX = viewBox.min_.x_;
+    float minY = viewBox.min_.y_;
+    float maxX = viewBox.max_.x_;
+    float maxY = viewBox.max_.y_;
+
+    Vector2 center((minX + maxX) * 0.5f, (minY + maxY) * 0.5f);
+    Vector2 viewSize(maxX - minX, maxY - minY);
+
+    // Quantize size to reduce swimming
+    // Note: if size is uniform and there is no focusing, quantization is unnecessary
+    if (parameters.nonUniform_)
+    {
+        viewSize.x_ = ceilf(sqrtf(viewSize.x_ / parameters.quantize_));
+        viewSize.y_ = ceilf(sqrtf(viewSize.y_ / parameters.quantize_));
+        viewSize.x_ = Max(viewSize.x_ * viewSize.x_ * parameters.quantize_, parameters.minView_);
+        viewSize.y_ = Max(viewSize.y_ * viewSize.y_ * parameters.quantize_, parameters.minView_);
+    }
+    else if (parameters.focus_)
+    {
+        viewSize.x_ = Max(viewSize.x_, viewSize.y_);
+        viewSize.x_ = ceilf(sqrtf(viewSize.x_ / parameters.quantize_));
+        viewSize.x_ = Max(viewSize.x_ * viewSize.x_ * parameters.quantize_, parameters.minView_);
+        viewSize.y_ = viewSize.x_;
+    }
+
+    shadowCamera->SetOrthoSize(viewSize);
+
+    // Center shadow camera to the view space bounding box
+    Quaternion rot(shadowCameraNode->GetWorldRotation());
+    Vector3 adjust(center.x_, center.y_, 0.0f);
+    shadowCameraNode->Translate(rot * adjust, TS_WORLD);
+
+    // If the shadow map viewport is known, snap to whole texels
+    if (shadowMapWidth > 0.0f)
+    {
+        Vector3 viewPos(rot.Inverse() * shadowCameraNode->GetWorldPosition());
+        // Take into account that shadow map border will not be used
+        float invActualSize = 1.0f / (shadowMapWidth - 2.0f);
+        Vector2 texelSize(viewSize.x_ * invActualSize, viewSize.y_ * invActualSize);
+        Vector3 snap(-fmodf(viewPos.x_, texelSize.x_), -fmodf(viewPos.y_, texelSize.y_), 0.0f);
+        shadowCameraNode->Translate(rot * snap, TS_WORLD);
+    }
+}
+
+/// Setup shadow camera for directional light.
+void SetupDirLightShadowCamera(Camera* shadowCamera, Light* light,
+    float nearSplit, float farSplit, const BoundingBox& litGeometriesBox,
+    Camera* cullCamera, float minZ, float maxZ)
+{
+    Node* shadowCameraNode = shadowCamera->GetNode();
+    Node* lightNode = light->GetNode();
+    float extrusionDistance = Min(cullCamera->GetFarClip(), light->GetShadowMaxExtrusion());
+    const FocusParameters& parameters = light->GetShadowFocus();
+
+    // Calculate initial position & rotation
+    Vector3 pos = cullCamera->GetNode()->GetWorldPosition() - extrusionDistance * lightNode->GetWorldDirection();
+    shadowCameraNode->SetTransform(pos, lightNode->GetWorldRotation());
+
+    // Calculate main camera shadowed frustum in light's view space
+    farSplit = Min(farSplit, cullCamera->GetFarClip());
+    // Use the scene Z bounds to limit frustum size if applicable
+    if (parameters.focus_)
+    {
+        nearSplit = Max(minZ, nearSplit);
+        farSplit = Min(maxZ, farSplit);
+    }
+
+    Frustum splitFrustum = cullCamera->GetSplitFrustum(nearSplit, farSplit);
+    Polyhedron frustumVolume;
+    frustumVolume.Define(splitFrustum);
+    // If focusing enabled, clip the frustum volume by the combined bounding box of the lit geometries within the frustum
+    if (parameters.focus_ && litGeometriesBox.Defined())
+    {
+        frustumVolume.Clip(litGeometriesBox);
+        // If volume became empty, restore it to avoid zero size
+        if (frustumVolume.Empty())
+            frustumVolume.Define(splitFrustum);
+    }
+
+    // Transform frustum volume to light space
+    const Matrix3x4& lightView = shadowCamera->GetView();
+    frustumVolume.Transform(lightView);
+
+    // Fit the frustum volume inside a bounding box. If uniform size, use a sphere instead
+    BoundingBox shadowBox;
+    if (!parameters.nonUniform_)
+        shadowBox.Define(Sphere(frustumVolume));
+    else
+        shadowBox.Define(frustumVolume);
+
+    shadowCamera->SetOrthographic(true);
+    shadowCamera->SetAspectRatio(1.0f);
+    shadowCamera->SetNearClip(0.0f);
+    shadowCamera->SetFarClip(shadowBox.max_.z_);
+
+    // Center shadow camera on the bounding box. Can not snap to texels yet as the shadow map viewport is unknown
+    QuantizeDirLightShadowCamera(shadowCamera, light, IntRect(0, 0, 0, 0), shadowBox);
+}
+
+/// Finalize shadow camera.
+void FinalizeShadowCamera(Camera* shadowCamera, Light* light, const IntRect& shadowViewport,
+    const BoundingBox& shadowCasterBox)
+{
+    const FocusParameters& parameters = light->GetShadowFocus();
+    auto shadowMapWidth = (float)(shadowViewport.Width());
+    LightType type = light->GetLightType();
+
+    if (type == LIGHT_DIRECTIONAL)
+    {
+        BoundingBox shadowBox;
+        shadowBox.max_.y_ = shadowCamera->GetOrthoSize() * 0.5f;
+        shadowBox.max_.x_ = shadowCamera->GetAspectRatio() * shadowBox.max_.y_;
+        shadowBox.min_.y_ = -shadowBox.max_.y_;
+        shadowBox.min_.x_ = -shadowBox.max_.x_;
+
+        // Requantize and snap to shadow map texels
+        QuantizeDirLightShadowCamera(shadowCamera, light, shadowViewport, shadowBox);
+    }
+
+    if (type == LIGHT_SPOT && parameters.focus_)
+    {
+        float viewSizeX = Max(Abs(shadowCasterBox.min_.x_), Abs(shadowCasterBox.max_.x_));
+        float viewSizeY = Max(Abs(shadowCasterBox.min_.y_), Abs(shadowCasterBox.max_.y_));
+        float viewSize = Max(viewSizeX, viewSizeY);
+        // Scale the quantization parameters, because view size is in projection space (-1.0 - 1.0)
+        float invOrthoSize = 1.0f / shadowCamera->GetOrthoSize();
+        float quantize = parameters.quantize_ * invOrthoSize;
+        float minView = parameters.minView_ * invOrthoSize;
+
+        viewSize = Max(ceilf(viewSize / quantize) * quantize, minView);
+        if (viewSize < 1.0f)
+            shadowCamera->SetZoom(1.0f / viewSize);
+    }
+
+    // Perform a finalization step for all lights: ensure zoom out of 2 pixels to eliminate border filtering issues
+    // For point lights use 4 pixels, as they must not cross sides of the virtual cube map (maximum 3x3 PCF)
+    if (shadowCamera->GetZoom() >= 1.0f)
+    {
+        if (light->GetLightType() != LIGHT_POINT)
+            shadowCamera->SetZoom(shadowCamera->GetZoom() * ((shadowMapWidth - 2.0f) / shadowMapWidth));
+        else
+        {
+#ifdef URHO3D_OPENGL
+            shadowCamera->SetZoom(shadowCamera->GetZoom() * ((shadowMapWidth - 3.0f) / shadowMapWidth));
+#else
+            shadowCamera->SetZoom(shadowCamera->GetZoom() * ((shadowMapWidth - 4.0f) / shadowMapWidth));
+#endif
+        }
+    }
+}
+
+/// Return viewport for given light and split.
+IntRect GetShadowMapViewport(Light* light, int splitIndex, Texture2D* shadowMap)
+{
+    const int width = shadowMap->GetWidth();
+    const int height = shadowMap->GetHeight();
+
+    switch (light->GetLightType())
+    {
+    case LIGHT_DIRECTIONAL:
+    {
+        int numSplits = light->GetNumShadowSplits();
+        if (numSplits == 1)
+            return{ 0, 0, width, height };
+        else if (numSplits == 2)
+            return{ splitIndex * width / 2, 0, (splitIndex + 1) * width / 2, height };
+        else
+            return{ (splitIndex & 1) * width / 2, (splitIndex / 2) * height / 2,
+            ((splitIndex & 1) + 1) * width / 2, (splitIndex / 2 + 1) * height / 2 };
+    }
+
+    case LIGHT_SPOT:
+        return{ 0, 0, width, height };
+
+    case LIGHT_POINT:
+        return{ (splitIndex & 1) * width / 2, (splitIndex / 2) * height / 3,
+            ((splitIndex & 1) + 1) * width / 2, (splitIndex / 2 + 1) * height / 3 };
+    }
+
+    return{};
+}
+
+/// Light shadow split context.
+struct LightShadowSplitContext
+{
+    Camera* shadowCamera_{};
+    Frustum shadowCameraFrustum_;
+    Matrix3x4 lightView_;
+    Matrix4 lightProj_;
+    Frustum lightViewFrustum_;
+    BoundingBox lightViewFrustumBox_;
+    /// Define the structure.
+    void Define(Camera* cullCamera, Camera* shadowCamera, float nearClip, float farClip)
+    {
+        shadowCamera_ = shadowCamera;
+        shadowCameraFrustum_ = shadowCamera->GetFrustum();
+        lightView_ = shadowCamera->GetView();
+        lightProj_ = shadowCamera->GetProjection();
+
+        // Transform scene frustum into shadow camera's view space for shadow caster visibility check. For point & spot lights,
+        // we can use the whole scene frustum. For directional lights, use the intersection of the scene frustum and the split
+        // frustum, so that shadow casters do not get rendered into unnecessary splits
+        lightViewFrustum_ = cullCamera->GetSplitFrustum(nearClip, farClip).Transformed(lightView_);
+        lightViewFrustumBox_.Define(lightViewFrustum_);
+    }
+    /// Return whether the frustum is degenerate.
+    bool IsDegenerate() const { return lightViewFrustum_.vertices_[0] == lightViewFrustum_.vertices_[4]; }
+    /// Returns whether shadow caster visible
+    bool IsShadowCasterVisible(bool drawableVisible, BoundingBox lightViewBox) const
+    {
+        if (shadowCamera_->IsOrthographic())
+        {
+            // Extrude the light space bounding box up to the far edge of the frustum's light space bounding box
+            lightViewBox.max_.z_ = Max(lightViewBox.max_.z_, lightViewFrustumBox_.max_.z_);
+            return lightViewFrustum_.IsInsideFast(lightViewBox) != OUTSIDE;
+        }
+        else
+        {
+            // If light is not directional, can do a simple check: if object is visible, its shadow is too
+            if (drawableVisible)
+                return true;
+
+            // For perspective lights, extrusion direction depends on the position of the shadow caster
+            Vector3 center = lightViewBox.Center();
+            Ray extrusionRay(center, center);
+
+            float extrusionDistance = shadowCamera_->GetFarClip();
+            float originalDistance = Clamp(center.Length(), M_EPSILON, extrusionDistance);
+
+            // Because of the perspective, the bounding box must also grow when it is extruded to the distance
+            float sizeFactor = extrusionDistance / originalDistance;
+
+            // Calculate the endpoint box and merge it to the original. Because it's axis-aligned, it will be larger
+            // than necessary, so the test will be conservative
+            Vector3 newCenter = extrusionDistance * extrusionRay.direction_;
+            Vector3 newHalfSize = lightViewBox.Size() * sizeFactor * 0.5f;
+            BoundingBox extrudedBox(newCenter - newHalfSize, newCenter + newHalfSize);
+            lightViewBox.Merge(extrudedBox);
+
+            return lightViewFrustum_.IsInsideFast(lightViewBox) != OUTSIDE;
+        }
+    }
+};
+
+}
+//////////////////////////////////////////////////////////////////////////
 void BatchQueueData::ShallowClear()
 {
     batches_.Clear();
@@ -158,6 +569,465 @@ void BatchQueueData::ShallowClear(Vector<BatchQueueData*>& queues)
 }
 
 //////////////////////////////////////////////////////////////////////////
+void LightView::Clear(Light* light, unsigned lightIndex, unsigned maxSortedInstances, float nearClip, float farClip)
+{
+    light_ = light;
+    lightIndex_ = lightIndex;
+    lightType_ = light_->GetLightType();
+    lightMask_ = light_->GetLightMask();
+    perVertex_ = light_->GetPerVertex();
+
+    // Clear light batch queue
+    litBaseBatches_.Clear(maxSortedInstances);
+    litBaseBatches_.Clear(maxSortedInstances);
+    volumeBatches_.Clear();
+
+    // Clear shadow casters and shadow batch data
+    for (Vector<Drawable*>& shadowCasters : shadowCasters_)
+        shadowCasters.Clear();
+    for (BatchQueueData& shadowBatchesData : shadowSplitsData_)
+        shadowBatchesData.ShallowClear();
+    for (BoundingBox& shadowCasterBox : shadowCasterBox_)
+        shadowCasterBox.Clear();
+
+    // Reset light parameters
+    numSplits_ = 0;
+    negative_ = light->IsNegative();
+    isShadowed_ = IsLightShadowed(light);
+    shadowMap_ = nullptr;
+
+    // Update splits
+    if (isShadowed_)
+    {
+        switch (light->GetLightType())
+        {
+        case LIGHT_DIRECTIONAL:
+        {
+            const CascadeParameters& cascade = light->GetShadowCascade();
+
+            float nearSplit = nearClip;
+            float farSplit = 0;
+            int numSplits = light->GetNumShadowSplits();
+
+            while (numSplits_ < numSplits)
+            {
+                // If split is completely beyond camera far clip, we are done
+                if (nearSplit > farClip)
+                    break;
+
+                farSplit = Min(farClip, cascade.splits_[numSplits_]);
+                if (farSplit <= nearSplit)
+                    break;
+
+                // Setup the shadow camera for the split
+                shadowCameras_[numSplits_] = renderer_->GetShadowCamera();
+                shadowNearSplits_[numSplits_] = nearSplit;
+                shadowFarSplits_[numSplits_] = farSplit;
+
+                nearSplit = farSplit;
+                ++numSplits_;
+            }
+            break;
+        }
+        case LIGHT_SPOT:
+        {
+            shadowCameras_[0] = renderer_->GetShadowCamera();
+            numSplits_ = 1;
+            break;
+        }
+        case LIGHT_POINT:
+        {
+            static const Vector3* directions[] =
+            {
+                &Vector3::RIGHT,
+                &Vector3::LEFT,
+                &Vector3::UP,
+                &Vector3::DOWN,
+                &Vector3::FORWARD,
+                &Vector3::BACK
+            };
+
+            for (unsigned i = 0; i < MAX_CUBEMAP_FACES; ++i)
+            {
+                shadowCameras_[i] = renderer_->GetShadowCamera();
+            }
+
+            numSplits_ = MAX_CUBEMAP_FACES;
+            break;
+        }
+        }
+    }
+
+    // Resize shadow splits
+    shadowSplits_.Resize(numSplits_);
+    for (ShadowBatchQueue& shadowBatchQueue : shadowSplits_)
+        shadowBatchQueue.shadowBatches_.Clear(maxSortedInstances);
+
+    shadowSplitsData_.Resize(numSplits_);
+    for (BatchQueueData& shadowBatchQueueData : shadowSplitsData_)
+        shadowBatchQueueData.ShallowClear();
+}
+
+void LightView::SetupDirectionalShadowCameras(const LightViewThreadData& lightViewData, Camera* cullCamera, float minZ, float maxZ)
+{
+    if (!HasShadow())
+        return;
+
+    assert(lightType_ == LIGHT_DIRECTIONAL);
+
+    for (unsigned splitIndex = 0; splitIndex < numSplits_; ++splitIndex)
+    {
+        Camera* shadowCamera = shadowCameras_[splitIndex];
+        const float nearSplit = shadowNearSplits_[splitIndex];
+        const float farSplit = shadowFarSplits_[splitIndex];
+        const BoundingBox& litGeometryBox = lightViewData.litGeometriesBox_[splitIndex];
+        SetupDirLightShadowCamera(shadowCamera, light_, nearSplit, farSplit, litGeometryBox,
+            cullCamera, minZ, maxZ);
+    }
+}
+
+void LightView::SetupPointShadowCameras()
+{
+    if (!HasShadow())
+        return;
+
+    assert(lightType_ == LIGHT_DIRECTIONAL);
+    assert(numSplits_ == MAX_CUBEMAP_FACES);
+
+    static const Vector3* directions[] =
+    {
+        &Vector3::RIGHT,
+        &Vector3::LEFT,
+        &Vector3::UP,
+        &Vector3::DOWN,
+        &Vector3::FORWARD,
+        &Vector3::BACK
+    };
+
+    for (unsigned splitIndex = 0; splitIndex < MAX_CUBEMAP_FACES; ++splitIndex)
+    {
+        Camera* shadowCamera = shadowCameras_[splitIndex];
+        Node* cameraNode = shadowCamera->GetNode();
+
+        // When making a shadowed point light, align the splits along X, Y and Z axes regardless of light rotation
+        cameraNode->SetPosition(light_->GetNode()->GetWorldPosition());
+        cameraNode->SetDirection(*directions[splitIndex]);
+        shadowCamera->SetNearClip(light_->GetShadowNearFarRatio() * light_->GetRange());
+        shadowCamera->SetFarClip(light_->GetRange());
+        shadowCamera->SetFov(90.0f);
+        shadowCamera->SetAspectRatio(1.0f);
+    }
+}
+
+void LightView::SetupSpotShadowCameras()
+{
+    if (!HasShadow())
+        return;
+
+    assert(lightType_ == LIGHT_SPOT);
+    assert(numSplits_ == 1);
+
+    Camera* shadowCamera = shadowCameras_[0];
+    Node* cameraNode = shadowCamera->GetNode();
+    Node* lightNode = light_->GetNode();
+
+    cameraNode->SetTransform(lightNode->GetWorldPosition(), lightNode->GetWorldRotation());
+    shadowCamera->SetNearClip(light_->GetShadowNearFarRatio() * light_->GetRange());
+    shadowCamera->SetFarClip(light_->GetRange());
+    shadowCamera->SetFov(light_->GetFov());
+    shadowCamera->SetAspectRatio(light_->GetAspectRatio());
+}
+
+void LightView::BeginProcessingDirectionalLitGeometry(WorkQueue* workQueue, unsigned viewMask,
+    const SceneGridQueryResult& cellsQuery, const ZoneContext& zoneContext, VisibleLightsThreadDataVector& result)
+{
+    assert(lightType_ == LIGHT_DIRECTIONAL);
+
+    const bool isFocused = light_->GetShadowFocus().focus_;
+    const bool collectLitGeometriesBox = isFocused && isShadowed_;
+
+    // For directional light:
+    // 1. Iterate over visible geometry;
+    // 2. Collect lit geometry;
+    // 3. Calculate lit drawables volume if focused and shadowed.
+    // Reuse frustum query
+    cellsQuery.ScheduleWork(workQueue,
+        [=, &result](const SceneGridCellRef& cellRef, unsigned threadIndex)
+    {
+        Vector<LitGeometryDescIdx>& resultLitGeometry = result[threadIndex].litGeometry_;
+        LightViewThreadData& resultLightData = result[threadIndex].lightData_[lightIndex_];
+
+        SceneGridCellDrawableSoA& cell = *cellRef.data_;
+        for (unsigned index = cellRef.beginIndex_; index < cellRef.endIndex_; ++index)
+        {
+            if (!IsDrawableLitByDirectionalLight(cell, index, viewMask, zoneContext, lightMask_))
+                continue;
+
+            // TODO(eugeneko) Get grid index w/o pointer picking
+            Drawable* drawable = cell.drawable_[index];
+            const unsigned gridIndex = drawable->GetDrawableIndex().gridIndex_;
+
+            // Make and push lit geometry
+            LitGeometryDescIdx litGeometry;
+            litGeometry.drawableIndex_ = gridIndex;
+            litGeometry.lightIndex_ = lightIndex_;
+            litGeometry.negativeLight_ = negative_;
+            litGeometry.perVertex_ = perVertex_;
+            // TODO(eugeneko) Use true sort value
+            litGeometry.sortValue_ = light_->GetSortValue();
+            resultLitGeometry.Push(litGeometry);
+
+            if (collectLitGeometriesBox)
+            {
+                const float geometryMinZ = cell.minmaxZ_[index].x_;
+                const float geometryMaxZ = cell.minmaxZ_[index].y_;
+                for (unsigned splitIndex = 0; splitIndex < numSplits_; ++splitIndex)
+                {
+                    const float splitNearZ = shadowNearSplits_[splitIndex];
+                    const float splitFarZ = shadowFarSplits_[splitIndex];
+                    if (geometryMinZ <= splitFarZ && geometryMaxZ >= splitNearZ)
+                        resultLightData.litGeometriesBox_[splitIndex].Merge(cell.boundingBox_[index]);
+                }
+            }
+        }
+    });
+}
+
+void LightView::BeginProcessingPointLitGeometry(WorkQueue* workQueue, unsigned viewMask, Camera* cullCamera,
+    SceneGrid* sceneGrid, const ZoneContext& zoneContext, VisibleLightsThreadDataVector& result)
+{
+    assert(lightType_ == LIGHT_POINT);
+
+    const Sphere lightSphere(light_->GetNode()->GetWorldPosition(), light_->GetRange());
+    // For point light:
+    // 1. Query cells in sphere;
+    // 2. Iterate over objects in cells;
+    // 3. Collect lit geometry;
+    workQueue->ScheduleWork([=, &result](unsigned threadIndex)
+    {
+        sceneGrid->ProcessCellsInSphere(lightSphere,
+            [=, &result](SceneGridCellDrawableSoA& cell, bool isInside)
+        {
+            Vector<LitGeometryDescIdx>& resultLitGeometry = result[threadIndex].litGeometry_;
+            for (unsigned index = 0; index < cell.size_; ++index)
+            {
+                if (!IsDrawableAffectedByPointLight(cell, index, isInside, viewMask, lightSphere))
+                    continue;
+
+                bool lit = false;
+                bool castShadow = false;
+                CheckDrawableLitAndCastShadow(cell, index, cullCamera, zoneContext, lightMask_, lit, castShadow);
+
+                if (lit)
+                {
+                    // TODO(eugeneko) Get grid index w/o pointer picking
+                    Drawable* drawable = cell.drawable_[index];
+                    const unsigned gridIndex = drawable->GetDrawableIndex().gridIndex_;
+
+                    LitGeometryDescIdx litGeometry;
+                    litGeometry.drawableIndex_ = gridIndex;
+                    litGeometry.lightIndex_ = lightIndex_;
+                    litGeometry.negativeLight_ = negative_;
+                    litGeometry.perVertex_ = perVertex_;
+                    // TODO(eugeneko) Use true sort value
+                    litGeometry.sortValue_ = light_->GetSortValue();
+                    resultLitGeometry.Push(litGeometry);
+                }
+
+                if (HasShadow() && castShadow)
+                {
+                    assert(0);
+                }
+            }
+        });
+    });
+}
+
+void LightView::BeginProcessingSpotLitGeometry(WorkQueue* workQueue, unsigned viewMask, Camera* cullCamera,
+    SceneGrid* sceneGrid, const ZoneContext& zoneContext, VisibleLightsThreadDataVector& result)
+{
+    assert(lightType_ == LIGHT_SPOT);
+
+    const Frustum lightFrustum = light_->GetFrustum();
+    const Sphere lightSphere(light_->GetNode()->GetWorldPosition(), light_->GetRange());
+
+    // For spot lights:
+    // 1. Query cells in frustum;
+    // 2. Iterate over objects in cells;
+    // 3. Collect lit geometry;
+    workQueue->ScheduleWork([=, &result](unsigned threadIndex)
+    {
+        sceneGrid->ProcessCellsInFrustum(lightFrustum,
+            [=, &result](SceneGridCellDrawableSoA& cell, bool isInside)
+        {
+            Vector<LitGeometryDescIdx>& resultLitGeometry = result[threadIndex].litGeometry_;
+            for (unsigned index = 0; index < cell.size_; ++index)
+            {
+                if (!IsDrawableAffectedBySpotLight(cell, index, isInside, viewMask, lightSphere, lightFrustum))
+                    continue;
+
+                bool lit = false;
+                bool castShadow = false;
+                CheckDrawableLitAndCastShadow(cell, index, cullCamera, zoneContext, lightMask_, lit, castShadow);
+
+                if (lit)
+                {
+                    // TODO(eugeneko) Get grid index w/o pointer picking
+                    Drawable* drawable = cell.drawable_[index];
+                    const unsigned gridIndex = drawable->GetDrawableIndex().gridIndex_;
+
+                    LitGeometryDescIdx litGeometry;
+                    litGeometry.drawableIndex_ = gridIndex;
+                    litGeometry.lightIndex_ = lightIndex_;
+                    litGeometry.negativeLight_ = negative_;
+                    litGeometry.perVertex_ = perVertex_;
+                    // TODO(eugeneko) Use true sort value
+                    litGeometry.sortValue_ = light_->GetSortValue();
+                    resultLitGeometry.Push(litGeometry);
+                }
+
+                if (HasShadow() && castShadow)
+                {
+                    assert(0);
+                }
+            }
+        });
+    });
+}
+
+void LightView::BeginProcessingDirectionalShadowCasters(WorkQueue* workQueue, unsigned viewMask, Camera* cullCamera,
+    SceneGrid* sceneGrid, const ZoneContext& zoneContext, float sceneMinZ, float sceneMaxZ)
+{
+    if (!HasShadow())
+        return;
+
+    assert(lightType_ == LIGHT_DIRECTIONAL);
+
+    for (unsigned splitIndex = 0; splitIndex < numSplits_; ++splitIndex)
+    {
+        const float splitNear = Max(sceneMinZ, shadowNearSplits_[splitIndex]);
+        const float splitFar = Min(sceneMaxZ, shadowFarSplits_[splitIndex]);
+
+        LightShadowSplitContext shadowContext;
+        shadowContext.Define(cullCamera, shadowCameras_[splitIndex], splitNear, splitFar);
+
+        if (shadowContext.IsDegenerate())
+            continue;
+
+        workQueue->ScheduleWork([=](unsigned threadIndex)
+        {
+            Vector<Drawable*>& resultShadowCasters = shadowCasters_[splitIndex];
+            assert(resultShadowCasters.Empty());
+
+            sceneGrid->ProcessCellsInFrustum(shadowContext.shadowCameraFrustum_,
+                [=, &resultShadowCasters, &shadowContext, &zoneContext](SceneGridCellDrawableSoA& cell, bool isInside)
+            {
+                for (unsigned index = 0; index < cell.size_; ++index)
+                {
+                    // Skip if view mask doesn't match or if not shadow caster
+                    if (!cell.castShadows_[index] || !(cell.viewMask_[index] & viewMask))
+                        continue;
+
+                    // Skip drawables outside the frustum
+                    if (!isInside && !cell.IsInFrustum(index, shadowContext.shadowCameraFrustum_))
+                        continue;
+
+                    // Check if casts shadow
+                    bool lit = false;
+                    bool castShadow = false;
+                    CheckDrawableLitAndCastShadow(cell, index, cullCamera, zoneContext, lightMask_, lit, castShadow);
+                    if (!castShadow)
+                        continue;
+
+                    // Project shadow caster bounding box to light view space for visibility check
+                    const BoundingBox lightViewBox = cell.boundingBox_[index].Transformed(shadowContext.lightView_);
+
+                    if (shadowContext.IsShadowCasterVisible(cell.visible_[index], lightViewBox))
+                    {
+                        resultShadowCasters.Push(cell.drawable_[index]);
+                    }
+                }
+            });
+        });
+    }
+}
+
+void LightView::FinalizeLightShadows(Camera* cullCamera, const IntVector2& viewSize)
+{
+    if (numSplits_ > 0)
+    {
+        shadowMap_ = renderer_->GetShadowMap(
+            light_, cullCamera, (unsigned)viewSize.x_, (unsigned)viewSize.y_);
+
+        if (!shadowMap_)
+            numSplits_ = 0;
+    }
+
+    if (numSplits_ > 0)
+    {
+        shadowSplits_.Resize(numSplits_);
+        shadowSplitsData_.Resize(numSplits_);
+    }
+
+    for (unsigned splitIndex = 0; splitIndex < numSplits_; ++splitIndex)
+    {
+        shadowViewports_[splitIndex] = GetShadowMapViewport(light_, splitIndex, shadowMap_);
+        FinalizeShadowCamera(shadowCameras_[splitIndex], light_, shadowViewports_[splitIndex], shadowCasterBox_[splitIndex]);
+    }
+}
+
+void LightView::BeginCollectingShadowBatches(WorkQueue* workQueue, int materialQuality)
+{
+    if (!HasShadow())
+        return;
+
+    for (unsigned splitIndex = 0; splitIndex < numSplits_; ++splitIndex)
+    {
+        workQueue->ScheduleWork([=](unsigned threadIndex)
+        {
+            const Vector<Drawable*>& shadowCasters = shadowCasters_[splitIndex];
+            BatchQueueData& resultShadowQueueData = shadowSplitsData_[splitIndex];
+            ShadowBatchQueue& resultShadowQueue = shadowSplits_[splitIndex];
+
+            resultShadowQueue.shadowViewport_ = shadowViewports_[splitIndex];
+            resultShadowQueue.shadowCamera_ = shadowCameras_[splitIndex];
+            resultShadowQueue.nearSplit_ = shadowNearSplits_[splitIndex];
+            resultShadowQueue.farSplit_ = shadowFarSplits_[splitIndex];
+
+            resultShadowQueueData.ShallowClear();
+            for (Drawable* drawable : shadowCasters)
+            {
+                const Vector<SourceBatch>& batches = drawable->GetBatches();
+
+                for (unsigned i = 0; i < batches.Size(); ++i)
+                {
+                    const SourceBatch& srcBatch = batches[i];
+
+                    Technique* tech = GetTechnique(materialQuality, drawable->GetLodDistance(), srcBatch.material_, renderer_->GetDefaultMaterial());
+                    if (!srcBatch.geometry_ || !srcBatch.numWorldTransforms_ || !tech)
+                        continue;
+
+                    Pass* pass = tech->GetSupportedPass(Technique::shadowPassIndex);
+                    // Skip if material has no shadow pass
+                    if (!pass)
+                        continue;
+
+                    Batch destBatch(srcBatch);
+                    destBatch.pass_ = pass;
+                    destBatch.zone_ = nullptr;
+
+                    resultShadowQueueData.AddBatch(destBatch, true);
+                }
+            }
+
+            // Fill batches
+            resultShadowQueueData.ExportBatches(resultShadowQueue.shadowBatches_);
+            resultShadowQueueData.ExportBatchGroups(resultShadowQueue.shadowBatches_);
+        });
+    }
+}
+
+//////////////////////////////////////////////////////////////////////////
 BatchCollector::BatchCollector(Context* context)
     : Object(context)
     , renderer_(context->GetSubsystem<Renderer>())
@@ -223,7 +1093,7 @@ void BatchCollector::CollectZonesAndOccluders(SceneGrid* sceneGrid)
     ClearVector(zonesAndOccluders_);
 
     zonesAndOccludersQuery_.ScheduleWork(workQueue_,
-        [=](SceneGridCellRef& cellRef, unsigned threadIndex)
+        [=](const SceneGridCellRef& cellRef, unsigned threadIndex)
     {
         SceneGridCellDrawableSoA& cell = *cellRef.data_;
         SceneQueryZonesAndOccludersResult& result = zonesAndOccluders_[threadIndex];
@@ -256,9 +1126,9 @@ void BatchCollector::ProcessZones()
     Zone* defaultZone = renderer_->GetDefaultZone();
 
     ZoneVector& zones = zonesAndOccluders_[0].zones_;
-    zonesData_.cameraZoneOverride_ = false;
-    zonesData_.cameraZone_ = nullptr;
-    zonesData_.farClipZone_ = nullptr;
+    zoneContext_.cameraZoneOverride_ = false;
+    zoneContext_.cameraZone_ = nullptr;
+    zoneContext_.farClipZone_ = nullptr;
 
     // Sort zones
     Sort(zones.Begin(), zones.End(),
@@ -270,19 +1140,19 @@ void BatchCollector::ProcessZones()
     const Vector3 farClipPos = cameraPos + cullCameraNode->GetWorldDirection() * Vector3(0.0f, 0.0f, cullCamera_->GetFarClip());
     for (Zone* zone : zones)
     {
-        if (!zonesData_.cameraZone_ && zone->IsInside(cameraPos))
-            zonesData_.cameraZone_ = zone;
-        if (!zonesData_.farClipZone_ && zone->IsInside(farClipPos))
-            zonesData_.farClipZone_ = zone;
-        if (zonesData_.cameraZone_ && zonesData_.farClipZone_)
+        if (!zoneContext_.cameraZone_ && zone->IsInside(cameraPos))
+            zoneContext_.cameraZone_ = zone;
+        if (!zoneContext_.farClipZone_ && zone->IsInside(farClipPos))
+            zoneContext_.farClipZone_ = zone;
+        if (zoneContext_.cameraZone_ && zoneContext_.farClipZone_)
             break;
     }
 
-    if (!zonesData_.cameraZone_)
-        zonesData_.cameraZone_ = defaultZone;
+    if (!zoneContext_.cameraZone_)
+        zoneContext_.cameraZone_ = defaultZone;
 
-    if (!zonesData_.farClipZone_)
-        zonesData_.farClipZone_ = defaultZone;
+    if (!zoneContext_.farClipZone_)
+        zoneContext_.farClipZone_ = defaultZone;
 }
 
 void BatchCollector::CollectGeometriesAndLights(SceneGrid* sceneGrid, OcclusionBuffer* occlusionBuffer)
@@ -295,13 +1165,13 @@ void BatchCollector::CollectGeometriesAndLights(SceneGrid* sceneGrid, OcclusionB
     const Matrix3x4 viewMatrix = cullCamera_->GetView();
     const Vector3 viewZ = Vector3(viewMatrix.m20_, viewMatrix.m21_, viewMatrix.m22_);
     const Vector3 absViewZ = viewZ.Abs();
-    const unsigned cameraZoneLightMask = zonesData_.cameraZone_->GetLightMask();
-    const unsigned cameraZoneShadowMask = zonesData_.cameraZone_->GetShadowMask();
+    const unsigned cameraZoneLightMask = zoneContext_.cameraZone_->GetLightMask();
+    const unsigned cameraZoneShadowMask = zoneContext_.cameraZone_->GetShadowMask();
 
     ClearVector(geometriesAndLights_);
 
     geometriesAndLightsQuery_.ScheduleWork(workQueue_,
-        [=](SceneGridCellRef& cellRef, unsigned threadIndex)
+        [=](const SceneGridCellRef& cellRef, unsigned threadIndex)
     {
         SceneGridCellDrawableSoA& cell = *cellRef.data_;
         SceneQueryGeometriesAndLightsResult& result = geometriesAndLights_[threadIndex];
@@ -341,7 +1211,7 @@ void BatchCollector::CollectGeometriesAndLights(SceneGrid* sceneGrid, OcclusionB
             Drawable* drawable = cell.drawable_[index];
             if (isGeometry)
             {
-                if (!zonesData_.cameraZoneOverride_ && HasVisibleZones())
+                if (!zoneContext_.cameraZoneOverride_ && HasVisibleZones())
                 {
                     UpdateDirtyZone(GetVisibleZones(), cell, index, viewMask, frustum);
                 }
@@ -371,9 +1241,9 @@ void BatchCollector::CollectGeometriesAndLights(SceneGrid* sceneGrid, OcclusionB
                 unsigned zoneLightMask = cell.cachedZoneLightMask_[index];
                 unsigned zoneShadowMask = cell.cachedZoneShadowMask_[index];
 
-                if (zonesData_.cameraZoneOverride_ || !cachedZone)
+                if (zoneContext_.cameraZoneOverride_ || !cachedZone)
                 {
-                    actualZone = zonesData_.cameraZone_;
+                    actualZone = zoneContext_.cameraZone_;
                     zoneLightMask = cameraZoneLightMask;
                     zoneShadowMask = cameraZoneShadowMask;
                 }
@@ -464,7 +1334,7 @@ void BatchCollector::ProcessLights(SceneGrid* sceneGrid)
     const unsigned numLights = GetVisibleLights().Size();
 
     // Resize related arrays
-    lightBatchQueues_.Resize(numLights);
+    lightViews_.Resize(numLights);
     for (BatchCollectorPerThreadData& perThread : perThreadData_)
         perThread.ClearLightArrays(numLights);
 
@@ -478,172 +1348,25 @@ void BatchCollector::ProcessLights(SceneGrid* sceneGrid)
         const LightType lightType = light->GetLightType();
         const unsigned lightMask = light->GetLightMask();
 
-        LightBatchQueueEx* lightBatchQueue = GetOrCreateLightBatchQueue(light);
-        lightBatchQueues_[lightIndex] = lightBatchQueue;
+        LightView* lightView = GetOrCreateLightView(light);
+        lightViews_[lightIndex] = lightView;
 
-        lightBatchQueue->Clear();
-        lightBatchQueue->negative_ = light->IsNegative();
-        lightBatchQueue->shadowMap_ = nullptr;
-        lightBatchQueue->isShadowed_ = IsLightShadowed(light);
-        lightBatchQueue->isPerVertex_ = light->GetPerVertex();
-
-        // Update shadow splits
-        if (lightBatchQueue->isShadowed_)
-        {
-            SetupShadowSplits(renderer_, lightBatchQueue, cullCamera_);
-        }
+        lightView->Clear(light, lightIndex, maxSortedInstances_, cullCamera_->GetNearClip(), cullCamera_->GetFarClip());
 
         // Process light
         if (lightType == LIGHT_DIRECTIONAL)
         {
-            const bool isFocused = light->GetShadowFocus().focus_;
-
-            // For directional light:
-            // 1. Iterate over visible geometry;
-            // 2. Collect lit geometry;
-            // 3. Calculate lit drawables volume if focused and shadowed.
-            // Reuse frustum query
-            geometriesAndLightsQuery_.ScheduleWork(workQueue_,
-                [=](SceneGridCellRef& cellRef, unsigned threadIndex)
-            {
-                SceneGridCellDrawableSoA& cell = *cellRef.data_;
-                VisibleLightsPerThreadData& result = lightsData_[threadIndex];
-                const unsigned numSplits = lightBatchQueue->numSplits_;
-
-                for (unsigned index = cellRef.beginIndex_; index < cellRef.endIndex_; ++index)
-                {
-                    // Skip non-geometries or invisible geometries
-                    if (!(cell.drawableFlag_[index] & DRAWABLE_GEOMETRY) || !cell.visible_[index])
-                        continue;
-
-                    // Filter by light mask
-                    // TODO(eugeneko) Optimize it?
-                    const unsigned zoneLightMask = GetActualZone(cell.cachedZone_[index])->GetLightMask();
-                    if (!(cell.lightMask_[index] & zoneLightMask & lightMask))
-                        continue;
-
-                    // TODO(eugeneko) Get grid index w/o pointer picking
-                    Drawable* drawable = cell.drawable_[index];
-                    const unsigned gridIndex = drawable->GetDrawableIndex().gridIndex_;
-
-                    // Make and push lit geometry
-                    LitGeometryDescIdx litGeometry;
-                    litGeometry.drawableIndex_ = gridIndex;
-                    litGeometry.lightIndex_ = lightIndex;
-                    litGeometry.negativeLight_ = lightBatchQueue->negative_;
-                    litGeometry.perVertex_ = lightBatchQueue->isPerVertex_;
-                    // TODO(eugeneko) Use true sort value
-                    litGeometry.sortValue_ = light->GetSortValue();
-                    result.litGeometry_.Push(litGeometry);
-
-                    if (isFocused && lightBatchQueue->isShadowed_)
-                    {
-                        const float geometryMinZ = cell.minmaxZ_[index].x_;
-                        const float geometryMaxZ = cell.minmaxZ_[index].y_;
-                        for (unsigned splitIndex = 0; splitIndex < numSplits; ++splitIndex)
-                        {
-                            const float splitNearZ = lightBatchQueue->shadowNearSplits_[splitIndex];
-                            const float splitFarZ = lightBatchQueue->shadowFarSplits_[splitIndex];
-                            if (geometryMinZ <= splitFarZ && geometryMaxZ >= splitNearZ)
-                                result.lightData_[lightIndex].litGeometriesBox_[splitIndex].Merge(cell.boundingBox_[index]);
-                        }
-                    }
-                }
-            });
+            lightView->BeginProcessingDirectionalLitGeometry(workQueue_, viewMask_, geometriesAndLightsQuery_, zoneContext_, lightsData_);
         }
         else if (lightType == LIGHT_POINT)
         {
-            const Sphere lightSphere(light->GetNode()->GetWorldPosition(), light->GetRange());
-            // For point light:
-            // 1. Query cells in sphere;
-            // 2. Iterate over objects in cells;
-            // 3. Collect lit geometry;
-            workQueue_->ScheduleWork([=](unsigned threadIndex)
-            {
-                sceneGrid->ProcessCellsInSphere(lightSphere,
-                    [=](SceneGridCellDrawableSoA& cell, bool isInside)
-                {
-                    VisibleLightsPerThreadData& result = lightsData_[threadIndex];
-                    for (unsigned index = 0; index < cell.size_; ++index)
-                    {
-                        // Skip drawables outside the sphere
-                        if (!isInside && !cell.IsInSphere(index, lightSphere))
-                            continue;
-
-                        // Filter by light mask
-                        // TODO(eugeneko) Optimize it?
-                        const unsigned zoneLightMask = GetActualZone(cell.cachedZone_[index])->GetLightMask();
-                        if (!(cell.lightMask_[index] & zoneLightMask & lightMask))
-                            continue;
-
-                        // Add visible to lit geometry
-                        if (cell.visible_[index])
-                        {
-                            // TODO(eugeneko) Get grid index w/o pointer picking
-                            Drawable* drawable = cell.drawable_[index];
-                            const unsigned gridIndex = drawable->GetDrawableIndex().gridIndex_;
-
-                            LitGeometryDescIdx litGeometry;
-                            litGeometry.drawableIndex_ = gridIndex;
-                            litGeometry.lightIndex_ = lightIndex;
-                            litGeometry.negativeLight_ = lightBatchQueue->negative_;
-                            litGeometry.perVertex_ = lightBatchQueue->isPerVertex_;
-                            // TODO(eugeneko) Use true sort value
-                            litGeometry.sortValue_ = light->GetSortValue();
-                            result.litGeometry_.Push(litGeometry);
-                        }
-                    }
-                });
-            });
+            lightView->SetupPointShadowCameras();
+            lightView->BeginProcessingPointLitGeometry(workQueue_, viewMask_, cullCamera_, sceneGrid, zoneContext_, lightsData_);
         }
         else if (lightType == LIGHT_SPOT)
         {
-            const Frustum lightFrustum = light->GetFrustum();
-            const Sphere lightSphere(light->GetNode()->GetWorldPosition(), light->GetRange());
-            // For spot lights:
-            // 1. Query cells in frustum;
-            // 2. Iterate over objects in cells;
-            // 3. Collect lit geometry;
-            workQueue_->ScheduleWork([=](unsigned threadIndex)
-            {
-                sceneGrid->ProcessCellsInFrustum(lightFrustum,
-                    [=](SceneGridCellDrawableSoA& cell, bool isInside)
-                {
-                    VisibleLightsPerThreadData& result = lightsData_[threadIndex];
-                    for (unsigned index = 0; index < cell.size_; ++index)
-                    {
-                        if (!isInside && !cell.IsInSphere(index, lightSphere))
-                            continue;
-
-                        // Skip drawables outside the sphere
-                        if (!isInside && !cell.IsInFrustum(index, lightFrustum))
-                            continue;
-
-                        // Filter by light mask
-                        // TODO(eugeneko) Optimize it?
-                        const unsigned zoneLightMask = GetActualZone(cell.cachedZone_[index])->GetLightMask();
-                        if (!(cell.lightMask_[index] & zoneLightMask & lightMask))
-                            continue;
-
-                        // Add visible to lit geometry
-                        if (cell.visible_[index])
-                        {
-                            // TODO(eugeneko) Get grid index w/o pointer picking
-                            Drawable* drawable = cell.drawable_[index];
-                            const unsigned gridIndex = drawable->GetDrawableIndex().gridIndex_;
-
-                            LitGeometryDescIdx litGeometry;
-                            litGeometry.drawableIndex_ = gridIndex;
-                            litGeometry.lightIndex_ = lightIndex;
-                            litGeometry.negativeLight_ = lightBatchQueue->negative_;
-                            litGeometry.perVertex_ = lightBatchQueue->isPerVertex_;
-                            // TODO(eugeneko) Use true sort value
-                            litGeometry.sortValue_ = light->GetSortValue();
-                            result.litGeometry_.Push(litGeometry);
-                        }
-                    }
-                });
-            });
+            lightView->SetupSpotShadowCameras();
+            lightView->BeginProcessingSpotLitGeometry(workQueue_, viewMask_, cullCamera_, sceneGrid, zoneContext_, lightsData_);
         }
 
         // Find or create queues data for each thread
@@ -666,120 +1389,26 @@ void BatchCollector::ProcessLights(SceneGrid* sceneGrid)
         }
     }
 
-    // Step 1+. Complete threaded job and merge results.
+    // Step 2. Complete threaded job and merge results.
     workQueue_->Complete(M_MAX_UNSIGNED);
     AppendVectorToFirst(lightsData_);
 
-    // Step 2. Update shadow cameras.
+    // Step 3. Update shadow cameras for directional lights and collect shadow casters.
     const float sceneMinZ = geometriesAndLights_[0].minZ_;
     const float sceneMaxZ = geometriesAndLights_[0].maxZ_;
     for (unsigned lightIndex = 0; lightIndex < numLights; ++lightIndex)
     {
-        LightBatchQueueEx* lightBatchQueue = lightBatchQueues_[lightIndex];
-        if (lightBatchQueue->numSplits_ == 0)
-            continue;
-
-        const LightPerThreadData& lightData = lightsData_[0].lightData_[lightIndex];
-        SetupShadowCameras(lightBatchQueue, lightData, cullCamera_, sceneMinZ, sceneMaxZ);
-    }
-
-    // Step 3. Collect shadow casters
-    for (unsigned lightIndex = 0; lightIndex < numLights; ++lightIndex)
-    {
-        LightBatchQueueEx* lightBatchQueue = lightBatchQueues_[lightIndex];
-        if (lightBatchQueue->numSplits_ == 0)
-            continue;
-
-        Light* light = lightBatchQueue->light_;
-        for (unsigned splitIndex = 0; splitIndex < lightBatchQueue->numSplits_; ++splitIndex)
+        LightView* lightView = lightViews_[lightIndex];
+        if (lightView->HasShadow() && lightView->GetLightType() == LIGHT_DIRECTIONAL)
         {
-            Camera* shadowCamera = lightBatchQueue->shadowCameras_[splitIndex];
-
-            // TODO(eugeneko) Extract this code
-            // @{
-            const unsigned lightMask = light->GetLightMask();
-            const Frustum& shadowCameraFrustum = shadowCamera->GetFrustum();
-            const Matrix3x4& lightView = shadowCamera->GetView();
-            const Matrix4& lightProj = shadowCamera->GetProjection();
-            const LightType type = light->GetLightType();
-
-            lightBatchQueue->shadowCasterBox_[splitIndex].Clear();
-
-            // Transform scene frustum into shadow camera's view space for shadow caster visibility check. For point & spot lights,
-            // we can use the whole scene frustum. For directional lights, use the intersection of the scene frustum and the split
-            // frustum, so that shadow casters do not get rendered into unnecessary splits
-            Frustum lightViewFrustum;
-            if (type != LIGHT_DIRECTIONAL)
-                lightViewFrustum = cullCamera_->GetSplitFrustum(sceneMinZ, sceneMaxZ).Transformed(lightView);
-            else
-                lightViewFrustum = cullCamera_->GetSplitFrustum(Max(sceneMinZ, lightBatchQueue->shadowNearSplits_[splitIndex]),
-                    Min(sceneMaxZ, lightBatchQueue->shadowFarSplits_[splitIndex])).Transformed(lightView);
-
-            BoundingBox lightViewFrustumBox(lightViewFrustum);
-
-            // Check for degenerate split frustum: in that case there is no need to get shadow casters
-            if (lightViewFrustum.vertices_[0] == lightViewFrustum.vertices_[4])
-                continue;
-            // @}
-
-            if (type == LIGHT_DIRECTIONAL)
-            {
-                workQueue_->ScheduleWork([=](unsigned threadIndex)
-                {
-                    Vector<Drawable*>& shadowCasters = lightBatchQueue->shadowCasters_[splitIndex];
-                    BoundingBox& shadowCasterBox = lightBatchQueue->shadowCasterBox_[splitIndex];
-                    assert(shadowCasters.Empty());
-
-                    sceneGrid->ProcessCellsInFrustum(shadowCameraFrustum,
-                        [=, &shadowCasters, &shadowCasterBox](SceneGridCellDrawableSoA& cell, bool isInside)
-                    {
-                        for (unsigned index = 0; index < cell.size_; ++index)
-                        {
-                            // Skip if view mask doesn't match or if not shadow caster
-                            if (!cell.castShadows_[index] || !(cell.viewMask_[index] & viewMask_))
-                                continue;
-
-                            // Skip drawables outside the frustum
-                            if (!isInside && !cell.IsInFrustum(index, shadowCameraFrustum))
-                                continue;
-
-                            // Skip if shadow mask doesn't match
-                            const unsigned zoneShadowMask = GetActualZone(cell.cachedZone_[index])->GetShadowMask();
-                            if (!(cell.shadowMask_[index] & zoneShadowMask & lightMask))
-                                continue;
-
-                            // Calculate draw distance
-                            const float drawDistance = cell.drawDistance_[index];
-                            const float shadowDistance = GetEffectiveShadowDistance(cell.shadowDistance_[index], drawDistance);
-                            const float distance = cullCamera_->GetDistance(cell.boundingSphere_[index].center_);
-
-                            // Discard if drawable is too far
-                            if (shadowDistance > 0.0f && distance > shadowDistance)
-                                continue;
-
-                            // Project shadow caster bounding box to light view space for visibility check
-                            const BoundingBox lightViewBox = cell.boundingBox_[index].Transformed(lightView);
-
-                            if (IsShadowCasterVisible(cell.visible_[index], lightViewBox, shadowCamera, lightView, lightViewFrustum, lightViewFrustumBox))
-                            {
-                                // Merge to shadow caster bounding box (only needed for focused spot lights) and add to the list
-                                if (type == LIGHT_SPOT && light->GetShadowFocus().focus_)
-                                {
-                                    const BoundingBox lightProjBox{ lightViewBox.Projected(lightProj) };
-                                    shadowCasterBox.Merge(lightProjBox);
-                                }
-                                shadowCasters.Push(cell.drawable_[index]);
-                            }
-                        }
-                    });
-                });
-            }
-            else
-            {
-                assert(0);
-            }
+            const LightViewThreadData& lightData = lightsData_[0].lightData_[lightIndex];
+            lightView->SetupDirectionalShadowCameras(lightData, cullCamera_, sceneMinZ, sceneMaxZ);
+            lightView->BeginProcessingDirectionalShadowCasters(workQueue_, viewMask_, cullCamera_,
+                sceneGrid, zoneContext_, sceneMinZ, sceneMaxZ);
         }
     }
+
+    // Step 4. Complete threaded job.
     workQueue_->Complete(M_MAX_UNSIGNED);
 }
 
@@ -859,85 +1488,16 @@ void BatchCollector::CollectShadowBatches(const IntVector2& viewSize, int materi
     // Get shadow maps and finalize shadow cameras
     for (unsigned lightIndex = 0; lightIndex < numLights; ++lightIndex)
     {
-        LightBatchQueueEx* lightBatchQueue = lightBatchQueues_[lightIndex];
-        Light* light = lightBatchQueue->light_;
-        if (lightBatchQueue->numSplits_ > 0)
-        {
-            lightBatchQueue->shadowMap_ = renderer_->GetShadowMap(
-                light, cullCamera_, (unsigned)viewSize.x_, (unsigned)viewSize.y_);
-
-            if (!lightBatchQueue->shadowMap_)
-                lightBatchQueue->numSplits_ = 0;
-        }
-
-        for (unsigned splitIndex = 0; splitIndex < lightBatchQueue->numSplits_; ++splitIndex)
-        {
-            const IntRect shadowViewport = GetShadowMapViewport(light, splitIndex, lightBatchQueue->shadowMap_);
-            lightBatchQueue->shadowViewports_[splitIndex] = shadowViewport;
-
-            Camera* shadowCamera = lightBatchQueue->shadowCameras_[splitIndex];
-            const BoundingBox& shaderCasterBox = lightBatchQueue->shadowCasterBox_[splitIndex];
-            FinalizeShadowCamera(shadowCamera, light, shadowViewport, shaderCasterBox);
-        }
+        LightView* lightView = lightViews_[lightIndex];
+        lightView->FinalizeLightShadows(cullCamera_, viewSize);
     }
 
+    // Get shadow batches
     for (unsigned lightIndex = 0; lightIndex < numLights; ++lightIndex)
     {
-        LightBatchQueueEx* lightBatchQueue = lightBatchQueues_[lightIndex];
-        const unsigned numSplits = lightBatchQueue->numSplits_;
-        if (numSplits == 0)
-            continue;
-
-        // TODO(eugeneko) Remove this resize
-        lightBatchQueue->shadowSplits_.Resize(numSplits);
-        lightBatchQueue->shadowSplitsData_.Resize(numSplits);
-        for (unsigned splitIndex = 0; splitIndex < numSplits; ++splitIndex)
-        {
-            workQueue_->ScheduleWork([=](unsigned threadIndex)
-            {
-                const Vector<Drawable*>& shadowCasters = lightBatchQueue->shadowCasters_[splitIndex];
-                BatchQueueData& shadowQueueData = lightBatchQueue->shadowSplitsData_[splitIndex];
-                ShadowBatchQueue& shadowQueue = lightBatchQueue->shadowSplits_[splitIndex];
-
-                shadowQueue.shadowViewport_ = lightBatchQueue->shadowViewports_[splitIndex];
-                shadowQueue.shadowCamera_ = lightBatchQueue->shadowCameras_[splitIndex];
-                shadowQueue.nearSplit_ = lightBatchQueue->shadowNearSplits_[splitIndex];
-                shadowQueue.farSplit_ = lightBatchQueue->shadowFarSplits_[splitIndex];
-
-                shadowQueueData.ShallowClear();
-                for (Drawable* drawable : shadowCasters)
-                {
-                    const Vector<SourceBatch>& batches = drawable->GetBatches();
-
-                    for (unsigned i = 0; i < batches.Size(); ++i)
-                    {
-                        const SourceBatch& srcBatch = batches[i];
-
-                        Technique* tech = GetTechnique(materialQuality, drawable->GetLodDistance(), srcBatch.material_, renderer_->GetDefaultMaterial());
-                        if (!srcBatch.geometry_ || !srcBatch.numWorldTransforms_ || !tech)
-                            continue;
-
-                        Pass* pass = tech->GetSupportedPass(Technique::shadowPassIndex);
-                        // Skip if material has no shadow pass
-                        if (!pass)
-                            continue;
-
-                        Batch destBatch(srcBatch);
-                        destBatch.pass_ = pass;
-                        destBatch.zone_ = nullptr;
-
-                        shadowQueueData.AddBatch(destBatch, true);
-                    }
-                }
-
-                // Fill batches
-                shadowQueue.shadowBatches_.Clear(maxSortedInstances_);
-                shadowQueueData.ExportBatches(shadowQueue.shadowBatches_);
-                shadowQueueData.ExportBatchGroups(shadowQueue.shadowBatches_);
-            });
-        }
+        LightView* lightView = lightViews_[lightIndex];
+        lightView->BeginCollectingShadowBatches(workQueue_, materialQuality);
     }
-
     workQueue_->Complete(M_MAX_UNSIGNED);
 }
 
@@ -1015,7 +1575,7 @@ void BatchCollector::FillBatchQueues()
         if (light->GetPerVertex())
             continue;
 
-        LightBatchQueueEx* lightBatchQueue = lightBatchQueues_[lightIndex];
+        LightBatchQueue* lightBatchQueue = lightViews_[lightIndex]->GetLigthBatchQueue();
         assert(lightBatchQueue);
 
         BatchQueue& lightQueue = lightBatchQueue->litBatches_;
@@ -1060,18 +1620,18 @@ void BatchCollector::FinalizeBatches(unsigned alphaPassIndex)
     }
 
     // Update batch queues for lights
-    for (unsigned lightIndex = 0; lightIndex < lightBatchQueues_.Size(); ++lightIndex)
+    for (unsigned lightIndex = 0; lightIndex < lightViews_.Size(); ++lightIndex)
     {
         Light* light = GetVisibleLight(lightIndex);
         if (light->GetPerVertex())
             continue;
 
-        LightBatchQueueEx* lightBatchQueue = lightBatchQueues_[lightIndex];
+        LightBatchQueue* lightBatchQueue = lightViews_[lightIndex]->GetLigthBatchQueue();
         assert(lightBatchQueue);
         FinalizeBatchQueue(lightBatchQueue->litBatches_, true);
         FinalizeBatchQueue(lightBatchQueue->litBaseBatches_, true);
 
-        for (unsigned splitIndex = 0; splitIndex < lightBatchQueue->numSplits_; ++splitIndex)
+        for (unsigned splitIndex = 0; splitIndex < lightBatchQueue->shadowSplits_.Size(); ++splitIndex)
         {
             FinalizeBatchQueue(lightBatchQueue->shadowSplits_[splitIndex].shadowBatches_, true);
         }
@@ -1080,29 +1640,28 @@ void BatchCollector::FinalizeBatches(unsigned alphaPassIndex)
 
 Zone* BatchCollector::GetDrawableZone(Drawable* drawable) const
 {
-    if (zonesData_.cameraZoneOverride_)
-        return zonesData_.cameraZone_;
+    if (zoneContext_.cameraZoneOverride_)
+        return zoneContext_.cameraZone_;
     Zone* drawableZone = drawable->GetZone();
-    return drawableZone ? drawableZone : zonesData_.cameraZone_;
+    return drawableZone ? drawableZone : zoneContext_.cameraZone_;
 }
 
 Zone* BatchCollector::GetActualZone(Zone* drawableZone) const
 {
-    if (zonesData_.cameraZoneOverride_)
-        return zonesData_.cameraZone_;
-    return drawableZone ? drawableZone : zonesData_.cameraZone_;
+    if (zoneContext_.cameraZoneOverride_)
+        return zoneContext_.cameraZone_;
+    return drawableZone ? drawableZone : zoneContext_.cameraZone_;
 }
 
-LightBatchQueueEx* BatchCollector::GetOrCreateLightBatchQueue(Light* light)
+LightView* BatchCollector::GetOrCreateLightView(Light* light)
 {
-    auto iterLightBatchQueue = lightBatchQueueMap_.Find(light);
-    if (iterLightBatchQueue == lightBatchQueueMap_.End())
+    auto iterLightView = lightViewMap_.Find(light);
+    if (iterLightView == lightViewMap_.End())
     {
-        LightBatchQueueEx* queue = AllocateLightBatchQueue();
-        queue->light_ = light;
-        iterLightBatchQueue = lightBatchQueueMap_.Insert(MakePair(light, queue));
+        LightView* queue = AllocateLightView();
+        iterLightView = lightViewMap_.Insert(MakePair(light, queue));
     }
-    return iterLightBatchQueue->second_;
+    return iterLightView->second_;
 }
 
 void BatchCollector::FinalizeBatchQueue(BatchQueue& queue, bool allowShadows)
@@ -1182,413 +1741,6 @@ void BatchCollector::UpdateDirtyZone(const Vector<Zone*>& zones, SceneGridCellDr
         cellData.cachedZoneViewMask_[index] = newZone->GetViewMask();
         cellData.cachedZoneLightMask_[index] = newZone->GetLightMask();
         cellData.cachedZoneShadowMask_[index] = newZone->GetShadowMask();
-    }
-}
-
-bool BatchCollector::IsLightShadowed(Light* light)
-{
-    // Check if light should be shadowed
-    bool isShadowed = light->GetCastShadows() && !light->GetPerVertex() && light->GetShadowIntensity() < 1.0f;
-    // If shadow distance non-zero, check it
-    if (isShadowed && light->GetShadowDistance() > 0.0f && light->GetDistance() > light->GetShadowDistance())
-        isShadowed = false;
-    // OpenGL ES can not support point light shadows
-#ifdef GL_ES_VERSION_2_0
-    if (isShadowed && light->GetLightType() == LIGHT_POINT)
-        isShadowed = false;
-#endif
-    return isShadowed;
-}
-
-void BatchCollector::SetupShadowSplits(Renderer* renderer, LightBatchQueueEx* queue, Camera* cullCamera)
-{
-    Light* light = queue->light_;
-
-    unsigned splits = 0;
-
-    switch (light->GetLightType())
-    {
-    case LIGHT_DIRECTIONAL:
-        {
-            const CascadeParameters& cascade = light->GetShadowCascade();
-
-            float nearSplit = cullCamera->GetNearClip();
-            float farSplit = 0;
-            int numSplits = light->GetNumShadowSplits();
-
-            while (splits < numSplits)
-            {
-                // If split is completely beyond camera far clip, we are done
-                if (nearSplit > cullCamera->GetFarClip())
-                    break;
-
-                farSplit = Min(cullCamera->GetFarClip(), cascade.splits_[splits]);
-                if (farSplit <= nearSplit)
-                    break;
-
-                // Setup the shadow camera for the split
-                queue->shadowCameras_[splits] = renderer->GetShadowCamera();
-                queue->shadowNearSplits_[splits] = nearSplit;
-                queue->shadowFarSplits_[splits] = farSplit;
-
-                nearSplit = farSplit;
-                ++splits;
-            }
-        }
-        break;
-
-    case LIGHT_SPOT:
-        {
-            queue->shadowCameras_[0] = renderer->GetShadowCamera();
-            splits = 1;
-        }
-        break;
-
-    case LIGHT_POINT:
-        {
-            static const Vector3* directions[] =
-            {
-                &Vector3::RIGHT,
-                &Vector3::LEFT,
-                &Vector3::UP,
-                &Vector3::DOWN,
-                &Vector3::FORWARD,
-                &Vector3::BACK
-            };
-
-            for (unsigned i = 0; i < MAX_CUBEMAP_FACES; ++i)
-            {
-                queue->shadowCameras_[i] = renderer->GetShadowCamera();
-            }
-
-            splits = MAX_CUBEMAP_FACES;
-        }
-        break;
-    }
-
-    queue->numSplits_ = splits;
-}
-
-void BatchCollector::SetupShadowCameras(LightBatchQueueEx* queue, const LightPerThreadData& lightData,
-    Camera* cullCamera, float minZ, float maxZ)
-{
-    Light* light = queue->light_;
-    const unsigned numSplits = queue->numSplits_;
-
-    switch (light->GetLightType())
-    {
-    case LIGHT_DIRECTIONAL:
-        {
-            for (unsigned splitIndex = 0; splitIndex < numSplits; ++splitIndex)
-            {
-                Camera* shadowCamera = queue->shadowCameras_[splitIndex];
-                const float nearSplit = queue->shadowNearSplits_[splitIndex];
-                const float farSplit = queue->shadowFarSplits_[splitIndex];
-                const BoundingBox& litGeometryBox = lightData.litGeometriesBox_[splitIndex];
-                SetupDirLightShadowCamera(shadowCamera, light, nearSplit, farSplit, litGeometryBox,
-                    cullCamera, minZ, maxZ);
-            }
-        }
-        break;
-
-    case LIGHT_SPOT:
-        {
-            assert(numSplits == 1);
-
-            Camera* shadowCamera = queue->shadowCameras_[0];
-            Node* cameraNode = shadowCamera->GetNode();
-            Node* lightNode = light->GetNode();
-
-            cameraNode->SetTransform(lightNode->GetWorldPosition(), lightNode->GetWorldRotation());
-            shadowCamera->SetNearClip(light->GetShadowNearFarRatio() * light->GetRange());
-            shadowCamera->SetFarClip(light->GetRange());
-            shadowCamera->SetFov(light->GetFov());
-            shadowCamera->SetAspectRatio(light->GetAspectRatio());
-        }
-        break;
-
-    case LIGHT_POINT:
-        {
-            assert(numSplits == MAX_CUBEMAP_FACES);
-
-            static const Vector3* directions[] =
-            {
-                &Vector3::RIGHT,
-                &Vector3::LEFT,
-                &Vector3::UP,
-                &Vector3::DOWN,
-                &Vector3::FORWARD,
-                &Vector3::BACK
-            };
-
-            for (unsigned splitIndex = 0; splitIndex < MAX_CUBEMAP_FACES; ++splitIndex)
-            {
-                Camera* shadowCamera = queue->shadowCameras_[splitIndex];
-                Node* cameraNode = shadowCamera->GetNode();
-
-                // When making a shadowed point light, align the splits along X, Y and Z axes regardless of light rotation
-                cameraNode->SetPosition(light->GetNode()->GetWorldPosition());
-                cameraNode->SetDirection(*directions[splitIndex]);
-                shadowCamera->SetNearClip(light->GetShadowNearFarRatio() * light->GetRange());
-                shadowCamera->SetFarClip(light->GetRange());
-                shadowCamera->SetFov(90.0f);
-                shadowCamera->SetAspectRatio(1.0f);
-            }
-        }
-        break;
-    }
-}
-
-void BatchCollector::SetupDirLightShadowCamera(Camera* shadowCamera, Light* light,
-    float nearSplit, float farSplit, const BoundingBox& litGeometriesBox,
-    Camera* cullCamera, float minZ, float maxZ)
-{
-    Node* shadowCameraNode = shadowCamera->GetNode();
-    Node* lightNode = light->GetNode();
-    float extrusionDistance = Min(cullCamera->GetFarClip(), light->GetShadowMaxExtrusion());
-    const FocusParameters& parameters = light->GetShadowFocus();
-
-    // Calculate initial position & rotation
-    Vector3 pos = cullCamera->GetNode()->GetWorldPosition() - extrusionDistance * lightNode->GetWorldDirection();
-    shadowCameraNode->SetTransform(pos, lightNode->GetWorldRotation());
-
-    // Calculate main camera shadowed frustum in light's view space
-    farSplit = Min(farSplit, cullCamera->GetFarClip());
-    // Use the scene Z bounds to limit frustum size if applicable
-    if (parameters.focus_)
-    {
-        nearSplit = Max(minZ, nearSplit);
-        farSplit = Min(maxZ, farSplit);
-    }
-
-    Frustum splitFrustum = cullCamera->GetSplitFrustum(nearSplit, farSplit);
-    Polyhedron frustumVolume;
-    frustumVolume.Define(splitFrustum);
-    // If focusing enabled, clip the frustum volume by the combined bounding box of the lit geometries within the frustum
-    if (parameters.focus_ && litGeometriesBox.Defined())
-    {
-        frustumVolume.Clip(litGeometriesBox);
-        // If volume became empty, restore it to avoid zero size
-        if (frustumVolume.Empty())
-            frustumVolume.Define(splitFrustum);
-    }
-
-    // Transform frustum volume to light space
-    const Matrix3x4& lightView = shadowCamera->GetView();
-    frustumVolume.Transform(lightView);
-
-    // Fit the frustum volume inside a bounding box. If uniform size, use a sphere instead
-    BoundingBox shadowBox;
-    if (!parameters.nonUniform_)
-        shadowBox.Define(Sphere(frustumVolume));
-    else
-        shadowBox.Define(frustumVolume);
-
-    shadowCamera->SetOrthographic(true);
-    shadowCamera->SetAspectRatio(1.0f);
-    shadowCamera->SetNearClip(0.0f);
-    shadowCamera->SetFarClip(shadowBox.max_.z_);
-
-    // Center shadow camera on the bounding box. Can not snap to texels yet as the shadow map viewport is unknown
-    QuantizeDirLightShadowCamera(shadowCamera, light, IntRect(0, 0, 0, 0), shadowBox);
-}
-
-void BatchCollector::FinalizeShadowCamera(Camera* shadowCamera, Light* light, const IntRect& shadowViewport,
-    const BoundingBox& shadowCasterBox)
-{
-    const FocusParameters& parameters = light->GetShadowFocus();
-    auto shadowMapWidth = (float)(shadowViewport.Width());
-    LightType type = light->GetLightType();
-
-    if (type == LIGHT_DIRECTIONAL)
-    {
-        BoundingBox shadowBox;
-        shadowBox.max_.y_ = shadowCamera->GetOrthoSize() * 0.5f;
-        shadowBox.max_.x_ = shadowCamera->GetAspectRatio() * shadowBox.max_.y_;
-        shadowBox.min_.y_ = -shadowBox.max_.y_;
-        shadowBox.min_.x_ = -shadowBox.max_.x_;
-
-        // Requantize and snap to shadow map texels
-        QuantizeDirLightShadowCamera(shadowCamera, light, shadowViewport, shadowBox);
-    }
-
-    if (type == LIGHT_SPOT && parameters.focus_)
-    {
-        float viewSizeX = Max(Abs(shadowCasterBox.min_.x_), Abs(shadowCasterBox.max_.x_));
-        float viewSizeY = Max(Abs(shadowCasterBox.min_.y_), Abs(shadowCasterBox.max_.y_));
-        float viewSize = Max(viewSizeX, viewSizeY);
-        // Scale the quantization parameters, because view size is in projection space (-1.0 - 1.0)
-        float invOrthoSize = 1.0f / shadowCamera->GetOrthoSize();
-        float quantize = parameters.quantize_ * invOrthoSize;
-        float minView = parameters.minView_ * invOrthoSize;
-
-        viewSize = Max(ceilf(viewSize / quantize) * quantize, minView);
-        if (viewSize < 1.0f)
-            shadowCamera->SetZoom(1.0f / viewSize);
-    }
-
-    // Perform a finalization step for all lights: ensure zoom out of 2 pixels to eliminate border filtering issues
-    // For point lights use 4 pixels, as they must not cross sides of the virtual cube map (maximum 3x3 PCF)
-    if (shadowCamera->GetZoom() >= 1.0f)
-    {
-        if (light->GetLightType() != LIGHT_POINT)
-            shadowCamera->SetZoom(shadowCamera->GetZoom() * ((shadowMapWidth - 2.0f) / shadowMapWidth));
-        else
-        {
-#ifdef URHO3D_OPENGL
-            shadowCamera->SetZoom(shadowCamera->GetZoom() * ((shadowMapWidth - 3.0f) / shadowMapWidth));
-#else
-            shadowCamera->SetZoom(shadowCamera->GetZoom() * ((shadowMapWidth - 4.0f) / shadowMapWidth));
-#endif
-        }
-    }
-}
-
-void BatchCollector::QuantizeDirLightShadowCamera(Camera* shadowCamera, Light* light, const IntRect& shadowViewport,
-    const BoundingBox& viewBox)
-{
-    Node* shadowCameraNode = shadowCamera->GetNode();
-    const FocusParameters& parameters = light->GetShadowFocus();
-    auto shadowMapWidth = (float)(shadowViewport.Width());
-
-    float minX = viewBox.min_.x_;
-    float minY = viewBox.min_.y_;
-    float maxX = viewBox.max_.x_;
-    float maxY = viewBox.max_.y_;
-
-    Vector2 center((minX + maxX) * 0.5f, (minY + maxY) * 0.5f);
-    Vector2 viewSize(maxX - minX, maxY - minY);
-
-    // Quantize size to reduce swimming
-    // Note: if size is uniform and there is no focusing, quantization is unnecessary
-    if (parameters.nonUniform_)
-    {
-        viewSize.x_ = ceilf(sqrtf(viewSize.x_ / parameters.quantize_));
-        viewSize.y_ = ceilf(sqrtf(viewSize.y_ / parameters.quantize_));
-        viewSize.x_ = Max(viewSize.x_ * viewSize.x_ * parameters.quantize_, parameters.minView_);
-        viewSize.y_ = Max(viewSize.y_ * viewSize.y_ * parameters.quantize_, parameters.minView_);
-    }
-    else if (parameters.focus_)
-    {
-        viewSize.x_ = Max(viewSize.x_, viewSize.y_);
-        viewSize.x_ = ceilf(sqrtf(viewSize.x_ / parameters.quantize_));
-        viewSize.x_ = Max(viewSize.x_ * viewSize.x_ * parameters.quantize_, parameters.minView_);
-        viewSize.y_ = viewSize.x_;
-    }
-
-    shadowCamera->SetOrthoSize(viewSize);
-
-    // Center shadow camera to the view space bounding box
-    Quaternion rot(shadowCameraNode->GetWorldRotation());
-    Vector3 adjust(center.x_, center.y_, 0.0f);
-    shadowCameraNode->Translate(rot * adjust, TS_WORLD);
-
-    // If the shadow map viewport is known, snap to whole texels
-    if (shadowMapWidth > 0.0f)
-    {
-        Vector3 viewPos(rot.Inverse() * shadowCameraNode->GetWorldPosition());
-        // Take into account that shadow map border will not be used
-        float invActualSize = 1.0f / (shadowMapWidth - 2.0f);
-        Vector2 texelSize(viewSize.x_ * invActualSize, viewSize.y_ * invActualSize);
-        Vector3 snap(-fmodf(viewPos.x_, texelSize.x_), -fmodf(viewPos.y_, texelSize.y_), 0.0f);
-        shadowCameraNode->Translate(rot * snap, TS_WORLD);
-    }
-}
-
-bool BatchCollector::IsShadowCasterVisible(bool drawableVisible, BoundingBox lightViewBox, Camera* shadowCamera, const Matrix3x4& lightView, const Frustum& lightViewFrustum, const BoundingBox& lightViewFrustumBox)
-{
-    if (shadowCamera->IsOrthographic())
-    {
-        // Extrude the light space bounding box up to the far edge of the frustum's light space bounding box
-        lightViewBox.max_.z_ = Max(lightViewBox.max_.z_, lightViewFrustumBox.max_.z_);
-        return lightViewFrustum.IsInsideFast(lightViewBox) != OUTSIDE;
-    }
-    else
-    {
-        // If light is not directional, can do a simple check: if object is visible, its shadow is too
-        if (drawableVisible)
-            return true;
-
-        // For perspective lights, extrusion direction depends on the position of the shadow caster
-        Vector3 center = lightViewBox.Center();
-        Ray extrusionRay(center, center);
-
-        float extrusionDistance = shadowCamera->GetFarClip();
-        float originalDistance = Clamp(center.Length(), M_EPSILON, extrusionDistance);
-
-        // Because of the perspective, the bounding box must also grow when it is extruded to the distance
-        float sizeFactor = extrusionDistance / originalDistance;
-
-        // Calculate the endpoint box and merge it to the original. Because it's axis-aligned, it will be larger
-        // than necessary, so the test will be conservative
-        Vector3 newCenter = extrusionDistance * extrusionRay.direction_;
-        Vector3 newHalfSize = lightViewBox.Size() * sizeFactor * 0.5f;
-        BoundingBox extrudedBox(newCenter - newHalfSize, newCenter + newHalfSize);
-        lightViewBox.Merge(extrudedBox);
-
-        return lightViewFrustum.IsInsideFast(lightViewBox) != OUTSIDE;
-    }
-}
-
-IntRect BatchCollector::GetShadowMapViewport(Light* light, int splitIndex, Texture2D* shadowMap)
-{
-    const int width = shadowMap->GetWidth();
-    const int height = shadowMap->GetHeight();
-
-    switch (light->GetLightType())
-    {
-    case LIGHT_DIRECTIONAL:
-        {
-            int numSplits = light->GetNumShadowSplits();
-            if (numSplits == 1)
-                return {0, 0, width, height};
-            else if (numSplits == 2)
-                return {splitIndex * width / 2, 0, (splitIndex + 1) * width / 2, height};
-            else
-                return {(splitIndex & 1) * width / 2, (splitIndex / 2) * height / 2,
-                    ((splitIndex & 1) + 1) * width / 2, (splitIndex / 2 + 1) * height / 2};
-        }
-
-    case LIGHT_SPOT:
-        return {0, 0, width, height};
-
-    case LIGHT_POINT:
-        return {(splitIndex & 1) * width / 2, (splitIndex / 2) * height / 3,
-            ((splitIndex & 1) + 1) * width / 2, (splitIndex / 2 + 1) * height / 3};
-    }
-
-    return {};
-}
-
-Technique* BatchCollector::GetTechnique(int materialQuality, float lodDistance, Material* material, Material* defaultMaterial)
-{
-    if (!material)
-        return defaultMaterial->GetTechniques()[0].technique_;
-
-    const Vector<TechniqueEntry>& techniques = material->GetTechniques();
-    // If only one technique, no choice
-    if (techniques.Size() == 1)
-        return techniques[0].technique_;
-    else
-    {
-        // Check for suitable technique. Techniques should be ordered like this:
-        // Most distant & highest quality
-        // Most distant & lowest quality
-        // Second most distant & highest quality
-        // ...
-        for (unsigned i = 0; i < techniques.Size(); ++i)
-        {
-            const TechniqueEntry& entry = techniques[i];
-            Technique* tech = entry.technique_;
-
-            if (!tech || (!tech->IsSupported()) || materialQuality < entry.qualityLevel_)
-                continue;
-            if (lodDistance >= entry.lodDistance_)
-                return tech;
-        }
-
-        // If no suitable technique found, fallback to the last
-        return techniques.Size() ? techniques.Back().technique_ : nullptr;
     }
 }
 

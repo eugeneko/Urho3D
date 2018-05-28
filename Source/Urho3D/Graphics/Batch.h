@@ -242,7 +242,7 @@ struct BatchQueue
 {
 public:
     /// Clear for new frame by clearing all groups and batches.
-    void Clear(int maxSortedInstances);
+    void Clear(unsigned maxSortedInstances);
     /// Sort non-instanced draw calls back to front.
     void SortBackToFront();
     /// Sort instanced and non-instanced draw calls front to back.

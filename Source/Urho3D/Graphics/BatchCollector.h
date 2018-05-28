@@ -39,16 +39,28 @@ struct ScenePassInfo;
 class Renderer;
 class WorkQueue;
 
-struct BatchQueueData
+/// Stores batch queue data.
+class BatchQueueData
 {
-    HashMap<BatchGroupKey, BatchGroup> batchGroups_;
-    Vector<Batch> batches_;
+public:
+    /// Clear batches without deallocation.
     void ShallowClear();
+    /// Add batch.
     void AddBatch(const Batch& batch, bool allowInstancing);
+    /// Append batches from other storage.
     void AppendBatchGroups(const BatchQueueData& other);
+    /// Export batches from batch queue. Actual batches are not copied.
     void ExportBatches(BatchQueue& queue);
+    /// Export batch groups from batch queue. Actual batch groups are not copied.
     void ExportBatchGroups(BatchQueue& queue);
+
+    // TODO(eugeneko) Extract
     static void ShallowClear(Vector<BatchQueueData*>& queues);
+private:
+    /// Grouped batches, may be instanced.
+    HashMap<BatchGroupKey, BatchGroup> batchGroups_;
+    /// Non-grouped batches.
+    Vector<Batch> batches_;
 };
 
 struct LitGeometryDescIdx
@@ -60,18 +72,20 @@ struct LitGeometryDescIdx
     bool negativeLight_{};
 };
 
-struct LightPerThreadData
+/// Per-thread LightView data.
+struct LightViewThreadData
 {
     /// Bounding box that contains all lit geometries per-split.
     BoundingBox litGeometriesBox_[MAX_LIGHT_SPLITS];
 };
 
-struct VisibleLightsPerThreadData
+/// Per-thread data for all visible LightView-s.
+struct VisibleLightsThreadData
 {
     /// Lit geometry.
     Vector<LitGeometryDescIdx> litGeometry_;
     /// Light data. Indexed via lightIndex.
-    Vector<LightPerThreadData> lightData_;
+    Vector<LightViewThreadData> lightData_;
     /// Clear.
     void Clear(unsigned numLights)
     {
@@ -80,7 +94,7 @@ struct VisibleLightsPerThreadData
         lightData_.Resize(numLights);
     }
     /// Append.
-    void Append(const VisibleLightsPerThreadData& other)
+    void Append(const VisibleLightsThreadData& other)
     {
         litGeometry_.Push(other.litGeometry_);
 
@@ -93,10 +107,59 @@ struct VisibleLightsPerThreadData
     }
 };
 
-struct LightBatchQueueEx : LightBatchQueue
+using VisibleLightsThreadDataVector = Vector<VisibleLightsThreadData>;
+
+class LightView : private LightBatchQueue
 {
+public:
+    /// Construct.
+    LightView(Renderer* renderer) : renderer_(renderer) {}
+    /// Clear light batch queue per-frame data. Setup light parameters.
+    void Clear(Light* light, unsigned lightIndex, unsigned maxSortedInstances, float nearClip, float farClip);
+
+    /// Setup shadow cameras for directional light.
+    void SetupDirectionalShadowCameras(const LightViewThreadData& lightViewData, Camera* cullCamera, float minZ, float maxZ);
+    /// Setup shadow cameras for point light.
+    void SetupPointShadowCameras();
+    /// Setup shadow cameras for spot light.
+    void SetupSpotShadowCameras();
+    /// Begin processing of lit geometries for directional light.
+    void BeginProcessingDirectionalLitGeometry(WorkQueue* workQueue, unsigned viewMask,
+        const SceneGridQueryResult& cellsQuery, const ZoneContext& zoneContext, VisibleLightsThreadDataVector& result);
+    /// Begin processing of lit geometries for point light.
+    void BeginProcessingPointLitGeometry(WorkQueue* workQueue, unsigned viewMask, Camera* cullCamera,
+        SceneGrid* sceneGrid, const ZoneContext& zoneContext, VisibleLightsThreadDataVector& result);
+    /// Begin processing of lit geometries for spot light.
+    void BeginProcessingSpotLitGeometry(WorkQueue* workQueue, unsigned viewMask, Camera* cullCamera,
+        SceneGrid* sceneGrid, const ZoneContext& zoneContext, VisibleLightsThreadDataVector& result);
+    /// Begin processing of shadow casters for directional light.
+    void BeginProcessingDirectionalShadowCasters(WorkQueue* workQueue, unsigned viewMask, Camera* cullCamera,
+        SceneGrid* sceneGrid, const ZoneContext& zoneContext, float sceneMinZ, float sceneMaxZ);
+
+    /// Finalize shadow cameras and allocate shadow maps.
+    void FinalizeLightShadows(Camera* cullCamera, const IntVector2& viewSize);
+    /// Collect shadow batches.
+    void BeginCollectingShadowBatches(WorkQueue* workQueue, int materialQuality);
+
+    /// Get light batch queue.
+    LightBatchQueue* GetLigthBatchQueue() { return this; }
+    /// Return light type.
+    LightType GetLightType() const { return lightType_; }
+    /// Return whether the light shall be shadowed.
+    bool HasShadow() const { return numSplits_ != 0; }
+
+private:
+    /// Renderer.
+    Renderer* renderer_{};
+
+    /// Light index.
+    unsigned lightIndex_{};
+    /// Light type.
+    LightType lightType_{};
+    /// Light mask.
+    unsigned lightMask_{};
     /// Whether the light is per-vertex.
-    bool isPerVertex_{};
+    bool perVertex_{};
     /// Whether the light is shadowed.
     bool isShadowed_{};
     /// Shadow map split count.
@@ -115,15 +178,6 @@ struct LightBatchQueueEx : LightBatchQueue
     float shadowFarSplits_[MAX_LIGHT_SPLITS];
     /// Shadow map split queues data.
     Vector<BatchQueueData> shadowSplitsData_;
-    /// Clear.
-    void Clear()
-    {
-        for (Vector<Drawable*>& drawables : shadowCasters_)
-            drawables.Clear();
-        for (BatchQueueData& queueData : shadowSplitsData_)
-            queueData.ShallowClear();
-        numSplits_ = 0;
-    }
 };
 
 struct LitGeometryDescPacked
@@ -235,9 +289,9 @@ public:
     {
         return scenePassQueues_[passIndex].Get();
     }
-    LightBatchQueueEx* GetLightBatchQueue(unsigned lightIndex)
+    LightBatchQueue* GetLightBatchQueue(unsigned lightIndex)
     {
-        return lightBatchQueues_[lightIndex];
+        return lightViews_[lightIndex]->GetLigthBatchQueue();
     }
 
     /// Return whether the calculations are threaded.
@@ -255,12 +309,12 @@ public:
     /// Return actual zone for specified drawable zone.
     Zone* GetActualZone(Zone* drawableZone) const;
     /// Return far clip zone.
-    Zone* GetFarClipZone() const { return zonesData_.farClipZone_; }
+    Zone* GetFarClipZone() const { return zoneContext_.farClipZone_; }
 
     /// Get all light batch queues. Indexed via lightIndex. Not null.
-    const Vector<LightBatchQueueEx*>& GetLightBatchQueues() const { return lightBatchQueues_; }
+    const Vector<LightView*>& GetLightViews() const { return lightViews_; }
     /// Return whether there is any light batch queue.
-    bool HasLightBatchQueues() const { return !lightBatchQueues_.Empty(); }
+    bool HasLightBatchQueues() const { return !lightViews_.Empty(); }
 
 private:
     BatchQueueData* AllocateStaticQueueData()
@@ -273,13 +327,13 @@ private:
         dynamicQueueDataPool_.Emplace(MakeUnique<BatchQueueData>());
         return dynamicQueueDataPool_.Back().Get();
     }
-    LightBatchQueueEx* AllocateLightBatchQueue()
+    LightView* AllocateLightView()
     {
-        lightBatchQueuePool_.Emplace(MakeUnique<LightBatchQueueEx>());
-        return lightBatchQueuePool_.Back().Get();
+        lightViewPool_.Emplace(MakeUnique<LightView>(renderer_));
+        return lightViewPool_.Back().Get();
     }
-    /// Get or create light batch queue.
-    LightBatchQueueEx* GetOrCreateLightBatchQueue(Light* light);
+    /// Get or create light view.
+    LightView* GetOrCreateLightView(Light* light);
 
     void FinalizeBatchQueue(BatchQueue& queue, bool allowShadows);
     void FinalizeBatch(Batch& batch, bool allowShadows, const BatchQueue& queue);
@@ -301,37 +355,6 @@ private:
     /// Update drawable zone
     static void UpdateDirtyZone(const Vector<Zone*>& zones, SceneGridCellDrawableSoA& cellData, unsigned index,
         unsigned viewMask, const Frustum& frustum);
-    /// Check whether the light has shadow.
-    static bool IsLightShadowed(Light* light);
-    /// Setup light shadow splits. Allocate shadow cameras.
-    static void SetupShadowSplits(Renderer* renderer, LightBatchQueueEx* queue, Camera* cullCamera);
-    /// Setup shadow cameras for specified light.
-    static void SetupShadowCameras(LightBatchQueueEx* queue, const LightPerThreadData& lightData,
-        Camera* cullCamera, float minZ, float maxZ);
-    /// Setup shadow camera for directional light.
-    static void SetupDirLightShadowCamera(Camera* shadowCamera, Light* light,
-        float nearSplit, float farSplit, const BoundingBox& litGeometriesBox,
-        Camera* cullCamera, float minZ, float maxZ);
-    /// Finalize shadow camera.
-    static void FinalizeShadowCamera(Camera* shadowCamera, Light* light, const IntRect& shadowViewport,
-        const BoundingBox& shadowCasterBox);
-    /// Quantize shadow camera for directional light.
-    static void QuantizeDirLightShadowCamera(Camera* shadowCamera, Light* light, const IntRect& shadowViewport, const BoundingBox& viewBox);
-    /// Return whether the shadow caster is visible.
-    static bool IsShadowCasterVisible(bool drawableVisible, BoundingBox lightViewBox, Camera* shadowCamera, const Matrix3x4& lightView,
-        const Frustum& lightViewFrustum, const BoundingBox& lightViewFrustumBox);
-    /// Return viewport for given light and split.
-    static IntRect GetShadowMapViewport(Light* light, int splitIndex, Texture2D* shadowMap);
-    /// Get effective shadow distance.
-    static float GetEffectiveShadowDistance(float shadowDistance, float drawDistance)
-    {
-        if (drawDistance > 0.0f && (shadowDistance <= 0.0f || drawDistance < shadowDistance))
-            return drawDistance;
-        else
-            return shadowDistance;
-    }
-    /// Get material technique.
-    static Technique* GetTechnique(int materialQuality, float lodDistance, Material* material, Material* defaultMaterial);
 
 private:
     /// @name Constants since initialization
@@ -364,7 +387,7 @@ private:
     /// Temporary buffer for visible zones and occluders. Size is equal to number of threads.
     Vector<SceneQueryZonesAndOccludersResult> zonesAndOccluders_;
     /// Processed zone data.
-    ViewCookedZonesData zonesData_;
+    ZoneContext zoneContext_;
     /// Scene query for geometries and lights.
     SceneGridQueryResult geometriesAndLightsQuery_;
     /// Temporary buffer for visible geometries and lights. Size is equal to number of threads. Defines lightIndex.
@@ -372,13 +395,13 @@ private:
     /// Visible geometries. Ordered by gridIndex.
     Vector<Drawable*> visibleGeometries_;
     /// Temporary buffer for visible lights data. Size is equal to number of threads.
-    Vector<VisibleLightsPerThreadData> lightsData_;
+    VisibleLightsThreadDataVector lightsData_;
 
     /// Persistent mapping for light batch queues.
-    HashMap<Light*, LightBatchQueueEx*> lightBatchQueueMap_;
+    HashMap<Light*, LightView*> lightViewMap_;
 
     /// Light batch queues. Indexed via lightIndex. Not null.
-    Vector<LightBatchQueueEx*> lightBatchQueues_;
+    Vector<LightView*> lightViews_;
 
     Vector<unsigned> numLightsPerVisibleGeometry_;
     Vector<LitGeometryDescPacked> sortedLitGeometries_;
@@ -389,7 +412,7 @@ private:
 
     Vector<UniquePtr<BatchQueueData>> staticQueueDataPool_;
     Vector<UniquePtr<BatchQueueData>> dynamicQueueDataPool_;
-    Vector<UniquePtr<LightBatchQueueEx>> lightBatchQueuePool_;
+    Vector<UniquePtr<LightView>> lightViewPool_;
 };
 
 }

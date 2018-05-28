@@ -416,7 +416,7 @@ struct SceneGridQueryResult
         cells_.Clear();
         threadRanges_.Clear();
     }
-    template <class T> void ScheduleWork(WorkQueue* workQueue, const T& work)
+    template <class T> void ScheduleWork(WorkQueue* workQueue, const T& work) const
     {
         const unsigned numThreads = threadRanges_.Size();
         for (unsigned i = 0; i < numThreads; ++i)
@@ -441,6 +441,10 @@ struct SceneGridQueryResult
 class SceneGrid
 {
 public:
+    /// Construct.
+    SceneGrid() = default;
+    /// Non-copyable.
+    SceneGrid(const SceneGrid& other) = delete;
     /// Destruct.
     ~SceneGrid()
     {
@@ -891,12 +895,17 @@ struct OldSceneQueryGeometriesAndLightsResult
     }
 };
 
-// TODO(eugeneko) Rename
-struct ViewCookedZonesData
+struct ZoneContext
 {
     bool cameraZoneOverride_{};
     Zone* cameraZone_{};
     Zone* farClipZone_{};
+    Zone* GetActualZone(Zone* drawableZone) const
+    {
+        if (cameraZoneOverride_)
+            return cameraZone_;
+        return drawableZone ? drawableZone : cameraZone_;
+    }
 };
 
 /// Per-view drawable data.
@@ -930,7 +939,7 @@ public:
             result.Clear();
 
         zonesAndOccludersQuery_.ScheduleWork(workQueue,
-            [=](SceneGridCellRef& cellRef, unsigned threadIndex)
+            [=](const SceneGridCellRef& cellRef, unsigned threadIndex)
         {
             SceneGridCellDrawableSoA& data = *cellRef.data_;
             SceneQueryZonesAndOccludersResult& result = zonesAndOccludersThreadResults_[threadIndex];
@@ -1009,7 +1018,7 @@ public:
             result.Clear();
 
         zonesAndOccludersQuery_.ScheduleWork(workQueue,
-            [=](SceneGridCellRef& cellRef, unsigned threadIndex)
+            [=](const SceneGridCellRef& cellRef, unsigned threadIndex)
         {
             SceneGridCellDrawableSoA& data = *cellRef.data_;
             OldSceneQueryGeometriesAndLightsResult& result = geometriesAndLightsThreadResults_[threadIndex];
@@ -1163,7 +1172,7 @@ public:
 
     const SceneQueryZonesAndOccludersResult& GetZonesAndOccluders() const { return zonesAndOccluders_; }
     const OldSceneQueryGeometriesAndLightsResult& GetGeometriesAndLights() const { return geometriesAndLights_; }
-    const ViewCookedZonesData& GetCookedZonesData() const { return zonesData_; }
+    const ZoneContext& GetCookedZonesData() const { return zonesData_; }
     const ZoneVector& GetZones() const { return zonesAndOccluders_.zones_; }
     const DrawableVector& GetOccluders() const { return zonesAndOccluders_.occluders_; }
     const DrawableVector& GetGeometries() const { return geometriesAndLights_.geometries_; }
@@ -1225,7 +1234,7 @@ private:
     Vector<SceneQueryZonesAndOccludersResult> zonesAndOccludersThreadResults_;
     SceneQueryZonesAndOccludersResult zonesAndOccluders_;
 
-    ViewCookedZonesData zonesData_;
+    ZoneContext zonesData_;
 
     SceneGridQueryResult geometriesAndLightsQuery_;
     Vector<OldSceneQueryGeometriesAndLightsResult> geometriesAndLightsThreadResults_;

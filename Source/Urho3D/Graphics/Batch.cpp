@@ -717,13 +717,13 @@ unsigned BatchGroupKey::ToHash() const
                       (size_t)material_ / sizeof(Material) + (size_t)geometry_ / sizeof(Geometry)) + renderOrder_;
 }
 
-void BatchQueue::Clear(int maxSortedInstances)
+void BatchQueue::Clear(unsigned maxSortedInstances)
 {
     batches_.Clear();
     sortedBatches_.Clear();
     batchGroups_.Clear();
     sortedBatchGroups_.Clear();
-    maxSortedInstances_ = (unsigned)maxSortedInstances;
+    maxSortedInstances_ = maxSortedInstances;
 }
 
 void BatchQueue::SortBackToFront()
