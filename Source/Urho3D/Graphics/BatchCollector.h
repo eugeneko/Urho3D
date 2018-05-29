@@ -128,10 +128,10 @@ public:
         const SceneGridQueryResult& cellsQuery, const ZoneContext& zoneContext, VisibleLightsThreadDataVector& result);
     /// Begin processing of lit geometries for point light.
     void BeginProcessingPointLitGeometry(WorkQueue* workQueue, unsigned viewMask, Camera* cullCamera,
-        SceneGrid* sceneGrid, const ZoneContext& zoneContext, VisibleLightsThreadDataVector& result);
+        SceneGrid* sceneGrid, const ZoneContext& zoneContext, float sceneMinZ, float sceneMaxZ, VisibleLightsThreadDataVector& result);
     /// Begin processing of lit geometries for spot light.
     void BeginProcessingSpotLitGeometry(WorkQueue* workQueue, unsigned viewMask, Camera* cullCamera,
-        SceneGrid* sceneGrid, const ZoneContext& zoneContext, VisibleLightsThreadDataVector& result);
+        SceneGrid* sceneGrid, const ZoneContext& zoneContext, float sceneMinZ, float sceneMaxZ, VisibleLightsThreadDataVector& result);
     /// Begin processing of shadow casters for directional light.
     void BeginProcessingDirectionalShadowCasters(WorkQueue* workQueue, unsigned viewMask, Camera* cullCamera,
         SceneGrid* sceneGrid, const ZoneContext& zoneContext, float sceneMinZ, float sceneMaxZ);
@@ -171,7 +171,7 @@ private:
     /// Shadow cameras.
     Camera* shadowCameras_[MAX_LIGHT_SPLITS];
     /// Combined bounding box of shadow casters in light projection space. Only used for focused spot lights.
-    BoundingBox shadowCasterBox_[MAX_LIGHT_SPLITS];
+    BoundingBox shadowCasterBox_;
     /// Shadow camera near splits (directional lights only.)
     float shadowNearSplits_[MAX_LIGHT_SPLITS];
     /// Shadow camera far splits (directional lights only.)

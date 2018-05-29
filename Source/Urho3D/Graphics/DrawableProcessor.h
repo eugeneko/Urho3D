@@ -285,9 +285,9 @@ struct SceneGridCellDrawableSoA
     bool IsLight(unsigned index) const { return !!(drawableFlag_[index] & DRAWABLE_LIGHT); }
     bool IsGeometry(unsigned index) const { return !!(drawableFlag_[index] & DRAWABLE_GEOMETRY); }
     Intersection IntersectSphereFrustum(unsigned index, const Frustum& frustum) const { return frustum.IsInside(boundingSphere_[index]); }
-    Intersection IntersectBoxFrustum(unsigned index, const Frustum& frustum) const { return frustum.IsInside(boundingBox_[index]); }
+    Intersection IntersectBoxFrustum(unsigned index, const Frustum& frustum) const { return frustum.IsInsideFast(boundingBox_[index]); }
     Intersection IntersectSphereSphere(unsigned index, const Sphere& sphere) const { return sphere.IsInside(boundingSphere_[index]); }
-    Intersection IntersectBoxSphere(unsigned index, const Sphere& sphere) const { return sphere.IsInside(boundingBox_[index]); }
+    Intersection IntersectBoxSphere(unsigned index, const Sphere& sphere) const { return sphere.IsInsideFast(boundingBox_[index]); }
     bool IsInFrustum(unsigned index, const Frustum& frustum) const
     {
         const Intersection sphereIntersection = IntersectSphereFrustum(index, frustum);

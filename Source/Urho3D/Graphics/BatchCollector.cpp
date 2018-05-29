@@ -189,7 +189,8 @@ bool IsDrawableAffectedBySpotLight(SceneGridCellDrawableSoA& cell, unsigned inde
 
 /// Check whether the drawable is affected by point light.
 void CheckDrawableLitAndCastShadow(SceneGridCellDrawableSoA& cell, unsigned index,
-    Camera* cullCamera, const ZoneContext& zoneContext, unsigned lightMask, bool& lit, bool& castShadow)
+    Camera* cullCamera, const ZoneContext& zoneContext, unsigned lightMask, bool needShadow,
+    bool& lit, bool& castShadow)
 {
     lit = false;
     castShadow = false;
@@ -204,7 +205,7 @@ void CheckDrawableLitAndCastShadow(SceneGridCellDrawableSoA& cell, unsigned inde
     }
 
     // Cast shadow if shadow caster and shadow mask match
-    if (cell.castShadows_[index] && (cell.shadowMask_[index] & zone->GetShadowMask() & lightMask))
+    if (needShadow && cell.castShadows_[index] && (cell.shadowMask_[index] & zone->GetShadowMask() & lightMask))
     {
         // Calculate draw distance
         const float drawDistance = cell.drawDistance_[index];
@@ -587,8 +588,7 @@ void LightView::Clear(Light* light, unsigned lightIndex, unsigned maxSortedInsta
         shadowCasters.Clear();
     for (BatchQueueData& shadowBatchesData : shadowSplitsData_)
         shadowBatchesData.ShallowClear();
-    for (BoundingBox& shadowCasterBox : shadowCasterBox_)
-        shadowCasterBox.Clear();
+    shadowCasterBox_.Clear();
 
     // Reset light parameters
     numSplits_ = 0;
@@ -691,7 +691,7 @@ void LightView::SetupPointShadowCameras()
     if (!HasShadow())
         return;
 
-    assert(lightType_ == LIGHT_DIRECTIONAL);
+    assert(lightType_ == LIGHT_POINT);
     assert(numSplits_ == MAX_CUBEMAP_FACES);
 
     static const Vector3* directions[] =
@@ -743,17 +743,12 @@ void LightView::BeginProcessingDirectionalLitGeometry(WorkQueue* workQueue, unsi
 {
     assert(lightType_ == LIGHT_DIRECTIONAL);
 
-    const bool isFocused = light_->GetShadowFocus().focus_;
-    const bool collectLitGeometriesBox = isFocused && isShadowed_;
-
-    // For directional light:
-    // 1. Iterate over visible geometry;
-    // 2. Collect lit geometry;
-    // 3. Calculate lit drawables volume if focused and shadowed.
-    // Reuse frustum query
     cellsQuery.ScheduleWork(workQueue,
         [=, &result](const SceneGridCellRef& cellRef, unsigned threadIndex)
     {
+        const bool isFocused = light_->GetShadowFocus().focus_;
+        const bool collectLitGeometriesBox = isFocused && isShadowed_;
+
         Vector<LitGeometryDescIdx>& resultLitGeometry = result[threadIndex].litGeometry_;
         LightViewThreadData& resultLightData = result[threadIndex].lightData_[lightIndex_];
 
@@ -794,19 +789,23 @@ void LightView::BeginProcessingDirectionalLitGeometry(WorkQueue* workQueue, unsi
 }
 
 void LightView::BeginProcessingPointLitGeometry(WorkQueue* workQueue, unsigned viewMask, Camera* cullCamera,
-    SceneGrid* sceneGrid, const ZoneContext& zoneContext, VisibleLightsThreadDataVector& result)
+    SceneGrid* sceneGrid, const ZoneContext& zoneContext, float sceneMinZ, float sceneMaxZ, VisibleLightsThreadDataVector& result)
 {
     assert(lightType_ == LIGHT_POINT);
-
-    const Sphere lightSphere(light_->GetNode()->GetWorldPosition(), light_->GetRange());
-    // For point light:
-    // 1. Query cells in sphere;
-    // 2. Iterate over objects in cells;
-    // 3. Collect lit geometry;
     workQueue->ScheduleWork([=, &result](unsigned threadIndex)
     {
+        const Sphere lightSphere(light_->GetNode()->GetWorldPosition(), light_->GetRange());
+        const bool needShadow = HasShadow();
+
+        LightShadowSplitContext shadowContexts[MAX_CUBEMAP_FACES];
+        if (needShadow)
+        {
+            for (unsigned splitIndex = 0; splitIndex < MAX_CUBEMAP_FACES; ++splitIndex)
+                shadowContexts[splitIndex].Define(cullCamera, shadowCameras_[splitIndex], sceneMinZ, sceneMaxZ);
+        }
+
         sceneGrid->ProcessCellsInSphere(lightSphere,
-            [=, &result](SceneGridCellDrawableSoA& cell, bool isInside)
+            [=, &shadowContexts, &result](SceneGridCellDrawableSoA& cell, bool isInside)
         {
             Vector<LitGeometryDescIdx>& resultLitGeometry = result[threadIndex].litGeometry_;
             for (unsigned index = 0; index < cell.size_; ++index)
@@ -816,12 +815,12 @@ void LightView::BeginProcessingPointLitGeometry(WorkQueue* workQueue, unsigned v
 
                 bool lit = false;
                 bool castShadow = false;
-                CheckDrawableLitAndCastShadow(cell, index, cullCamera, zoneContext, lightMask_, lit, castShadow);
+                CheckDrawableLitAndCastShadow(cell, index, cullCamera, zoneContext, lightMask_, needShadow, lit, castShadow);
 
+                Drawable* drawable = cell.drawable_[index];
                 if (lit)
                 {
                     // TODO(eugeneko) Get grid index w/o pointer picking
-                    Drawable* drawable = cell.drawable_[index];
                     const unsigned gridIndex = drawable->GetDrawableIndex().gridIndex_;
 
                     LitGeometryDescIdx litGeometry;
@@ -834,9 +833,22 @@ void LightView::BeginProcessingPointLitGeometry(WorkQueue* workQueue, unsigned v
                     resultLitGeometry.Push(litGeometry);
                 }
 
-                if (HasShadow() && castShadow)
+                if (castShadow)
                 {
-                    assert(0);
+                    for (unsigned splitIndex = 0; splitIndex < MAX_CUBEMAP_FACES; ++splitIndex)
+                    {
+                        const LightShadowSplitContext& shadowContext = shadowContexts[splitIndex];
+
+                        // Check that this drawable is inside the split shadow camera frustum
+                        if (shadowContext.shadowCameraFrustum_.IsInsideFast(drawable->GetWorldBoundingBox()) == OUTSIDE)
+                            continue;
+
+                        const BoundingBox lightViewBox = cell.boundingBox_[index].Transformed(shadowContext.lightView_);
+                        if (shadowContext.IsShadowCasterVisible(cell.visible_[index], lightViewBox))
+                        {
+                            shadowCasters_[splitIndex].Push(drawable);
+                        }
+                    }
                 }
             }
         });
@@ -844,23 +856,26 @@ void LightView::BeginProcessingPointLitGeometry(WorkQueue* workQueue, unsigned v
 }
 
 void LightView::BeginProcessingSpotLitGeometry(WorkQueue* workQueue, unsigned viewMask, Camera* cullCamera,
-    SceneGrid* sceneGrid, const ZoneContext& zoneContext, VisibleLightsThreadDataVector& result)
+    SceneGrid* sceneGrid, const ZoneContext& zoneContext, float sceneMinZ, float sceneMaxZ, VisibleLightsThreadDataVector& result)
 {
     assert(lightType_ == LIGHT_SPOT);
-
-    const Frustum lightFrustum = light_->GetFrustum();
-    const Sphere lightSphere(light_->GetNode()->GetWorldPosition(), light_->GetRange());
-
-    // For spot lights:
-    // 1. Query cells in frustum;
-    // 2. Iterate over objects in cells;
-    // 3. Collect lit geometry;
     workQueue->ScheduleWork([=, &result](unsigned threadIndex)
     {
+        const bool needShadow = HasShadow();
+
+        const Frustum lightFrustum = light_->GetFrustum();
+        const Sphere lightSphere(light_->GetNode()->GetWorldPosition(), light_->GetRange());
+
+        LightShadowSplitContext shadowContext;
+        if (needShadow)
+            shadowContext.Define(cullCamera, shadowCameras_[0], sceneMinZ, sceneMaxZ);
+
         sceneGrid->ProcessCellsInFrustum(lightFrustum,
             [=, &result](SceneGridCellDrawableSoA& cell, bool isInside)
         {
             Vector<LitGeometryDescIdx>& resultLitGeometry = result[threadIndex].litGeometry_;
+            LightViewThreadData& resultLightData = result[threadIndex].lightData_[lightIndex_];
+
             for (unsigned index = 0; index < cell.size_; ++index)
             {
                 if (!IsDrawableAffectedBySpotLight(cell, index, isInside, viewMask, lightSphere, lightFrustum))
@@ -868,12 +883,12 @@ void LightView::BeginProcessingSpotLitGeometry(WorkQueue* workQueue, unsigned vi
 
                 bool lit = false;
                 bool castShadow = false;
-                CheckDrawableLitAndCastShadow(cell, index, cullCamera, zoneContext, lightMask_, lit, castShadow);
+                CheckDrawableLitAndCastShadow(cell, index, cullCamera, zoneContext, lightMask_, needShadow, lit, castShadow);
 
+                Drawable* drawable = cell.drawable_[index];
                 if (lit)
                 {
                     // TODO(eugeneko) Get grid index w/o pointer picking
-                    Drawable* drawable = cell.drawable_[index];
                     const unsigned gridIndex = drawable->GetDrawableIndex().gridIndex_;
 
                     LitGeometryDescIdx litGeometry;
@@ -886,9 +901,15 @@ void LightView::BeginProcessingSpotLitGeometry(WorkQueue* workQueue, unsigned vi
                     resultLitGeometry.Push(litGeometry);
                 }
 
-                if (HasShadow() && castShadow)
+                if (castShadow)
                 {
-                    assert(0);
+                    const BoundingBox lightViewBox = cell.boundingBox_[index].Transformed(shadowContext.lightView_);
+                    if (shadowContext.IsShadowCasterVisible(cell.visible_[index], lightViewBox))
+                    {
+                        shadowCasters_[0].Push(drawable);
+                        const BoundingBox lightProjBox{ lightViewBox.Projected(shadowContext.lightProj_) };
+                        shadowCasterBox_.Merge(lightProjBox);
+                    }
                 }
             }
         });
@@ -935,7 +956,7 @@ void LightView::BeginProcessingDirectionalShadowCasters(WorkQueue* workQueue, un
                     // Check if casts shadow
                     bool lit = false;
                     bool castShadow = false;
-                    CheckDrawableLitAndCastShadow(cell, index, cullCamera, zoneContext, lightMask_, lit, castShadow);
+                    CheckDrawableLitAndCastShadow(cell, index, cullCamera, zoneContext, lightMask_, true, lit, castShadow);
                     if (!castShadow)
                         continue;
 
@@ -972,7 +993,7 @@ void LightView::FinalizeLightShadows(Camera* cullCamera, const IntVector2& viewS
     for (unsigned splitIndex = 0; splitIndex < numSplits_; ++splitIndex)
     {
         shadowViewports_[splitIndex] = GetShadowMapViewport(light_, splitIndex, shadowMap_);
-        FinalizeShadowCamera(shadowCameras_[splitIndex], light_, shadowViewports_[splitIndex], shadowCasterBox_[splitIndex]);
+        FinalizeShadowCamera(shadowCameras_[splitIndex], light_, shadowViewports_[splitIndex], shadowCasterBox_);
     }
 }
 
@@ -1330,8 +1351,9 @@ void BatchCollector::UpdateVisibleGeometriesAndShadowCasters()
 
 void BatchCollector::ProcessLights(SceneGrid* sceneGrid)
 {
-    // Assign lights
     const unsigned numLights = GetVisibleLights().Size();
+    const float sceneMinZ = geometriesAndLights_[0].minZ_;
+    const float sceneMaxZ = geometriesAndLights_[0].maxZ_;
 
     // Resize related arrays
     lightViews_.Resize(numLights);
@@ -1356,17 +1378,20 @@ void BatchCollector::ProcessLights(SceneGrid* sceneGrid)
         // Process light
         if (lightType == LIGHT_DIRECTIONAL)
         {
-            lightView->BeginProcessingDirectionalLitGeometry(workQueue_, viewMask_, geometriesAndLightsQuery_, zoneContext_, lightsData_);
+            lightView->BeginProcessingDirectionalLitGeometry(
+                workQueue_, viewMask_, geometriesAndLightsQuery_, zoneContext_, lightsData_);
         }
         else if (lightType == LIGHT_POINT)
         {
             lightView->SetupPointShadowCameras();
-            lightView->BeginProcessingPointLitGeometry(workQueue_, viewMask_, cullCamera_, sceneGrid, zoneContext_, lightsData_);
+            lightView->BeginProcessingPointLitGeometry(
+                workQueue_, viewMask_, cullCamera_, sceneGrid, zoneContext_, sceneMinZ, sceneMaxZ, lightsData_);
         }
         else if (lightType == LIGHT_SPOT)
         {
             lightView->SetupSpotShadowCameras();
-            lightView->BeginProcessingSpotLitGeometry(workQueue_, viewMask_, cullCamera_, sceneGrid, zoneContext_, lightsData_);
+            lightView->BeginProcessingSpotLitGeometry(
+                workQueue_, viewMask_, cullCamera_, sceneGrid, zoneContext_, sceneMinZ, sceneMaxZ, lightsData_);
         }
 
         // Find or create queues data for each thread
@@ -1394,8 +1419,6 @@ void BatchCollector::ProcessLights(SceneGrid* sceneGrid)
     AppendVectorToFirst(lightsData_);
 
     // Step 3. Update shadow cameras for directional lights and collect shadow casters.
-    const float sceneMinZ = geometriesAndLights_[0].minZ_;
-    const float sceneMaxZ = geometriesAndLights_[0].maxZ_;
     for (unsigned lightIndex = 0; lightIndex < numLights; ++lightIndex)
     {
         LightView* lightView = lightViews_[lightIndex];
