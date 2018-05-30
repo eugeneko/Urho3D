@@ -607,7 +607,7 @@ void LightView::Clear(Light* light, unsigned lightIndex, unsigned maxSortedInsta
 
             float nearSplit = nearClip;
             float farSplit = 0;
-            int numSplits = light->GetNumShadowSplits();
+            unsigned numSplits = static_cast<unsigned>(light->GetNumShadowSplits());
 
             while (numSplits_ < numSplits)
             {
@@ -1062,7 +1062,7 @@ void BatchCollector::Initialize(bool threading, const PODVector<ScenePassInfo>& 
     // Calculate constants
     threading_ = threading && workQueue_->GetNumThreads() > 0;
     numThreads_ = threading_ ? workQueue_->GetNumThreads() + 1 : 1;
-    perThreadData_.Resize(numThreads_);
+    batchData_.Resize(numThreads_);
 
     maxSortedInstances_ = static_cast<unsigned>(renderer_->GetMaxSortedInstances());
 
@@ -1086,7 +1086,7 @@ void BatchCollector::Initialize(bool threading, const PODVector<ScenePassInfo>& 
     staticQueueDataPool_.Clear();
     for (unsigned threadIndex = 0; threadIndex < numThreads_; ++threadIndex)
     {
-        BatchCollectorPerThreadData& threadData = perThreadData_[threadIndex];
+        BatchCollectorPerThreadData& threadData = batchData_[threadIndex];
         threadData.scenePassQueueData_.Clear();
         threadData.scenePassQueueData_.Resize(maxScenePassIndex_ + 1);
         for (const ScenePassInfo& info : scenePasses)
@@ -1094,7 +1094,7 @@ void BatchCollector::Initialize(bool threading, const PODVector<ScenePassInfo>& 
     }
 }
 
-void BatchCollector::Clear(Camera* cullCamera, const FrameInfo& frame)
+void BatchCollector::ClearFrame(Camera* cullCamera, const FrameInfo& frame)
 {
     cullCamera_ = cullCamera;
     viewMask_ = cullCamera->GetViewMask();
@@ -1102,8 +1102,11 @@ void BatchCollector::Clear(Camera* cullCamera, const FrameInfo& frame)
 
     visibleGeometries_.Clear();
     sortedLitGeometries_.Clear();
-    for (BatchCollectorPerThreadData& perThread : perThreadData_)
+    for (BatchCollectorPerThreadData& perThread : batchData_)
+    {
         perThread.ShallowClear();
+        perThread.vertexLights_.Clear();
+    }
 }
 
 void BatchCollector::CollectZonesAndOccluders(SceneGrid* sceneGrid)
@@ -1357,7 +1360,7 @@ void BatchCollector::ProcessLights(SceneGrid* sceneGrid)
 
     // Resize related arrays
     lightViews_.Resize(numLights);
-    for (BatchCollectorPerThreadData& perThread : perThreadData_)
+    for (BatchCollectorPerThreadData& perThread : batchData_)
         perThread.ClearLightArrays(numLights);
 
     ClearVector(lightsData_, numLights);
@@ -1397,7 +1400,7 @@ void BatchCollector::ProcessLights(SceneGrid* sceneGrid)
         // Find or create queues data for each thread
         if (!light->GetPerVertex())
         {
-            for (BatchCollectorPerThreadData& perThread : perThreadData_)
+            for (BatchCollectorPerThreadData& perThread : batchData_)
             {
                 auto iterQueueData = perThread.lightBatchQueueDataMap_.Find(light);
                 if (iterQueueData == perThread.lightBatchQueueDataMap_.End())
@@ -1483,23 +1486,41 @@ void BatchCollector::SortLitGeometries(SceneGrid* sceneGrid)
     }
 }
 
+LightBatchQueue* BatchCollector::GetOrCreateVertexLightBatchQueue(unsigned threadIndex, const VertexLightBatchQueueKey& key)
+{
+    const unsigned long long hash = key.ToHash();
+    auto iterPrimary = vertexLights_.Find(hash);
+    if (iterPrimary != vertexLights_.End())
+        return &iterPrimary->second_;
+
+    auto& secondaryMap = batchData_[threadIndex].vertexLights_;
+    auto iterSecondary = secondaryMap.Find(hash);
+    if (iterSecondary == secondaryMap.End())
+    {
+        iterSecondary = secondaryMap.Insert(MakePair(hash, LightBatchQueue{}));
+        key.GetLights(iterSecondary->second_.vertexLights_);
+    }
+
+    return &iterSecondary->second_;
+}
+
 void BatchCollector::AddScenePassBatch(unsigned threadIndex, unsigned passIndex, const Batch& batch, bool grouped)
 {
-    BatchQueueData* queueData = perThreadData_[threadIndex].scenePassQueueData_[passIndex];
+    BatchQueueData* queueData = batchData_[threadIndex].scenePassQueueData_[passIndex];
     assert(queueData);
     queueData->AddBatch(batch, grouped);
 }
 
 void BatchCollector::AddLitBaseBatch(unsigned threadIndex, unsigned lightIndex, const Batch& batch, bool grouped)
 {
-    BatchQueueData* queueData = perThreadData_[threadIndex].litBaseQueueData_[lightIndex];
+    BatchQueueData* queueData = batchData_[threadIndex].litBaseQueueData_[lightIndex];
     assert(queueData);
     queueData->AddBatch(batch, grouped);
 }
 
 void BatchCollector::AddLightBatch(unsigned threadIndex, unsigned lightIndex, const Batch& batch, bool grouped)
 {
-    BatchQueueData* queueData = perThreadData_[threadIndex].lightQueueData_[lightIndex];
+    BatchQueueData* queueData = batchData_[threadIndex].lightQueueData_[lightIndex];
     assert(queueData);
     queueData->AddBatch(batch, grouped);
 }
@@ -1526,19 +1547,25 @@ void BatchCollector::CollectShadowBatches(const IntVector2& viewSize, int materi
 
 void BatchCollector::MergeThreadedResults()
 {
+    // Merge all vertex light batch queues.
+    for (BatchCollectorPerThreadData& perThread : batchData_)
+    {
+        vertexLights_.Insert(perThread.vertexLights_);
+    }
+
     if (!threading_)
         return;
 
     // Append all batch groups for scene passes
     for (unsigned passIndex = 0; passIndex < maxScenePassIndex_; ++passIndex)
     {
-        BatchQueueData* destData = perThreadData_[0].scenePassQueueData_[passIndex];
+        BatchQueueData* destData = batchData_[0].scenePassQueueData_[passIndex];
         if (!destData)
             continue;
 
         for (unsigned threadIndex = 1; threadIndex < numThreads_; ++threadIndex)
         {
-            BatchQueueData* sourceData = perThreadData_[threadIndex].scenePassQueueData_[passIndex];
+            BatchQueueData* sourceData = batchData_[threadIndex].scenePassQueueData_[passIndex];
             assert(sourceData);
             destData->AppendBatchGroups(*sourceData);
         }
@@ -1547,16 +1574,16 @@ void BatchCollector::MergeThreadedResults()
     // Append all batch groups for light passes.
     for (unsigned lightIndex = 0; lightIndex < GetVisibleLights().Size(); ++lightIndex)
     {
-        BatchQueueData* destLitBaseData = perThreadData_[0].litBaseQueueData_[lightIndex];
-        BatchQueueData* destLightData = perThreadData_[0].lightQueueData_[lightIndex];
+        BatchQueueData* destLitBaseData = batchData_[0].litBaseQueueData_[lightIndex];
+        BatchQueueData* destLightData = batchData_[0].lightQueueData_[lightIndex];
         assert(!!destLitBaseData == !!destLightData);
         if (!destLightData || !destLitBaseData)
             continue;
 
         for (unsigned threadIndex = 1; threadIndex < numThreads_; ++threadIndex)
         {
-            BatchQueueData* sourceLitBaseData = perThreadData_[threadIndex].litBaseQueueData_[lightIndex];
-            BatchQueueData* sourceLightData = perThreadData_[threadIndex].lightQueueData_[lightIndex];
+            BatchQueueData* sourceLitBaseData = batchData_[threadIndex].litBaseQueueData_[lightIndex];
+            BatchQueueData* sourceLightData = batchData_[threadIndex].lightQueueData_[lightIndex];
             assert(sourceLitBaseData && sourceLightData);
             destLitBaseData->AppendBatchGroups(*sourceLitBaseData);
             destLightData->AppendBatchGroups(*sourceLightData);
@@ -1577,14 +1604,14 @@ void BatchCollector::FillBatchQueues()
         queue->Clear(maxSortedInstances_);
 
         // Copy pointers to batch groups from first threaded storage
-        BatchQueueData* mergedQueueData = perThreadData_[0].scenePassQueueData_[passIndex];
+        BatchQueueData* mergedQueueData = batchData_[0].scenePassQueueData_[passIndex];
         assert(mergedQueueData);
         mergedQueueData->ExportBatchGroups(*queue);
 
         // Copy pointers to batches from each threaded storage
         for (unsigned threadIndex = 0; threadIndex < numThreads_; ++threadIndex)
         {
-            BatchQueueData* queueData = perThreadData_[threadIndex].scenePassQueueData_[passIndex];
+            BatchQueueData* queueData = batchData_[threadIndex].scenePassQueueData_[passIndex];
             assert(queueData);
             queueData->ExportBatches(*queue);
         }
@@ -1609,8 +1636,8 @@ void BatchCollector::FillBatchQueues()
         litBaseQueue.Clear(maxSortedInstances_);
 
         // Copy pointers to batch groups from first threaded storage
-        BatchQueueData* mergedLightQueueData = perThreadData_[0].lightQueueData_[lightIndex];
-        BatchQueueData* mergedLitBaseQueueData = perThreadData_[0].litBaseQueueData_[lightIndex];
+        BatchQueueData* mergedLightQueueData = batchData_[0].lightQueueData_[lightIndex];
+        BatchQueueData* mergedLitBaseQueueData = batchData_[0].litBaseQueueData_[lightIndex];
         assert(mergedLightQueueData && mergedLitBaseQueueData);
         mergedLightQueueData->ExportBatchGroups(lightQueue);
         mergedLitBaseQueueData->ExportBatchGroups(litBaseQueue);
@@ -1618,8 +1645,8 @@ void BatchCollector::FillBatchQueues()
         // Copy pointers to batches from each threaded storage
         for (unsigned threadIndex = 0; threadIndex < numThreads_; ++threadIndex)
         {
-            BatchQueueData* lightQueueData = perThreadData_[threadIndex].lightQueueData_[lightIndex];
-            BatchQueueData* litBaseQueueData = perThreadData_[threadIndex].litBaseQueueData_[lightIndex];
+            BatchQueueData* lightQueueData = batchData_[threadIndex].lightQueueData_[lightIndex];
+            BatchQueueData* litBaseQueueData = batchData_[threadIndex].litBaseQueueData_[lightIndex];
             assert(lightQueueData && litBaseQueueData);
             lightQueueData->ExportBatches(lightQueue);
             litBaseQueueData->ExportBatches(litBaseQueue);

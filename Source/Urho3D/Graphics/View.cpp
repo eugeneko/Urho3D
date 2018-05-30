@@ -401,7 +401,7 @@ void View::Update(const FrameInfo& frame)
     SendViewEvent(E_BEGINVIEWUPDATE);
 
     // Clear buffers, geometry, light, occluder & batch list
-    batchCollector_->Clear(cullCamera_, frame_);
+    batchCollector_->ClearFrame(cullCamera_, frame_);
     renderTargets_.Clear();
     geometries_.Clear();
     lights_.Clear();
@@ -995,10 +995,10 @@ void View::CookBatches()
                         continue;
 
                     // Apply vertex lights
-                    if (info.vertexLights_ && numVertexLights)
+                    if (info.vertexLights_ && numVertexLights > 0)
                     {
-                        // TODO(eugeneko) Implement it
-                        assert(0);
+                        VertexLightBatchQueueKey key(beginVertexLight.ptr_, numVertexLights, batchCollector_->GetVisibleLights());
+                        destBatch.lightQueue_ = batchCollector_->GetOrCreateVertexLightBatchQueue(threadIndex, key);
                     }
 
                     const bool allowInstancing = info.allowInstancing_ && (!info.markToStencil_ || drawableHasSimpleMask);
@@ -1054,9 +1054,17 @@ void View::CookBatches()
                         const LitGeometryDescPacked& lightData = *beginPixelLight;
 
                         destBatch.isBase_ = true;
-                        destBatch.lightQueue_ = nullptr; // TODO(eugeneko) Vertex lights here
+                        destBatch.lightQueue_ = nullptr;
                         destBatch.lightMask_ = cutLightMask;
                         destBatch.pass_ = baseOrAlphaPass;
+
+                        // Apply vertex lights
+                        // TODO(eugeneko) Test if base pass need vertex lights
+                        if (/*info.vertexLights_ &&*/ numVertexLights > 0)
+                        {
+                            VertexLightBatchQueueKey key(beginVertexLight.ptr_, numVertexLights, batchCollector_->GetVisibleLights());
+                            destBatch.lightQueue_ = batchCollector_->GetOrCreateVertexLightBatchQueue(threadIndex, key);
+                        }
 
                         const bool allowInstancing = basePassInfo->allowInstancing_
                             && (!basePassInfo->markToStencil_ || drawableHasSimpleMask);
@@ -1102,9 +1110,17 @@ void View::CookBatches()
                         const LitGeometryDescPacked& lightData = *beginPixelLight;
 
                         destBatch.isBase_ = true;
-                        destBatch.lightQueue_ = nullptr; // TODO(eugeneko) Vertex lights here
+                        destBatch.lightQueue_ = nullptr;
                         destBatch.lightMask_ = cutLightMask;
                         destBatch.pass_ = baseOrAlphaPass;
+
+                        // Apply vertex lights
+                        // TODO(eugeneko) Test if base pass need vertex lights
+                        if (/*info.vertexLights_ &&*/ numVertexLights > 0)
+                        {
+                            VertexLightBatchQueueKey key(beginVertexLight.ptr_, numVertexLights, batchCollector_->GetVisibleLights());
+                            destBatch.lightQueue_ = batchCollector_->GetOrCreateVertexLightBatchQueue(threadIndex, key);
+                        }
 
                         batchCollector_->AddScenePassBatch(threadIndex, alphaPassIndex_, destBatch, false);
                     }

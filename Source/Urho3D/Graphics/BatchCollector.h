@@ -203,6 +203,41 @@ struct LitGeometryDescPacked
 
 };
 
+/// Vertex light batch queue key.
+struct VertexLightBatchQueueKey
+{
+    /// Construct.
+    VertexLightBatchQueueKey() = default;
+    /// Construct from vertex lights.
+    VertexLightBatchQueueKey(const LitGeometryDescPacked* vertexLights, unsigned numVertexLights, const Vector<Light*>& lights)
+    {
+        numVertexLights = Min(numVertexLights, static_cast<unsigned>(MAX_VERTEX_LIGHTS));
+        for (unsigned i = 0; i < numVertexLights; ++i)
+        {
+            lights_[i] = lights[vertexLights[i].lightIndex_];
+        }
+    }
+    /// Make hash for the key.
+    unsigned long long ToHash() const
+    {
+        unsigned long long hash = 0;
+        for (Light* light : lights_)
+            hash += reinterpret_cast<unsigned long long>(light);
+        return hash;
+    }
+    /// Get lights.
+    void GetLights(PODVector<Light*>& lights) const
+    {
+        for (Light* light : lights_)
+        {
+            if (light)
+                lights.Push(light);
+        }
+    }
+    /// Lights. From 1 to 4 are non-zero.
+    Light* lights_[MAX_VERTEX_LIGHTS] = {};
+};
+
 struct LightBatchQueueData
 {
     BatchQueueData* litBaseQueueData_{};
@@ -220,6 +255,9 @@ struct BatchCollectorPerThreadData
     Vector<BatchQueueData*> litBaseQueueData_;
     /// Batch queues for each light "light" pass. Indexed via lightIndex. Null for vertex lights.
     Vector<BatchQueueData*> lightQueueData_;
+
+    /// Vertex lights.
+    HashMap<unsigned long long, LightBatchQueue> vertexLights_;
 
     /// Clear light arrays.
     void ClearLightArrays(unsigned numLights)
@@ -248,7 +286,7 @@ public:
 
     /// Clear the state before processing the frame.
     // TODO(eugeneko) Pass sceneGrid here
-    void Clear(Camera* cullCamera, const FrameInfo& frame);
+    void ClearFrame(Camera* cullCamera, const FrameInfo& frame);
     /// Collect zones and occluders.
     void CollectZonesAndOccluders(SceneGrid* sceneGrid);
     /// Process zones.
@@ -264,6 +302,8 @@ public:
     /// Sort lit geometries.
     void SortLitGeometries(SceneGrid* sceneGrid);
 
+    /// Get or create vertex light batch queue.
+    LightBatchQueue* GetOrCreateVertexLightBatchQueue(unsigned threadIndex, const VertexLightBatchQueueKey& key);
     /// Add scene pass batch.
     void AddScenePassBatch(unsigned threadIndex, unsigned passIndex, const Batch& batch, bool grouped);
     /// Add light batch for "litbase" pass.
@@ -382,6 +422,9 @@ private:
 
     /// @}
 
+    /// @name Scene queries
+    /// @{
+
     /// Scene query for zones and occluders.
     SceneGridQueryResult zonesAndOccludersQuery_;
     /// Temporary buffer for visible zones and occluders. Size is equal to number of threads.
@@ -394,19 +437,23 @@ private:
     Vector<SceneQueryGeometriesAndLightsResult> geometriesAndLights_;
     /// Visible geometries. Ordered by gridIndex.
     Vector<Drawable*> visibleGeometries_;
+
+    /// @}
+
     /// Temporary buffer for visible lights data. Size is equal to number of threads.
     VisibleLightsThreadDataVector lightsData_;
-
-    /// Persistent mapping for light batch queues.
+    /// Persistent vertex lights data.
+    HashMap<unsigned long long, LightBatchQueue> vertexLights_;
+    /// Persistent mapping for light views.
     HashMap<Light*, LightView*> lightViewMap_;
-
-    /// Light batch queues. Indexed via lightIndex. Not null.
+    /// Light views. Indexed via lightIndex.
     Vector<LightView*> lightViews_;
-
+    /// Number of lights for each drawable. Indexed with drawableIndex.
     Vector<unsigned> numLightsPerVisibleGeometry_;
+    /// Lit geometry.
     Vector<LitGeometryDescPacked> sortedLitGeometries_;
 
-    Vector<BatchCollectorPerThreadData> perThreadData_;
+    Vector<BatchCollectorPerThreadData> batchData_;
 
     Vector<UniquePtr<BatchQueue>> scenePassQueues_;
 
