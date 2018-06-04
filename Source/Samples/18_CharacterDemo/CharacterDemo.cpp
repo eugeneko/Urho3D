@@ -26,10 +26,14 @@
 #include <Urho3D/Graphics/AnimatedModel.h>
 #include <Urho3D/Graphics/AnimationController.h>
 #include <Urho3D/Graphics/Camera.h>
+#include <Urho3D/Graphics/Geometry.h>
+#include <Urho3D/Graphics/IndexBuffer.h>
 #include <Urho3D/Graphics/Light.h>
 #include <Urho3D/Graphics/Material.h>
 #include <Urho3D/Graphics/Octree.h>
 #include <Urho3D/Graphics/Renderer.h>
+#include <Urho3D/Graphics/Terrain.h>
+#include <Urho3D/Graphics/VertexBuffer.h>
 #include <Urho3D/Graphics/Zone.h>
 #include <Urho3D/Input/Controls.h>
 #include <Urho3D/Input/Input.h>
@@ -47,10 +51,232 @@
 #include "CharacterDemo.h"
 #include "Touch.h"
 
+#include <random>
+
 #include <Urho3D/DebugNew.h>
+
 
 URHO3D_DEFINE_APPLICATION_MAIN(CharacterDemo)
 
+//////////////////////////////////////////////////////////////////////////
+using PointCloud2D = PODVector<Vector2>;
+using PointCloud2DNorm = PODVector<Vector2>;
+class PoissonRandom
+{
+public:
+    PoissonRandom(unsigned seed);
+    ~PoissonRandom();
+    PointCloud2DNorm generate(float minDist, unsigned newPointsCount, unsigned numPoints);
+private:
+    struct Cell;
+    struct Grid;
+    float randomFloat();
+    static IntVector2 imageToGrid(const Vector2& p, float cellSize);
+    Vector2 popRandom(PointCloud2DNorm& points);
+    Vector2 generateRandomPointAround(const Vector2& p, float minDist);
+private:
+    struct Core;
+    UniquePtr<Core> impl_;
+};
+
+struct PoissonRandom::Core
+{
+    Core(unsigned seed) : m_generator(seed), m_distr(0.0, 1.0) {}
+    std::mt19937 m_generator;
+    std::uniform_real_distribution<> m_distr;
+};
+
+// Point Cloud
+PointCloud2D samplePointCloud(const PointCloud2DNorm& cloud,
+    const Vector2& begin, const Vector2& end,
+    float scale)
+{
+    PointCloud2D dest;
+    const Vector2 from = VectorFloor(begin / scale);
+    const Vector2 to = VectorCeil(end / scale);
+    for (float nx = from.x_; nx <= to.x_; ++nx)
+    {
+        for (float ny = from.y_; ny <= to.y_; ++ny)
+        {
+            const Vector2 tileBegin = Vector2(nx, ny);
+            const Vector2 tileEnd = Vector2(nx + 1, ny + 1);
+            const Vector2 clipBegin = VectorMax(begin / scale, VectorMin(end / scale, tileBegin));
+            const Vector2 clipEnd = VectorMax(begin / scale, VectorMin(end / scale, tileEnd));
+            for (const Vector2& sourcePoint : cloud)
+            {
+                const Vector2 point = VectorLerp(tileBegin, tileEnd, static_cast<Vector2>(sourcePoint));
+                if (point.x_ < clipBegin.x_ || point.y_ < clipBegin.y_ || point.x_ > clipEnd.x_ || point.y_ > clipEnd.y_)
+                    continue;
+
+                dest.Push(point * scale);
+            }
+        }
+    }
+    return dest;
+}
+
+
+// Ctor
+PoissonRandom::PoissonRandom(unsigned seed)
+    : impl_(MakeUnique<Core>(seed))
+{
+}
+PoissonRandom::~PoissonRandom()
+{
+}
+
+
+// Generator
+struct PoissonRandom::Cell
+    : public Vector2
+{
+    bool isValid = false;
+};
+float PoissonRandom::randomFloat()
+{
+    return static_cast<float>(impl_->m_distr(impl_->m_generator));
+}
+IntVector2 PoissonRandom::imageToGrid(const Vector2& p, float cellSize)
+{
+    return IntVector2(static_cast<int>(p.x_ / cellSize), static_cast<int>(p.y_ / cellSize));
+
+}
+struct PoissonRandom::Grid
+{
+    Grid(const int w, const int h, const float cellSize)
+        : m_width(w)
+        , m_height(h)
+        , m_cellSize(cellSize)
+    {
+        m_grid.Resize(m_height);
+
+        for (auto i = m_grid.Begin(); i != m_grid.End(); i++)
+        {
+            i->Resize(m_width);
+        }
+    }
+    void insert(const Vector2& p)
+    {
+        IntVector2 g = imageToGrid(p, m_cellSize);
+        Cell& c = m_grid[g.x_][g.y_];
+
+        c.x_ = p.x_;
+        c.y_ = p.y_;
+        c.isValid = true;
+    }
+    bool isInNeighbourhood(const Vector2& point, const float minDist, const float cellSize)
+    {
+        IntVector2 g = imageToGrid(point, cellSize);
+
+        // Number of adjucent cells to look for neighbour points
+        const int d = 5;
+
+        // Scan the neighbourhood of the point in the grid
+        for (int i = g.x_ - d; i < g.x_ + d; i++)
+        {
+            for (int j = g.y_ - d; j < g.y_ + d; j++)
+            {
+                // Wrap cells
+                int wi = i;
+                int wj = j;
+                while (wi < 0) wi += m_width;
+                while (wj < 0) wj += m_height;
+                wi %= m_width;
+                wj %= m_height;
+
+                // Test wrapped distances
+                Cell p = m_grid[wi][wj];
+                const float dist = Min(Min((p - point).Length(),
+                    (p + Vector2(1, 0) - point).Length()),
+                    Min((p + Vector2(0, 1) - point).Length(),
+                    (p + Vector2(1, 1) - point).Length()));
+
+                if (p.isValid && dist < minDist)
+                    return true;
+            }
+        }
+        return false;
+    }
+
+private:
+    int m_width;
+    int m_height;
+    float m_cellSize;
+
+    Vector<Vector<Cell>> m_grid;
+};
+Vector2 PoissonRandom::popRandom(PointCloud2DNorm& points)
+{
+    std::uniform_int_distribution<> dis(0, points.Size() - 1);
+    const int idx = dis(impl_->m_generator);
+    const Vector2 p = points[idx];
+    points.Erase(points.Begin() + idx);
+    return p;
+}
+Vector2 PoissonRandom::generateRandomPointAround(const Vector2& p, float minDist)
+{
+    // Start with non-uniform distribution
+    const float r1 = randomFloat();
+    const float r2 = randomFloat();
+
+    // Radius should be between MinDist and 2 * MinDist
+    const float radius = minDist * (r1 + 1.0f);
+
+    // Random angle
+    const float angle = 2 * 3.141592653589f * r2;
+
+    // The new point is generated around the point (x, y)
+    const float x = p.x_ + radius * cos(angle);
+    const float y = p.y_ + radius * sin(angle);
+
+    return Vector2(x, y);
+}
+PointCloud2DNorm PoissonRandom::generate(const float minDist, const unsigned newPointsCount, const unsigned numPoints)
+{
+    PointCloud2DNorm samplePoints;
+    PointCloud2DNorm processList;
+
+    // Create the grid
+    const float cellSize = minDist / sqrt(2.0f);
+
+    const int gridW = static_cast<int>(ceil(1.0f / cellSize));
+    const int gridH = static_cast<int>(ceil(1.0f / cellSize));
+
+    Grid grid(gridW, gridH, cellSize);
+
+    Vector2 firstPoint;
+    firstPoint.x_ = randomFloat();
+    firstPoint.y_ = randomFloat();
+
+    // Update containers
+    processList.Push(firstPoint);
+    samplePoints.Push(firstPoint);
+    grid.insert(firstPoint);
+
+    // Generate new points for each point in the queue
+    while (!processList.Empty() && samplePoints.Size() < numPoints)
+    {
+        const Vector2 point = popRandom(processList);
+
+        for (unsigned i = 0; i < newPointsCount; i++)
+        {
+            const Vector2 newPoint = generateRandomPointAround(point, minDist);
+
+            // Test
+            const bool fits = newPoint.x_ >= 0 && newPoint.y_ >= 0 && newPoint.x_ <= 1 && newPoint.y_ <= 1;
+
+            if (fits && !grid.isInNeighbourhood(newPoint, minDist, cellSize))
+            {
+                processList.Push(newPoint);
+                samplePoints.Push(newPoint);
+                grid.insert(newPoint);
+                continue;
+            }
+        }
+    }
+    return samplePoints;
+}
+//////////////////////////////////////////////////////////////////////////
 CharacterDemo::CharacterDemo(Context* context) :
     Sample(context),
     firstPerson_(false)
@@ -90,8 +316,10 @@ void CharacterDemo::CreateScene()
 
     scene_ = new Scene(context_);
 
+    auto sceneData = cache->GetResource<XMLFile>("ForestScene/Scene.xml");
+    scene_->LoadXML(sceneData->GetRoot());
+
     // Create scene subsystem components
-    scene_->CreateComponent<Octree>();
     scene_->CreateComponent<PhysicsWorld>();
 
     // Create camera and define viewport. We will be doing load / save, so it's convenient to create the camera outside the scene,
@@ -101,81 +329,130 @@ void CharacterDemo::CreateScene()
     camera->SetFarClip(300.0f);
     GetSubsystem<Renderer>()->SetViewport(0, new Viewport(context_, scene_, camera));
 
-    // Create static scene content. First create a zone for ambient lighting and fog control
-    Node* zoneNode = scene_->CreateChild("Zone");
-    auto* zone = zoneNode->CreateComponent<Zone>();
-    zone->SetAmbientColor(Color(0.15f, 0.15f, 0.15f));
-    zone->SetFogColor(Color(0.5f, 0.5f, 0.7f));
-    zone->SetFogStart(100.0f);
-    zone->SetFogEnd(300.0f);
-    zone->SetBoundingBox(BoundingBox(-1000.0f, 1000.0f));
+    // Generate grass geometries
+    Node* terrainNode = scene_->GetChild("Terrain", true);
+    auto terrain = terrainNode->GetComponent<Terrain>();
 
-    // Create a directional light with cascaded shadow mapping
-    Node* lightNode = scene_->CreateChild("DirectionalLight");
-    lightNode->SetDirection(Vector3(0.3f, -0.5f, 0.425f));
-    auto* light = lightNode->CreateComponent<Light>();
-    light->SetLightType(LIGHT_DIRECTIONAL);
-    light->SetCastShadows(true);
-    light->SetShadowBias(BiasParameters(0.00025f, 0.5f));
-    light->SetShadowCascade(CascadeParameters(10.0f, 50.0f, 200.0f, 0.0f, 0.8f));
-    light->SetSpecularIntensity(0.5f);
-
-    // Create the floor object
-    Node* floorNode = scene_->CreateChild("Floor");
-    floorNode->SetPosition(Vector3(0.0f, -0.5f, 0.0f));
-    floorNode->SetScale(Vector3(200.0f, 1.0f, 200.0f));
-    auto* object = floorNode->CreateComponent<StaticModel>();
-    object->SetModel(cache->GetResource<Model>("Models/Box.mdl"));
-    object->SetMaterial(cache->GetResource<Material>("Materials/Stone.xml"));
-
-    auto* body = floorNode->CreateComponent<RigidBody>();
-    // Use collision layer bit 2 to mark world scenery. This is what we will raycast against to prevent camera from going
-    // inside geometry
-    body->SetCollisionLayer(2);
-    auto* shape = floorNode->CreateComponent<CollisionShape>();
-    shape->SetBox(Vector3::ONE);
-
-    // Create mushrooms of varying sizes
-    const unsigned NUM_MUSHROOMS = 60;
-    for (unsigned i = 0; i < NUM_MUSHROOMS; ++i)
+    unsigned totalGrassInstances = 0;
+    const int NUM_GRASS_CHUNKS = 8;
+    const float MAX_GRASS_ANGLE = 25.0f;
+    if (Node* zoneNode = scene_->GetChild("GrassRegion", true))
     {
-        Node* objectNode = scene_->CreateChild("Mushroom");
-        objectNode->SetPosition(Vector3(Random(180.0f) - 90.0f, 0.0f, Random(180.0f) - 90.0f));
-        objectNode->SetRotation(Quaternion(0.0f, Random(360.0f), 0.0f));
-        objectNode->SetScale(2.0f + Random(5.0f));
-        auto* object = objectNode->CreateComponent<StaticModel>();
-        object->SetModel(cache->GetResource<Model>("Models/Mushroom.mdl"));
-        object->SetMaterial(cache->GetResource<Material>("Materials/Mushroom.xml"));
-        object->SetCastShadows(true);
+        PODVector<float> vertexData;
+        PODVector<unsigned short> indexData;
 
-        auto* body = objectNode->CreateComponent<RigidBody>();
-        body->SetCollisionLayer(2);
-        auto* shape = objectNode->CreateComponent<CollisionShape>();
-        shape->SetTriangleMesh(object->GetModel(), 0);
+        PoissonRandom random(Rand());
+        auto points = random.generate(0.02f, 10, 20000);
+
+        auto zone = zoneNode->GetComponent<Zone>();
+        const BoundingBox boundingBox = zone->GetWorldBoundingBox();
+        IntVector2 chunkIndex;
+        for (chunkIndex.x_ = 0; chunkIndex.x_ < NUM_GRASS_CHUNKS; ++chunkIndex.x_)
+        {
+            const float chunkSize = (boundingBox.max_.x_ - boundingBox.min_.x_) / static_cast<float>(NUM_GRASS_CHUNKS);
+            for (chunkIndex.y_ = 0; chunkIndex.y_ < NUM_GRASS_CHUNKS; ++chunkIndex.y_)
+            {
+                const Vector2 chunkBegin(boundingBox.min_.x_ + chunkIndex.x_ * chunkSize,
+                    boundingBox.min_.z_ + chunkIndex.y_ * chunkSize);
+
+                // Prepare buffers
+                auto vertexBuffer = MakeShared<VertexBuffer>(context_);
+                auto indexBuffer = MakeShared<IndexBuffer>(context_);
+                auto geometry = MakeShared<Geometry>(context_);
+                geometry->SetVertexBuffer(0, vertexBuffer);
+                geometry->SetIndexBuffer(indexBuffer);
+
+                auto model = MakeShared<Model>(context_);
+                model->SetNumGeometries(1);
+                model->SetNumGeometryLodLevels(0, 1);
+                model->SetGeometry(0, 0, geometry);
+
+                // Generate grass instances
+                PODVector<Vector3> positions;
+                PODVector<Vector3> normals;
+                PODVector<Quaternion> rotations;
+                for (unsigned i = 0; i < points.Size(); ++i)
+                {
+                    Vector3 position{ points[i].x_ * chunkSize + chunkBegin.x_ , 0.0f, points[i].y_ * chunkSize + chunkBegin.y_ };
+                    position.y_ = terrain->GetHeight(position);
+                    const Vector3 normal = terrain->GetNormal(position);
+                    const Quaternion rotation = Quaternion(Vector3::UP, normal)
+                        * Quaternion(Random(0.0f, 360.0f), Vector3::UP)
+                        * Quaternion(30.0f, Vector3::RIGHT);
+
+                    if (normal.DotProduct(Vector3::UP) < Cos(MAX_GRASS_ANGLE))
+                        continue;
+
+                    positions.Push(position);
+                    normals.Push(normal);
+                    rotations.Push(rotation);
+                }
+
+                const unsigned numBillboards = positions.Size();
+                totalGrassInstances += numBillboards;
+
+                // Fill buffers
+                vertexData.Resize(numBillboards * 4 * 8);
+                indexData.Resize(numBillboards * 6);
+
+                unsigned short* indexPtr = indexData.Buffer();
+                unsigned vertexIndex = 0;
+                for (unsigned i = 0; i < numBillboards; ++i)
+                {
+                    indexPtr[0] = (unsigned short)vertexIndex;
+                    indexPtr[1] = (unsigned short)(vertexIndex + 1);
+                    indexPtr[2] = (unsigned short)(vertexIndex + 2);
+                    indexPtr[3] = (unsigned short)(vertexIndex + 2);
+                    indexPtr[4] = (unsigned short)(vertexIndex + 3);
+                    indexPtr[5] = (unsigned short)vertexIndex;
+
+                    indexPtr += 6;
+                    vertexIndex += 4;
+                }
+
+                BoundingBox boundingBox;
+                float* vertexPtr = vertexData.Buffer();
+                for (unsigned i = 0; i < numBillboards; ++i)
+                {
+                    const Matrix3 rotationMatrix = rotations[i].RotationMatrix();
+                    const Vector3 xAxis = rotationMatrix.Column(0);
+                    const Vector3 yAxis = rotationMatrix.Column(1);
+                    static const Vector2 uvs[4] = { Vector2::UP, Vector2::ONE, Vector2::RIGHT, Vector2::ZERO };
+                    for (unsigned j = 0; j < 4; ++j)
+                    {
+                        const Vector3 pos = positions[i] + xAxis * (uvs[j].x_ - 0.5f) + yAxis * (1.0f - uvs[j].y_);
+                        boundingBox.Merge(pos);
+                        vertexPtr[0] = pos.x_;
+                        vertexPtr[1] = pos.y_;
+                        vertexPtr[2] = pos.z_;
+                        vertexPtr[3] = normals[i].x_;
+                        vertexPtr[4] = normals[i].y_;
+                        vertexPtr[5] = normals[i].z_;
+                        vertexPtr[6] = uvs[j].x_;
+                        vertexPtr[7] = uvs[j].y_;
+                        vertexPtr += 8;
+                    }
+                }
+
+                // Update GPU
+                vertexBuffer->SetSize(static_cast<unsigned>(vertexData.Size() / 8),
+                    MASK_POSITION | MASK_NORMAL /*| MASK_COLOR*/ | MASK_TEXCOORD1 /*| MASK_TEXCOORD2*/, true);
+                vertexBuffer->SetData(vertexData.Buffer());
+                indexBuffer->SetSize(static_cast<unsigned>(indexData.Size()), false, true);
+                indexBuffer->SetData(indexData.Buffer());
+                geometry->SetDrawRange(TRIANGLE_LIST, 0, indexData.Size(), false);
+                model->SetBoundingBox(boundingBox);
+
+                // Make node
+                Node* grassChunk = zoneNode->CreateChild("GrassChunk");
+                auto grassStaticModel = grassChunk->CreateComponent<StaticModel>();
+                grassStaticModel->SetModel(model);
+                grassStaticModel->SetMaterial(cache->GetResource<Material>("ForestScene/Grass/Grass_mat.xml"));
+                grassStaticModel->SetCastShadows(true);
+            }
+        }
     }
-
-    // Create movable boxes. Let them fall from the sky at first
-    const unsigned NUM_BOXES = 100;
-    for (unsigned i = 0; i < NUM_BOXES; ++i)
-    {
-        float scale = Random(2.0f) + 0.5f;
-
-        Node* objectNode = scene_->CreateChild("Box");
-        objectNode->SetPosition(Vector3(Random(180.0f) - 90.0f, Random(10.0f) + 10.0f, Random(180.0f) - 90.0f));
-        objectNode->SetRotation(Quaternion(Random(360.0f), Random(360.0f), Random(360.0f)));
-        objectNode->SetScale(scale);
-        auto* object = objectNode->CreateComponent<StaticModel>();
-        object->SetModel(cache->GetResource<Model>("Models/Box.mdl"));
-        object->SetMaterial(cache->GetResource<Material>("Materials/Stone.xml"));
-        object->SetCastShadows(true);
-
-        auto* body = objectNode->CreateComponent<RigidBody>();
-        body->SetCollisionLayer(2);
-        // Bigger boxes will be heavier and harder to move
-        body->SetMass(scale * 2.0f);
-        auto* shape = objectNode->CreateComponent<CollisionShape>();
-        shape->SetBox(Vector3::ONE);
-    }
+    URHO3D_LOGINFOF("Num grass instances: %d", totalGrassInstances);
 }
 
 void CharacterDemo::CreateCharacter()
@@ -185,19 +462,9 @@ void CharacterDemo::CreateCharacter()
     Node* objectNode = scene_->CreateChild("Jack");
     objectNode->SetPosition(Vector3(0.0f, 1.0f, 0.0f));
 
-    // spin node
+    // Spin node
     Node* adjustNode = objectNode->CreateChild("AdjNode");
     adjustNode->SetRotation( Quaternion(180, Vector3(0,1,0) ) );
-
-    // Create the rendering component + animation controller
-    auto* object = adjustNode->CreateComponent<AnimatedModel>();
-    object->SetModel(cache->GetResource<Model>("Models/Mutant/Mutant.mdl"));
-    object->SetMaterial(cache->GetResource<Material>("Models/Mutant/Materials/mutant_M.xml"));
-    object->SetCastShadows(true);
-    adjustNode->CreateComponent<AnimationController>();
-
-    // Set the head bone for manual control
-    object->GetSkeleton().GetBone("Mutant:Head")->animated_ = false;
 
     // Create rigidbody, and set non-zero mass so that the body becomes dynamic
     auto* body = objectNode->CreateComponent<RigidBody>();
@@ -318,23 +585,6 @@ void CharacterDemo::HandleUpdate(StringHash eventType, VariantMap& eventData)
             // Turn on/off gyroscope on mobile platform
             if (touch_ && input->GetKeyPress(KEY_G))
                 touch_->useGyroscope_ = !touch_->useGyroscope_;
-
-            // Check for loading / saving the scene
-            if (input->GetKeyPress(KEY_F5))
-            {
-                File saveFile(context_, GetSubsystem<FileSystem>()->GetProgramDir() + "Data/Scenes/CharacterDemo.xml", FILE_WRITE);
-                scene_->SaveXML(saveFile);
-            }
-            if (input->GetKeyPress(KEY_F7))
-            {
-                File loadFile(context_, GetSubsystem<FileSystem>()->GetProgramDir() + "Data/Scenes/CharacterDemo.xml", FILE_READ);
-                scene_->LoadXML(loadFile);
-                // After loading we have to reacquire the weak pointer to the Character component, as it has been recreated
-                // Simply find the character's scene node by name as there's only one of them
-                Node* characterNode = scene_->GetChild("Jack", true);
-                if (characterNode)
-                    character_ = characterNode->GetComponent<Character>();
-            }
         }
     }
 }
@@ -349,35 +599,6 @@ void CharacterDemo::HandlePostUpdate(StringHash eventType, VariantMap& eventData
     // Get camera lookat dir from character yaw + pitch
     const Quaternion& rot = characterNode->GetRotation();
     Quaternion dir = rot * Quaternion(character_->controls_.pitch_, Vector3::RIGHT);
-
-    // Turn head to camera pitch, but limit to avoid unnatural animation
-    Node* headNode = characterNode->GetChild("Mutant:Head", true);
-    float limitPitch = Clamp(character_->controls_.pitch_, -45.0f, 45.0f);
-    Quaternion headDir = rot * Quaternion(limitPitch, Vector3(1.0f, 0.0f, 0.0f));
-    // This could be expanded to look at an arbitrary target, now just look at a point in front
-    Vector3 headWorldTarget = headNode->GetWorldPosition() + headDir * Vector3(0.0f, 0.0f, -1.0f);
-    headNode->LookAt(headWorldTarget, Vector3(0.0f, 1.0f, 0.0f));
-
-    if (firstPerson_)
-    {
-        cameraNode_->SetPosition(headNode->GetWorldPosition() + rot * Vector3(0.0f, 0.15f, 0.2f));
-        cameraNode_->SetRotation(dir);
-    }
-    else
-    {
-        // Third person camera: position behind the character
-        Vector3 aimPoint = characterNode->GetPosition() + rot * Vector3(0.0f, 1.7f, 0.0f);
-
-        // Collide camera ray with static physics objects (layer bitmask 2) to ensure we see the character properly
-        Vector3 rayDir = dir * Vector3::BACK;
-        float rayDistance = touch_ ? touch_->cameraDistance_ : CAMERA_INITIAL_DIST;
-        PhysicsRaycastResult result;
-        scene_->GetComponent<PhysicsWorld>()->RaycastSingle(result, Ray(aimPoint, rayDir), rayDistance, 2);
-        if (result.body_)
-            rayDistance = Min(rayDistance, result.distance_);
-        rayDistance = Clamp(rayDistance, CAMERA_MIN_DIST, CAMERA_MAX_DIST);
-
-        cameraNode_->SetPosition(aimPoint + rayDir * rayDistance);
-        cameraNode_->SetRotation(dir);
-    }
+    cameraNode_->SetPosition(characterNode->GetWorldPosition() + Vector3(0.0f, 1.7f, 0.0f));
+    cameraNode_->SetRotation(dir);
 }
