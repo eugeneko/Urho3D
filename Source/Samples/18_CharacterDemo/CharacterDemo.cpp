@@ -59,8 +59,15 @@
 URHO3D_DEFINE_APPLICATION_MAIN(CharacterDemo)
 
 //////////////////////////////////////////////////////////////////////////
+static const unsigned LAYER_MAIN = 1 << 0;
+static const unsigned LAYER_GRASSPUSHER = 1 << 1;
+static const unsigned LAYER_OBSTACLE = 1 << 2;
+
+//////////////////////////////////////////////////////////////////////////
 using PointCloud2D = PODVector<Vector2>;
+
 using PointCloud2DNorm = PODVector<Vector2>;
+
 class PoissonRandom
 {
 public:
@@ -86,7 +93,6 @@ struct PoissonRandom::Core
     std::uniform_real_distribution<> m_distr;
 };
 
-// Point Cloud
 PointCloud2D samplePointCloud(const PointCloud2DNorm& cloud,
     const Vector2& begin, const Vector2& end,
     float scale)
@@ -115,32 +121,32 @@ PointCloud2D samplePointCloud(const PointCloud2DNorm& cloud,
     return dest;
 }
 
-
-// Ctor
 PoissonRandom::PoissonRandom(unsigned seed)
     : impl_(MakeUnique<Core>(seed))
 {
 }
+
 PoissonRandom::~PoissonRandom()
 {
 }
 
-
-// Generator
 struct PoissonRandom::Cell
     : public Vector2
 {
     bool isValid = false;
 };
+
 float PoissonRandom::randomFloat()
 {
     return static_cast<float>(impl_->m_distr(impl_->m_generator));
 }
+
 IntVector2 PoissonRandom::imageToGrid(const Vector2& p, float cellSize)
 {
     return IntVector2(static_cast<int>(p.x_ / cellSize), static_cast<int>(p.y_ / cellSize));
 
 }
+
 struct PoissonRandom::Grid
 {
     Grid(const int w, const int h, const float cellSize)
@@ -155,6 +161,7 @@ struct PoissonRandom::Grid
             i->Resize(m_width);
         }
     }
+
     void insert(const Vector2& p)
     {
         IntVector2 g = imageToGrid(p, m_cellSize);
@@ -164,6 +171,7 @@ struct PoissonRandom::Grid
         c.y_ = p.y_;
         c.isValid = true;
     }
+
     bool isInNeighbourhood(const Vector2& point, const float minDist, const float cellSize)
     {
         IntVector2 g = imageToGrid(point, cellSize);
@@ -205,6 +213,7 @@ private:
 
     Vector<Vector<Cell>> m_grid;
 };
+
 Vector2 PoissonRandom::popRandom(PointCloud2DNorm& points)
 {
     std::uniform_int_distribution<> dis(0, points.Size() - 1);
@@ -213,6 +222,7 @@ Vector2 PoissonRandom::popRandom(PointCloud2DNorm& points)
     points.Erase(points.Begin() + idx);
     return p;
 }
+
 Vector2 PoissonRandom::generateRandomPointAround(const Vector2& p, float minDist)
 {
     // Start with non-uniform distribution
@@ -231,6 +241,7 @@ Vector2 PoissonRandom::generateRandomPointAround(const Vector2& p, float minDist
 
     return Vector2(x, y);
 }
+
 PointCloud2DNorm PoissonRandom::generate(const float minDist, const unsigned newPointsCount, const unsigned numPoints)
 {
     PointCloud2DNorm samplePoints;
@@ -276,10 +287,10 @@ PointCloud2DNorm PoissonRandom::generate(const float minDist, const unsigned new
     }
     return samplePoints;
 }
+
 //////////////////////////////////////////////////////////////////////////
 CharacterDemo::CharacterDemo(Context* context) :
-    Sample(context),
-    firstPerson_(false)
+    Sample(context)
 {
     // Register factory and attributes for the Character component so it can be created via CreateComponent, and loaded / saved
     Character::RegisterObject(context);
@@ -331,128 +342,195 @@ void CharacterDemo::CreateScene()
 
     // Generate grass geometries
     Node* terrainNode = scene_->GetChild("Terrain", true);
+    Node* grassRegionNode = scene_->GetChild("GrassRegion", true);
+    if (terrainNode && grassRegionNode)
+    {
+        grassMaterial_ = cache->GetResource<Material>("ForestScene/Grass/Grass_mat.xml");
+        CreateGrass(terrainNode, grassRegionNode);
+        UpdateGrassTexture();
+    }
+}
+
+void CharacterDemo::CreateGrass(Node* terrainNode, Node* grassRegionNode)
+{
+    auto* cache = GetSubsystem<ResourceCache>();
+
     auto terrain = terrainNode->GetComponent<Terrain>();
 
     unsigned totalGrassInstances = 0;
     const int NUM_GRASS_CHUNKS = 8;
     const float MAX_GRASS_ANGLE = 25.0f;
-    if (Node* zoneNode = scene_->GetChild("GrassRegion", true))
+    const float GRASS_BILLBOARD_SIZE = 0.7f;
+    PODVector<float> vertexData;
+    PODVector<unsigned short> indexData;
+
+    PoissonRandom random(Rand());
+    auto points = random.generate(0.02f, 10, 20000);
+
+    auto zone = grassRegionNode->GetComponent<Zone>();
+    grassBoundingBox_ = zone->GetWorldBoundingBox();
+    IntVector2 chunkIndex;
+    for (chunkIndex.x_ = 0; chunkIndex.x_ < NUM_GRASS_CHUNKS; ++chunkIndex.x_)
     {
-        PODVector<float> vertexData;
-        PODVector<unsigned short> indexData;
-
-        PoissonRandom random(Rand());
-        auto points = random.generate(0.02f, 10, 20000);
-
-        auto zone = zoneNode->GetComponent<Zone>();
-        const BoundingBox boundingBox = zone->GetWorldBoundingBox();
-        IntVector2 chunkIndex;
-        for (chunkIndex.x_ = 0; chunkIndex.x_ < NUM_GRASS_CHUNKS; ++chunkIndex.x_)
+        const float chunkSize = (grassBoundingBox_.max_.x_ - grassBoundingBox_.min_.x_) / static_cast<float>(NUM_GRASS_CHUNKS);
+        for (chunkIndex.y_ = 0; chunkIndex.y_ < NUM_GRASS_CHUNKS; ++chunkIndex.y_)
         {
-            const float chunkSize = (boundingBox.max_.x_ - boundingBox.min_.x_) / static_cast<float>(NUM_GRASS_CHUNKS);
-            for (chunkIndex.y_ = 0; chunkIndex.y_ < NUM_GRASS_CHUNKS; ++chunkIndex.y_)
+            const Vector2 chunkBegin(grassBoundingBox_.min_.x_ + chunkIndex.x_ * chunkSize,
+                grassBoundingBox_.min_.z_ + chunkIndex.y_ * chunkSize);
+
+            // Prepare buffers
+            auto vertexBuffer = MakeShared<VertexBuffer>(context_);
+            auto indexBuffer = MakeShared<IndexBuffer>(context_);
+            auto geometry = MakeShared<Geometry>(context_);
+            geometry->SetVertexBuffer(0, vertexBuffer);
+            geometry->SetIndexBuffer(indexBuffer);
+
+            auto model = MakeShared<Model>(context_);
+            model->SetNumGeometries(1);
+            model->SetNumGeometryLodLevels(0, 1);
+            model->SetGeometry(0, 0, geometry);
+
+            // Generate grass instances
+            PODVector<Vector3> positions;
+            PODVector<Vector3> normals;
+            PODVector<Quaternion> rotations;
+            for (unsigned i = 0; i < points.Size(); ++i)
             {
-                const Vector2 chunkBegin(boundingBox.min_.x_ + chunkIndex.x_ * chunkSize,
-                    boundingBox.min_.z_ + chunkIndex.y_ * chunkSize);
+                Vector3 position{ points[i].x_ * chunkSize + chunkBegin.x_ , 0.0f, points[i].y_ * chunkSize + chunkBegin.y_ };
+                position.y_ = terrain->GetHeight(position);
+                const Vector3 normal = terrain->GetNormal(position);
+                const Quaternion rotation = Quaternion(Vector3::UP, normal)
+                    * Quaternion(Random(0.0f, 360.0f), Vector3::UP)
+                    * Quaternion(30.0f, Vector3::RIGHT);
 
-                // Prepare buffers
-                auto vertexBuffer = MakeShared<VertexBuffer>(context_);
-                auto indexBuffer = MakeShared<IndexBuffer>(context_);
-                auto geometry = MakeShared<Geometry>(context_);
-                geometry->SetVertexBuffer(0, vertexBuffer);
-                geometry->SetIndexBuffer(indexBuffer);
+                if (normal.DotProduct(Vector3::UP) < Cos(MAX_GRASS_ANGLE))
+                    continue;
 
-                auto model = MakeShared<Model>(context_);
-                model->SetNumGeometries(1);
-                model->SetNumGeometryLodLevels(0, 1);
-                model->SetGeometry(0, 0, geometry);
-
-                // Generate grass instances
-                PODVector<Vector3> positions;
-                PODVector<Vector3> normals;
-                PODVector<Quaternion> rotations;
-                for (unsigned i = 0; i < points.Size(); ++i)
-                {
-                    Vector3 position{ points[i].x_ * chunkSize + chunkBegin.x_ , 0.0f, points[i].y_ * chunkSize + chunkBegin.y_ };
-                    position.y_ = terrain->GetHeight(position);
-                    const Vector3 normal = terrain->GetNormal(position);
-                    const Quaternion rotation = Quaternion(Vector3::UP, normal)
-                        * Quaternion(Random(0.0f, 360.0f), Vector3::UP)
-                        * Quaternion(30.0f, Vector3::RIGHT);
-
-                    if (normal.DotProduct(Vector3::UP) < Cos(MAX_GRASS_ANGLE))
-                        continue;
-
-                    positions.Push(position);
-                    normals.Push(normal);
-                    rotations.Push(rotation);
-                }
-
-                const unsigned numBillboards = positions.Size();
-                totalGrassInstances += numBillboards;
-
-                // Fill buffers
-                vertexData.Resize(numBillboards * 4 * 8);
-                indexData.Resize(numBillboards * 6);
-
-                unsigned short* indexPtr = indexData.Buffer();
-                unsigned vertexIndex = 0;
-                for (unsigned i = 0; i < numBillboards; ++i)
-                {
-                    indexPtr[0] = (unsigned short)vertexIndex;
-                    indexPtr[1] = (unsigned short)(vertexIndex + 1);
-                    indexPtr[2] = (unsigned short)(vertexIndex + 2);
-                    indexPtr[3] = (unsigned short)(vertexIndex + 2);
-                    indexPtr[4] = (unsigned short)(vertexIndex + 3);
-                    indexPtr[5] = (unsigned short)vertexIndex;
-
-                    indexPtr += 6;
-                    vertexIndex += 4;
-                }
-
-                BoundingBox boundingBox;
-                float* vertexPtr = vertexData.Buffer();
-                for (unsigned i = 0; i < numBillboards; ++i)
-                {
-                    const Matrix3 rotationMatrix = rotations[i].RotationMatrix();
-                    const Vector3 xAxis = rotationMatrix.Column(0);
-                    const Vector3 yAxis = rotationMatrix.Column(1);
-                    static const Vector2 uvs[4] = { Vector2::UP, Vector2::ONE, Vector2::RIGHT, Vector2::ZERO };
-                    for (unsigned j = 0; j < 4; ++j)
-                    {
-                        const Vector3 pos = positions[i] + xAxis * (uvs[j].x_ - 0.5f) + yAxis * (1.0f - uvs[j].y_);
-                        boundingBox.Merge(pos);
-                        vertexPtr[0] = pos.x_;
-                        vertexPtr[1] = pos.y_;
-                        vertexPtr[2] = pos.z_;
-                        vertexPtr[3] = normals[i].x_;
-                        vertexPtr[4] = normals[i].y_;
-                        vertexPtr[5] = normals[i].z_;
-                        vertexPtr[6] = uvs[j].x_;
-                        vertexPtr[7] = uvs[j].y_;
-                        vertexPtr += 8;
-                    }
-                }
-
-                // Update GPU
-                vertexBuffer->SetSize(static_cast<unsigned>(vertexData.Size() / 8),
-                    MASK_POSITION | MASK_NORMAL /*| MASK_COLOR*/ | MASK_TEXCOORD1 /*| MASK_TEXCOORD2*/, true);
-                vertexBuffer->SetData(vertexData.Buffer());
-                indexBuffer->SetSize(static_cast<unsigned>(indexData.Size()), false, true);
-                indexBuffer->SetData(indexData.Buffer());
-                geometry->SetDrawRange(TRIANGLE_LIST, 0, indexData.Size(), false);
-                model->SetBoundingBox(boundingBox);
-
-                // Make node
-                Node* grassChunk = zoneNode->CreateChild("GrassChunk");
-                auto grassStaticModel = grassChunk->CreateComponent<StaticModel>();
-                grassStaticModel->SetModel(model);
-                grassStaticModel->SetMaterial(cache->GetResource<Material>("ForestScene/Grass/Grass_mat.xml"));
-                grassStaticModel->SetCastShadows(true);
+                positions.Push(position);
+                normals.Push(normal);
+                rotations.Push(rotation);
             }
+
+            const unsigned numBillboards = positions.Size();
+            totalGrassInstances += numBillboards;
+
+            // Fill buffers
+            static const unsigned VERTEX_STRIDE_FLOATS = 14;
+            vertexData.Resize(numBillboards * 4 * VERTEX_STRIDE_FLOATS);
+            indexData.Resize(numBillboards * 6);
+
+            unsigned short* indexPtr = indexData.Buffer();
+            unsigned vertexIndex = 0;
+            for (unsigned i = 0; i < numBillboards; ++i)
+            {
+                indexPtr[0] = (unsigned short)vertexIndex;
+                indexPtr[1] = (unsigned short)(vertexIndex + 1);
+                indexPtr[2] = (unsigned short)(vertexIndex + 2);
+                indexPtr[3] = (unsigned short)(vertexIndex + 2);
+                indexPtr[4] = (unsigned short)(vertexIndex + 3);
+                indexPtr[5] = (unsigned short)vertexIndex;
+
+                indexPtr += 6;
+                vertexIndex += 4;
+            }
+
+            BoundingBox modelBoundingBox;
+            float* vertexPtr = vertexData.Buffer();
+            for (unsigned i = 0; i < numBillboards; ++i)
+            {
+                Matrix3 scaleMatrix;
+                scaleMatrix.SetScale(GRASS_BILLBOARD_SIZE);
+                const Matrix3 rotationScaleMatrix = rotations[i].RotationMatrix() * scaleMatrix;
+                const Vector3 xAxis = rotationScaleMatrix.Column(0);
+                const Vector3 yAxis = rotationScaleMatrix.Column(1);
+                static const Vector2 uvs[4] = { Vector2::UP, Vector2::ONE, Vector2::RIGHT, Vector2::ZERO };
+                for (unsigned j = 0; j < 4; ++j)
+                {
+                    const Vector3 basePos = positions[i];
+                    const Vector3 pos = basePos + xAxis * (uvs[j].x_ - 0.5f) + yAxis * (1.0f - uvs[j].y_);
+                    modelBoundingBox.Merge(pos);
+                    vertexPtr[0] = pos.x_;
+                    vertexPtr[1] = pos.y_;
+                    vertexPtr[2] = pos.z_;
+                    vertexPtr[3] = normals[i].x_;
+                    vertexPtr[4] = normals[i].y_;
+                    vertexPtr[5] = normals[i].z_;
+                    vertexPtr[6] = uvs[j].x_;
+                    vertexPtr[7] = uvs[j].y_;
+                    vertexPtr[8] = (pos.x_ - grassBoundingBox_.min_.x_) / grassBoundingBox_.Size().x_;
+                    vertexPtr[9] = (pos.z_ - grassBoundingBox_.min_.z_) / grassBoundingBox_.Size().z_;
+                    vertexPtr[10] = basePos.x_;
+                    vertexPtr[11] = basePos.y_;
+                    vertexPtr[12] = basePos.z_;
+                    vertexPtr[13] = (1.0f - uvs[j].y_) * GRASS_BILLBOARD_SIZE;
+                    vertexPtr += VERTEX_STRIDE_FLOATS;
+                }
+            }
+
+            // Update GPU
+            vertexBuffer->SetSize(static_cast<unsigned>(vertexData.Size() / VERTEX_STRIDE_FLOATS),
+                MASK_POSITION | MASK_NORMAL /*| MASK_COLOR*/ | MASK_TEXCOORD1 | MASK_TEXCOORD2 | MASK_TANGENT, true);
+            vertexBuffer->SetData(vertexData.Buffer());
+            indexBuffer->SetSize(static_cast<unsigned>(indexData.Size()), false, true);
+            indexBuffer->SetData(indexData.Buffer());
+            geometry->SetDrawRange(TRIANGLE_LIST, 0, indexData.Size(), false);
+            model->SetBoundingBox(modelBoundingBox);
+
+            // Make node
+            Node* grassChunk = grassRegionNode->CreateChild("GrassChunk");
+            auto grassStaticModel = grassChunk->CreateComponent<StaticModel>();
+            grassStaticModel->SetModel(model);
+            grassStaticModel->SetMaterial(grassMaterial_);
+            grassStaticModel->SetCastShadows(true);
         }
     }
     URHO3D_LOGINFOF("Num grass instances: %d", totalGrassInstances);
+
+    grassTexture_ = MakeShared<Texture2D>(context_);
+    grassTexture_->SetNumLevels(1);
+    grassTexture_->SetSize(grassTextureSize_, grassTextureSize_, Graphics::GetRGBAFormat(), TEXTURE_DYNAMIC);
+    grassMaterial_->SetTexture(TU_NORMAL, grassTexture_);
+    grassTextureData_.Resize(grassTextureSize_ * grassTextureSize_ * 4);
+    grassPushiness_.Resize(grassTextureSize_ * grassTextureSize_);
+    staticGrassPushiness_.Resize(grassTextureSize_ * grassTextureSize_, 0.0f);
+
+    auto physicsWorld = scene_->GetComponent<PhysicsWorld>();
+    PODVector<PhysicsRaycastResult> raycastResults;
+    for (unsigned y = 0; y < grassTextureSize_; ++y)
+    {
+        for (unsigned x = 0; x < grassTextureSize_; ++x)
+        {
+            const float kx = (x + 0.5f) / grassTextureSize_;
+            const float ky = (y + 0.5f) / grassTextureSize_;
+            Vector3 samplePosition = VectorLerp(grassBoundingBox_.min_, grassBoundingBox_.max_, Vector3(kx, 0.0f, ky));
+            samplePosition.y_ = terrain->GetHeight(samplePosition);
+
+            raycastResults.Clear();
+            physicsWorld->Raycast(raycastResults, Ray(samplePosition, Vector3::UP), GRASS_BILLBOARD_SIZE, LAYER_GRASSPUSHER);
+            if (!raycastResults.Empty())
+            {
+                staticGrassPushiness_[y * grassTextureSize_ + x] = Min(maxGrassPushiness_,
+                    GRASS_BILLBOARD_SIZE - raycastResults[0].distance_);
+            }
+        }
+    }
+
+    for (unsigned i = 0; i < grassTextureSize_ * grassTextureSize_; ++i)
+    {
+        grassPushiness_[i] = staticGrassPushiness_[i];
+    }
+}
+
+void CharacterDemo::UpdateGrassTexture()
+{
+    for (unsigned i = 0; i < grassTextureSize_ * grassTextureSize_; ++i)
+    {
+        grassTextureData_[i * 4 + 0] = 0xff;
+        grassTextureData_[i * 4 + 1] = 0xff;
+        grassTextureData_[i * 4 + 2] = 0xff;
+        grassTextureData_[i * 4 + 3] = static_cast<unsigned char>(Clamp(grassPushiness_[i] * 255, 0.0f, 255.0f));
+    }
+    grassTexture_->SetData(0, 0, 0, grassTextureSize_, grassTextureSize_, grassTextureData_.Buffer());
 }
 
 void CharacterDemo::CreateCharacter()
@@ -469,6 +547,7 @@ void CharacterDemo::CreateCharacter()
     // Create rigidbody, and set non-zero mass so that the body becomes dynamic
     auto* body = objectNode->CreateComponent<RigidBody>();
     body->SetCollisionLayer(1);
+    body->SetCollisionMask(LAYER_OBSTACLE);
     body->SetMass(1.0f);
 
     // Set zero angular factor so that physics doesn't turn the character on its own.
@@ -577,10 +656,6 @@ void CharacterDemo::HandleUpdate(StringHash eventType, VariantMap& eventData)
             character_->controls_.pitch_ = Clamp(character_->controls_.pitch_, -80.0f, 80.0f);
             // Set rotation already here so that it's updated every rendering frame instead of every physics frame
             character_->GetNode()->SetRotation(Quaternion(character_->controls_.yaw_, Vector3::UP));
-
-            // Switch between 1st and 3rd person
-            if (input->GetKeyPress(KEY_F))
-                firstPerson_ = !firstPerson_;
 
             // Turn on/off gyroscope on mobile platform
             if (touch_ && input->GetKeyPress(KEY_G))

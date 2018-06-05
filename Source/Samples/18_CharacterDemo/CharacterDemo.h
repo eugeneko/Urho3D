@@ -106,6 +106,10 @@ protected:
 private:
     /// Create static scene content.
     void CreateScene();
+    /// Create grass over terrain node.
+    void CreateGrass(Node* terrainNode, Node* grassRegionNode);
+    /// Update grass texture.
+    void UpdateGrassTexture();
     /// Create controllable character.
     void CreateCharacter();
     /// Construct an instruction text to the UI.
@@ -121,6 +125,21 @@ private:
     SharedPtr<Touch> touch_;
     /// The controllable character component.
     WeakPtr<Character> character_;
-    /// First person camera flag.
-    bool firstPerson_;
+
+    /// Grass material.
+    SharedPtr<Material> grassMaterial_;
+    /// Grass bounding box.
+    BoundingBox grassBoundingBox_;
+    /// Grass texture size.
+    unsigned grassTextureSize_ = 256;
+    /// Max grass pushiness.
+    float maxGrassPushiness_ = 0.8f;
+    /// Grass texture.
+    SharedPtr<Texture2D> grassTexture_;
+    /// Grass texture data.
+    Vector<unsigned char> grassTextureData_;
+    /// Grass pushiness data.
+    Vector<float> grassPushiness_;
+    /// Static grass pushiness.
+    Vector<float> staticGrassPushiness_;
 };
