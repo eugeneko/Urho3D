@@ -109,7 +109,7 @@ private:
     /// Create grass over terrain node.
     void CreateGrass(Node* terrainNode, Node* grassRegionNode);
     /// Update grass texture.
-    void UpdateGrassTexture();
+    void UpdateGrassTexture(float timeStep);
     /// Create controllable character.
     void CreateCharacter();
     /// Construct an instruction text to the UI.
@@ -128,6 +128,8 @@ private:
 
     /// Grass material.
     SharedPtr<Material> grassMaterial_;
+    /// Grass push objects.
+    Vector<CollisionShape*> grassPushers_;
     /// Grass bounding box.
     BoundingBox grassBoundingBox_;
     /// Grass texture size.
@@ -138,8 +140,8 @@ private:
     SharedPtr<Texture2D> grassTexture_;
     /// Grass texture data.
     Vector<unsigned char> grassTextureData_;
+    /// Grass base height.
+    Vector<float> grassBaseHeight_;
     /// Grass pushiness data.
     Vector<float> grassPushiness_;
-    /// Static grass pushiness.
-    Vector<float> staticGrassPushiness_;
 };

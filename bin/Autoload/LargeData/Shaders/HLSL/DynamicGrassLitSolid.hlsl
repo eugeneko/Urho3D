@@ -64,9 +64,9 @@ void VS(float4 iPos : POSITION,
             out float2 oTexCoord2 : TEXCOORD7,
         #endif
     #endif
-    #ifdef VERTEXCOLOR
+    //#ifdef VERTEXCOLOR
         out float4 oColor : COLOR0,
-    #endif
+    //#endif
     #if defined(D3D11) && defined(CLIPPLANE)
         out float oClip : SV_CLIPDISTANCE0,
     #endif
@@ -89,6 +89,13 @@ void VS(float4 iPos : POSITION,
 
     oPos = GetClipPos(worldPos);
     oNormal = GetWorldNormal(modelMatrix);
+    oColor.xyz = float3(1, 1, 1) * lerp(1.0, 0.8, pushiness);
+    oColor.w = 1;
+#if 0
+    oNormal.xz += dynamicGrassData.xy  * 2.0 - 1.0;
+    oNormal.xz = clamp(oNormal.xz, -0.9, 0.9);
+    oNormal.y = sqrt(1.0 - oNormal.x * oNormal.x - oNormal.z * oNormal.z);
+#endif
     oWorldPos = float4(worldPos, GetDepth(oPos));
 
     #if defined(D3D11) && defined(CLIPPLANE)
@@ -178,9 +185,9 @@ void PS(
             float2 iTexCoord2 : TEXCOORD7,
         #endif
     #endif
-    #ifdef VERTEXCOLOR
+    //#ifdef VERTEXCOLOR
         float4 iColor : COLOR0,
-    #endif
+    //#endif
     #if defined(D3D11) && defined(CLIPPLANE)
         float iClip : SV_CLIPDISTANCE0,
     #endif
@@ -206,9 +213,9 @@ void PS(
         float4 diffColor = cMatDiffColor;
     #endif
 
-    #ifdef VERTEXCOLOR
+    //#ifdef VERTEXCOLOR
         diffColor *= iColor;
-    #endif
+    //#endif
 
     // Get material specular albedo
     #ifdef SPECMAP
