@@ -94,7 +94,12 @@ void Character::FixedUpdate(float timeStep)
         moveDir.Normalize();
 
     // If in air, allow control, but slower than when on ground
-    body->ApplyImpulse(rot * moveDir * (softGrounded ? MOVE_FORCE : INAIR_MOVE_FORCE));
+    Vector3 moveImpulse = rot * moveDir * (softGrounded ? MOVE_FORCE : INAIR_MOVE_FORCE);
+    //assert(softGrounded || body->GetLinearVelocity().ProjectOntoAxis(moveImpulse) < MAX_INAIR_VELOCITY);
+    //if (softGrounded || body->GetLinearVelocity().ProjectOntoAxis(moveImpulse) < MAX_INAIR_VELOCITY);
+    {
+        body->ApplyImpulse(moveImpulse);
+    }
 
     if (softGrounded)
     {

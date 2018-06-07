@@ -126,6 +126,11 @@ private:
     /// The controllable character component.
     WeakPtr<Character> character_;
 
+    /// Kick cooldown time.
+    float kickCooldown_ = 0.5f;
+    /// Kick cooldown.
+    float kickCooldownTimer_ = 0.0f;
+
     /// Grass material.
     SharedPtr<Material> grassMaterial_;
     /// Grass push objects.

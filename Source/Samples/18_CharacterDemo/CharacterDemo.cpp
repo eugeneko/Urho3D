@@ -40,6 +40,7 @@
 #include <Urho3D/IO/FileSystem.h>
 #include <Urho3D/Physics/CollisionShape.h>
 #include <Urho3D/Physics/PhysicsWorld.h>
+#include <Urho3D/Physics/PhysicsEvents.h>
 #include <Urho3D/Physics/RigidBody.h>
 #include <Urho3D/Resource/ResourceCache.h>
 #include <Urho3D/Scene/Scene.h>
@@ -470,8 +471,9 @@ void CharacterDemo::CreateGrass(Node* terrainNode, Node* grassRegionNode)
             float* vertexPtr = vertexData.Buffer();
             for (unsigned i = 0; i < numBillboards; ++i)
             {
+                const float size = GRASS_BILLBOARD_SIZE * Random(0.8f, 1.2f);
                 Matrix3 scaleMatrix;
-                scaleMatrix.SetScale(GRASS_BILLBOARD_SIZE);
+                scaleMatrix.SetScale(size);
                 const Matrix3 rotationScaleMatrix = rotations[i].RotationMatrix() * scaleMatrix;
                 const Vector3 xAxis = rotationScaleMatrix.Column(0);
                 const Vector3 yAxis = rotationScaleMatrix.Column(1);
@@ -717,6 +719,21 @@ void CharacterDemo::CreateCharacter()
     // Set the rigidbody to signal collision also when in rest, so that we get ground collisions properly
     body->SetCollisionEventMode(COLLISION_ALWAYS);
 
+    const float KICK_IMPULSE = 3.0f;
+
+    SubscribeToEvent(objectNode, E_NODECOLLISION,
+        [=](StringHash eventType, VariantMap& eventData)
+    {
+        Node* otherNode = static_cast<Node*>(eventData[NodeCollision::P_OTHERNODE].GetPtr());
+        if (kickCooldownTimer_ <= 0.0f && otherNode->HasTag("KICKABLE"))
+        {
+            kickCooldownTimer_ = kickCooldown_;
+            RigidBody* otherBody = static_cast<RigidBody*>(eventData[NodeCollision::P_OTHERBODY].GetPtr());
+            const Vector3 kickDirection = (cameraNode_->GetWorldDirection() * Vector3(1, 0, 1)).Normalized() + Vector3::UP * 0.3f;
+            otherBody->ApplyImpulse(kickDirection.Normalized() * KICK_IMPULSE);
+        }
+    });
+
     // Set a capsule shape for collision
     auto* shape = objectNode->CreateComponent<CollisionShape>();
     shape->SetCapsule(0.7f, 1.8f, Vector3(0.0f, 0.9f, 0.0f));
@@ -776,12 +793,15 @@ void CharacterDemo::HandleUpdate(StringHash eventType, VariantMap& eventData)
 {
     using namespace Update;
 
+    const float timeStep = eventData[Update::P_TIMESTEP].GetFloat();
     auto* input = GetSubsystem<Input>();
+
+    kickCooldownTimer_ -= timeStep;
 
     // Update grass
     if (grassTextureSize_ > 0)
     {
-        UpdateGrassTexture(eventData[Update::P_TIMESTEP].GetFloat());
+        UpdateGrassTexture(timeStep);
     }
 
     if (character_)

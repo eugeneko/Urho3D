@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <material>
-	<technique name="ForestScene/Grass/DynamicGrassDiff_tech.xml" quality="0" loddistance="0" />
+	<technique name="Techniques/Diff.xml" quality="0" loddistance="0" />
 	<texture unit="diffuse" name="ForestScene/Grass/billboardgrass0001.png" />
 	<shader psdefines="ALPHAMASK" />
 	<parameter name="UOffset" value="1 0 0 0" />
