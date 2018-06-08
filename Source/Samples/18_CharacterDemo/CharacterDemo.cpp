@@ -60,6 +60,11 @@
 URHO3D_DEFINE_APPLICATION_MAIN(CharacterDemo)
 
 //////////////////////////////////////////////////////////////////////////
+#ifdef URHO3D_D3D11
+static const bool DYNAMIC_GRASS = true;
+#else
+static const bool DYNAMIC_GRASS = false;
+#endif // URHO3D_D3D11
 static const unsigned LAYER_MAIN = 1 << 0;
 static const unsigned LAYER_GRASSPUSHER = 1 << 1;
 static const unsigned LAYER_OBSTACLE = 1 << 2;
@@ -380,8 +385,16 @@ void CharacterDemo::CreateScene()
     Node* grassRegionNode = scene_->GetChild("GrassRegion", true);
     if (terrainNode && grassRegionNode)
     {
-        grassLightMaterial_ = cache->GetResource<Material>("ForestScene/Grass/DynamicGrass_mat.xml");
-        grassDarkMaterial_ = cache->GetResource<Material>("ForestScene/Grass/DynamicGrass_mat2.xml");
+        if (DYNAMIC_GRASS)
+        {
+            grassLightMaterial_ = cache->GetResource<Material>("ForestScene/Grass/DynamicGrass_mat.xml");
+            grassDarkMaterial_ = cache->GetResource<Material>("ForestScene/Grass/DynamicGrass_mat2.xml");
+        }
+        else
+        {
+            grassLightMaterial_ = cache->GetResource<Material>("ForestScene/Grass/StaticGrass_mat.xml");
+            grassDarkMaterial_ = cache->GetResource<Material>("ForestScene/Grass/StaticGrass_mat2.xml");
+        }
         CreateGrass(terrainNode, grassRegionNode);
     }
 
@@ -522,10 +535,14 @@ void CharacterDemo::CreateGrass(Node* terrainNode, Node* grassRegionNode)
             grassStaticModel->SetModel(model);
             grassStaticModel->SetMaterial(grassLightMaterial_);
             grassStaticModel->SetCastShadows(true);
-            grassStaticModel->SetLightMask(0xff & ~(1 << 0));
+            if (DYNAMIC_GRASS)
+                grassStaticModel->SetLightMask(0xff & ~(1 << 0));
         }
     }
     URHO3D_LOGINFOF("Num grass instances: %d", totalGrassInstances);
+
+    if (!DYNAMIC_GRASS)
+        return;
 
     grassTexture_ = MakeShared<Texture2D>(context_);
     grassTexture_->SetNumLevels(1);
@@ -650,6 +667,9 @@ void CharacterDemo::SetupTheme(bool dark)
 
 void CharacterDemo::UpdateGrassTexture(float timeStep)
 {
+    if (!DYNAMIC_GRASS)
+        return;
+
     const float MAX_WIND_PUSHINESS = 0.1f;
     const float WIND_SCALE_T = 0.17f;
     const float WIND_SCALE_X = 0.13f;
