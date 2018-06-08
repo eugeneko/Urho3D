@@ -44,7 +44,7 @@ void VS(float4 iPos : POSITION,
     float4 dynamicGrassData = Sample2DLod0(NormalMap, iTexCoord2.xy);
     float pushiness = dynamicGrassData.w;
     float3 basePosition = mul(float4(iTangent.xyz, 1.0), modelMatrix);
-    float baseDistance = length(worldPos - basePosition);
+    float baseDistance = length(worldPos - basePosition) * dynamicGrassData.z;
     worldPos -= iNormal * iTangent.w * pushiness;
     worldPos = basePosition + normalize(worldPos - basePosition) * baseDistance;
 

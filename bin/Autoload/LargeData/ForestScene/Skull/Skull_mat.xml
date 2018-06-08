@@ -1,13 +1,14 @@
 <?xml version="1.0"?>
 <material>
-	<technique name="Techniques/DiffNormalSpec.xml" quality="0" loddistance="0" />
+	<technique name="Techniques/DiffNormalSpecEmissive.xml" quality="0" loddistance="0" />
 	<texture unit="diffuse" name="ForestScene/Skull/Skull_diffuse.TGA" />
 	<texture unit="normal" name="ForestScene/Skull/Skull_normal.tga" />
 	<texture unit="specular" name="ForestScene/Skull/Skull_specular.tga" />
+	<texture unit="emissive" name="ForestScene/Skull/Skull_emission.TGA" />
 	<parameter name="UOffset" value="1 0 0 0" />
 	<parameter name="VOffset" value="0 1 0 0" />
 	<parameter name="MatDiffColor" value="0.588235 0.588235 0.588235 1" />
-	<parameter name="MatEmissiveColor" value="0 0 0 1" />
+	<parameter name="MatEmissiveColor" value="0.5 0.5 0.5 1" />
 	<parameter name="MatEnvMapColor" value="1 1 1" />
 	<parameter name="MatSpecColor" value="0 0 0 2" />
 	<parameter name="Roughness" value="0.5" />

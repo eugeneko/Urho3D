@@ -380,9 +380,13 @@ void CharacterDemo::CreateScene()
     Node* grassRegionNode = scene_->GetChild("GrassRegion", true);
     if (terrainNode && grassRegionNode)
     {
-        grassMaterial_ = cache->GetResource<Material>("ForestScene/Grass/Grass_mat.xml");
+        grassLightMaterial_ = cache->GetResource<Material>("ForestScene/Grass/DynamicGrass_mat.xml");
+        grassDarkMaterial_ = cache->GetResource<Material>("ForestScene/Grass/DynamicGrass_mat2.xml");
         CreateGrass(terrainNode, grassRegionNode);
     }
+
+    darkTheme_ = true;
+    SetupTheme(false);
 }
 
 void CharacterDemo::CreateGrass(Node* terrainNode, Node* grassRegionNode)
@@ -402,6 +406,7 @@ void CharacterDemo::CreateGrass(Node* terrainNode, Node* grassRegionNode)
 
     auto zone = grassRegionNode->GetComponent<Zone>();
     grassBoundingBox_ = zone->GetWorldBoundingBox();
+
     IntVector2 chunkIndex;
     for (chunkIndex.x_ = 0; chunkIndex.x_ < NUM_GRASS_CHUNKS; ++chunkIndex.x_)
     {
@@ -471,7 +476,9 @@ void CharacterDemo::CreateGrass(Node* terrainNode, Node* grassRegionNode)
             float* vertexPtr = vertexData.Buffer();
             for (unsigned i = 0; i < numBillboards; ++i)
             {
-                const float size = GRASS_BILLBOARD_SIZE * Random(0.8f, 1.2f);
+                const Vector3 basePos = positions[i];
+                const float wave = (SmoothTriangleWave(basePos.x_ * 0.07f) + SmoothTriangleWave(basePos.z_ * 0.03f)) / 2;
+                const float size = GRASS_BILLBOARD_SIZE * (Random(0.6f, 1.0f) + wave * 0.3);
                 Matrix3 scaleMatrix;
                 scaleMatrix.SetScale(size);
                 const Matrix3 rotationScaleMatrix = rotations[i].RotationMatrix() * scaleMatrix;
@@ -480,7 +487,6 @@ void CharacterDemo::CreateGrass(Node* terrainNode, Node* grassRegionNode)
                 static const Vector2 uvs[4] = { Vector2::UP, Vector2::ONE, Vector2::RIGHT, Vector2::ZERO };
                 for (unsigned j = 0; j < 4; ++j)
                 {
-                    const Vector3 basePos = positions[i];
                     const Vector3 pos = basePos + xAxis * (uvs[j].x_ - 0.5f) + yAxis * (1.0f - uvs[j].y_);
                     modelBoundingBox.Merge(pos);
                     vertexPtr[0] = pos.x_;
@@ -514,8 +520,9 @@ void CharacterDemo::CreateGrass(Node* terrainNode, Node* grassRegionNode)
             Node* grassChunk = grassRegionNode->CreateChild("GrassChunk");
             auto grassStaticModel = grassChunk->CreateComponent<StaticModel>();
             grassStaticModel->SetModel(model);
-            grassStaticModel->SetMaterial(grassMaterial_);
+            grassStaticModel->SetMaterial(grassLightMaterial_);
             grassStaticModel->SetCastShadows(true);
+            grassStaticModel->SetLightMask(0xff & ~(1 << 0));
         }
     }
     URHO3D_LOGINFOF("Num grass instances: %d", totalGrassInstances);
@@ -523,10 +530,12 @@ void CharacterDemo::CreateGrass(Node* terrainNode, Node* grassRegionNode)
     grassTexture_ = MakeShared<Texture2D>(context_);
     grassTexture_->SetNumLevels(1);
     grassTexture_->SetSize(grassTextureSize_, grassTextureSize_, Graphics::GetRGBAFormat(), TEXTURE_DYNAMIC);
-    grassMaterial_->SetTexture(TU_NORMAL, grassTexture_);
+    grassLightMaterial_->SetTexture(TU_NORMAL, grassTexture_);
+    grassDarkMaterial_->SetTexture(TU_NORMAL, grassTexture_);
     grassTextureData_.Resize(grassTextureSize_ * grassTextureSize_ * 4);
     grassPushiness_.Resize(grassTextureSize_ * grassTextureSize_);
     grassBaseHeight_.Resize(grassTextureSize_ * grassTextureSize_);
+    grassScale_.Resize(grassTextureSize_ * grassTextureSize_, 1.0f);
 
     auto physicsWorld = scene_->GetComponent<PhysicsWorld>();
     for (unsigned y = 0; y < grassTextureSize_; ++y)
@@ -541,6 +550,102 @@ void CharacterDemo::CreateGrass(Node* terrainNode, Node* grassRegionNode)
             grassBaseHeight_[i] = terrain->GetHeight(samplePosition);
         }
     }
+
+    const float treeRadiusScale = 1.2f;
+    Node* treesNode = scene_->GetChild("Trees");
+    for (Node* treeNode : treesNode->GetChildren())
+    {
+        const Vector3 position = treeNode->GetWorldPosition();
+        const float radius = treeNode->GetComponent<StaticModel>()->GetWorldBoundingBox().HalfSize().x_ * treeRadiusScale;
+        for (unsigned y = 0; y < grassTextureSize_; ++y)
+        {
+            for (unsigned x = 0; x < grassTextureSize_; ++x)
+            {
+                const unsigned i = y * grassTextureSize_ + x;
+                const float kx = (x + 0.5f) / grassTextureSize_;
+                const float ky = (y + 0.5f) / grassTextureSize_;
+                Vector3 samplePosition = VectorLerp(grassBoundingBox_.min_, grassBoundingBox_.max_, Vector3(kx, 0.0f, ky));
+                samplePosition.y_ = grassBaseHeight_[i];
+                const float distance = (samplePosition - position).Length();
+                grassScale_[i] -= Pow(std::exp(-distance / radius), 2.0f);
+            }
+        }
+    }
+}
+
+void CharacterDemo::SetupTheme(bool dark)
+{
+    if (darkTheme_ == dark)
+        return;
+
+    auto* cache = GetSubsystem<ResourceCache>();
+
+    // Replace skull
+    Node* ballNode = scene_->GetChild("Ball", true);
+    Node* skullNode = scene_->GetChild("Skull", true);
+    if (!darkTheme_)
+    {
+        const Vector3 position = ballNode->GetWorldPosition();
+        ballNode->SetDeepEnabled(false);
+        skullNode->SetDeepEnabled(true);
+        skullNode->SetWorldPosition(position);
+    }
+    else
+    {
+        const Vector3 position = skullNode->GetWorldPosition();
+        skullNode->SetDeepEnabled(false);
+        ballNode->SetDeepEnabled(true);
+        ballNode->SetWorldPosition(position + Vector3::UP);
+    }
+
+    // Replace environment
+    Node* envLightNode = scene_->GetChild("EnvironmentLight", true);
+    Node* envDarkNode = scene_->GetChild("EnvironmentDark", true);
+    if (dark)
+    {
+        envLightNode->SetDeepEnabled(false);
+        envDarkNode->SetDeepEnabled(true);
+    }
+    else
+    {
+        envLightNode->SetDeepEnabled(true);
+        envDarkNode->SetDeepEnabled(false);
+    }
+
+    // Replace car
+    Node* carNode = scene_->GetChild("Car", true);
+    Node* ghostCarNode = carNode->GetChild("GhostCar", true);
+    ghostCarNode->SetDeepEnabled(dark);
+    auto carModel = carNode->GetComponent<StaticModel>();
+    carModel->SetMaterial(0, dark
+        ? cache->GetResource<Material>("ForestScene/Car/Body_mat2.xml")
+        : cache->GetResource<Material>("ForestScene/Car/Body_mat.xml"));
+
+    // Replace grass
+    Node* grassRegionNode = scene_->GetChild("GrassRegion", true);
+    for (Node* grassNode : grassRegionNode->GetChildren())
+    {
+        auto grassModel = grassNode->GetComponent<StaticModel>();
+        grassModel->SetMaterial(0, dark ? grassDarkMaterial_ : grassLightMaterial_);
+    }
+
+    // Replace terrain
+    Terrain* terrain = scene_->GetComponent<Terrain>(true);
+    terrain->SetMaterial(dark
+        ? cache->GetResource<Material>("ForestScene/Terrain/Terrain_mat2.xml")
+        : cache->GetResource<Material>("ForestScene/Terrain/Terrain_mat.xml"));
+
+    // Replace trees
+    for (Node* treeNode : scene_->GetChild("Trees")->GetChildren())
+    {
+        auto treeModel = treeNode->GetComponent<StaticModel>();
+        treeModel->SetMaterial(0, dark
+            ? cache->GetResource<Material>("ForestScene/FirTree/Leaf_mat2.xml")
+            : cache->GetResource<Material>("ForestScene/FirTree/Leaf_mat.xml"));
+    }
+
+    // Finalize
+    darkTheme_ = dark;
 }
 
 void CharacterDemo::UpdateGrassTexture(float timeStep)
@@ -557,7 +662,8 @@ void CharacterDemo::UpdateGrassTexture(float timeStep)
         for (unsigned x = 0; x < grassTextureSize_; ++x)
         {
             const unsigned i = y * grassTextureSize_ + x;
-            const float restorationSpeed = GRASS_RESTORATION_SPEED * Pow(Max(0.1f, 1.0f - grassPushiness_[i]), 2.0f);
+            const float restorationSpeed = GRASS_RESTORATION_SPEED * Pow(Max(0.1f, 1.0f - grassPushiness_[i]),
+                darkTheme_ ? 1.3f : 2.5f);
             grassPushiness_[i] = Max(0.0f, grassPushiness_[i] - restorationSpeed * timeStep);
         }
     }
@@ -688,7 +794,7 @@ void CharacterDemo::UpdateGrassTexture(float timeStep)
             grassTextureData_[i * 4 + 0] = 0;
             grassTextureData_[i * 4 + 1] = 0;
 #endif
-            grassTextureData_[i * 4 + 2] = 0;
+            grassTextureData_[i * 4 + 2] = static_cast<unsigned char>(Clamp(grassScale_[i] * 255, 0.0f, 255.0f));
             grassTextureData_[i * 4 + 3] = static_cast<unsigned char>(Clamp(grassPushiness_[i] * 255, 0.0f, 255.0f));
         }
     }
@@ -719,18 +825,20 @@ void CharacterDemo::CreateCharacter()
     // Set the rigidbody to signal collision also when in rest, so that we get ground collisions properly
     body->SetCollisionEventMode(COLLISION_ALWAYS);
 
-    const float KICK_IMPULSE = 3.0f;
+    const float KICK_VELOCITY = 10.0f;
 
     SubscribeToEvent(objectNode, E_NODECOLLISION,
         [=](StringHash eventType, VariantMap& eventData)
     {
         Node* otherNode = static_cast<Node*>(eventData[NodeCollision::P_OTHERNODE].GetPtr());
+
         if (kickCooldownTimer_ <= 0.0f && otherNode->HasTag("KICKABLE"))
         {
             kickCooldownTimer_ = kickCooldown_;
             RigidBody* otherBody = static_cast<RigidBody*>(eventData[NodeCollision::P_OTHERBODY].GetPtr());
             const Vector3 kickDirection = (cameraNode_->GetWorldDirection() * Vector3(1, 0, 1)).Normalized() + Vector3::UP * 0.3f;
-            otherBody->ApplyImpulse(kickDirection.Normalized() * KICK_IMPULSE);
+            otherBody->ApplyImpulse(kickDirection.Normalized() * otherBody->GetMass() * KICK_VELOCITY);
+            otherBody->SetAngularVelocity(cameraNode_->GetRight() * 10);
         }
     });
 
@@ -798,10 +906,37 @@ void CharacterDemo::HandleUpdate(StringHash eventType, VariantMap& eventData)
 
     kickCooldownTimer_ -= timeStep;
 
+    if (input->GetKeyPress(KEY_TAB))
+    {
+        SetupTheme(!darkTheme_);
+    }
+
     // Update grass
     if (grassTextureSize_ > 0)
     {
         UpdateGrassTexture(timeStep);
+    }
+
+    // Update skull light
+//     Node* skullNode = scene_->GetChild("Skull");
+//     Node* skullLightNode = skullNode->GetChild("SkullLight");
+//     skullLightNode->SetWorldPosition(skullNode->GetWorldPosition() + Vector3::UP * 1.0);
+
+    Node* handGrassPusher = scene_->GetChild("HandGrassPusher", true);
+    if (input->GetMouseButtonDown(MOUSEB_LEFT))
+    {
+        auto physicsWorld = scene_->GetComponent<PhysicsWorld>();
+        const Vector3 camPosition = cameraNode_->GetWorldPosition();
+        const Vector3 camDirection = cameraNode_->GetDirection();
+        const float maxDistance = 5.0f;
+        PhysicsRaycastResult raycast;
+        physicsWorld->RaycastSingle(raycast, Ray(camPosition, camDirection), maxDistance, LAYER_MAIN);
+        const float distance = raycast.body_ ? Min(maxDistance, raycast.distance_) : maxDistance;
+        handGrassPusher->SetWorldPosition(camPosition + camDirection * distance);
+    }
+    else
+    {
+        handGrassPusher->SetWorldPosition(Vector3(0, 100, 0));
     }
 
     if (character_)

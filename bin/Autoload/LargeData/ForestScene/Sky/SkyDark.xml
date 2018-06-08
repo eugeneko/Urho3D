@@ -1,0 +1,9 @@
+<cubemap>
+    <face name="ForestScene/Sky/FullMoonLeft2048.png" />
+    <face name="ForestScene/Sky/FullMoonRight2048.png" />
+    <face name="ForestScene/Sky/FullMoonUp2048.png" />
+    <face name="ForestScene/Sky/FullMoonDown2048.png" />
+    <face name="ForestScene/Sky/FullMoonFront2048.png" />
+    <face name="ForestScene/Sky/FullMoonBack2048.png" />
+    <quality low="0" />
+</cubemap>

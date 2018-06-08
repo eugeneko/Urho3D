@@ -108,6 +108,8 @@ private:
     void CreateScene();
     /// Create grass over terrain node.
     void CreateGrass(Node* terrainNode, Node* grassRegionNode);
+    /// Set dark/light theme.
+    void SetupTheme(bool dark);
     /// Update grass texture.
     void UpdateGrassTexture(float timeStep);
     /// Create controllable character.
@@ -126,13 +128,17 @@ private:
     /// The controllable character component.
     WeakPtr<Character> character_;
 
+    /// Theme.
+    bool darkTheme_ = false;
     /// Kick cooldown time.
     float kickCooldown_ = 0.5f;
     /// Kick cooldown.
     float kickCooldownTimer_ = 0.0f;
 
-    /// Grass material.
-    SharedPtr<Material> grassMaterial_;
+    /// Grass material (light).
+    SharedPtr<Material> grassLightMaterial_;
+    /// Grass material (dark).
+    SharedPtr<Material> grassDarkMaterial_;
     /// Grass push objects.
     Vector<CollisionShape*> grassPushers_;
     /// Grass bounding box.
@@ -145,6 +151,8 @@ private:
     SharedPtr<Texture2D> grassTexture_;
     /// Grass texture data.
     Vector<unsigned char> grassTextureData_;
+    /// Grass scale.
+    Vector<float> grassScale_;
     /// Grass base height.
     Vector<float> grassBaseHeight_;
     /// Grass pushiness data.

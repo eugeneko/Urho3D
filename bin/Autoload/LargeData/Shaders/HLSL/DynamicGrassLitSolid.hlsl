@@ -83,13 +83,17 @@ void VS(float4 iPos : POSITION,
     float4 dynamicGrassData = Sample2DLod0(NormalMap, iTexCoord2.xy);
     float pushiness = dynamicGrassData.w;
     float3 basePosition = mul(float4(iTangent.xyz, 1.0), modelMatrix);
-    float baseDistance = length(worldPos - basePosition);
+    float baseDistance = length(worldPos - basePosition) * dynamicGrassData.z;
     worldPos -= iNormal * iTangent.w * pushiness;
     worldPos = basePosition + normalize(worldPos - basePosition) * baseDistance;
 
     oPos = GetClipPos(worldPos);
     oNormal = GetWorldNormal(modelMatrix);
-    oColor.xyz = float3(1, 1, 1) * lerp(1.0, 0.8, pushiness);
+#ifndef GLOW
+    oColor.xyz = float3(1, 1, 1) * lerp(1.0, 0.85, pushiness);
+#else
+    oColor.xyz = float3(1, 1, 1) * pushiness;
+#endif
     oColor.w = 1;
 #if 0
     oNormal.xz += dynamicGrassData.xy  * 2.0 - 1.0;
@@ -214,7 +218,12 @@ void PS(
     #endif
 
     //#ifdef VERTEXCOLOR
+    float3 emissiveColor = cMatEmissiveColor;
+    #ifndef GLOW
         diffColor *= iColor;
+    #else
+        emissiveColor *= iColor;
+    #endif
     //#endif
 
     // Get material specular albedo
@@ -268,7 +277,7 @@ void PS(
 
         #ifdef AMBIENT
             finalColor += cAmbientColor.rgb * diffColor.rgb;
-            finalColor += cMatEmissiveColor;
+            finalColor += emissiveColor;
             oColor = float4(GetFog(finalColor, fogFactor), diffColor.a);
         #else
             oColor = float4(GetLitFog(finalColor, fogFactor), diffColor.a);
@@ -296,9 +305,9 @@ void PS(
             finalColor += Sample2D(EmissiveMap, iTexCoord2).rgb * diffColor.rgb;
         #endif
         #ifdef EMISSIVEMAP
-            finalColor += cMatEmissiveColor * Sample2D(EmissiveMap, iTexCoord.xy).rgb;
+            finalColor += emissiveColor * Sample2D(EmissiveMap, iTexCoord.xy).rgb;
         #else
-            finalColor += cMatEmissiveColor;
+            finalColor += emissiveColor;
         #endif
 
         oColor = float4(GetFog(finalColor, fogFactor), 1.0);
@@ -329,9 +338,9 @@ void PS(
             finalColor += Sample2D(EmissiveMap, iTexCoord2).rgb * diffColor.rgb;
         #endif
         #ifdef EMISSIVEMAP
-            finalColor += cMatEmissiveColor * Sample2D(EmissiveMap, iTexCoord.xy).rgb;
+            finalColor += emissiveColor * Sample2D(EmissiveMap, iTexCoord.xy).rgb;
         #else
-            finalColor += cMatEmissiveColor;
+            finalColor += emissiveColor;
         #endif
 
         oColor = float4(GetFog(finalColor, fogFactor), diffColor.a);
