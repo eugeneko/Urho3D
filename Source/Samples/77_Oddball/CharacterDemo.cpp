@@ -367,7 +367,7 @@ void CharacterDemo::CreateScene()
 
     scene_ = new Scene(context_);
 
-    auto sceneData = cache->GetResource<XMLFile>("ForestScene/Scene.xml");
+    auto sceneData = cache->GetResource<XMLFile>("77/Scene.xml");
     scene_->LoadXML(sceneData->GetRoot());
 
     // Create scene subsystem components
@@ -387,13 +387,13 @@ void CharacterDemo::CreateScene()
     {
         if (DYNAMIC_GRASS)
         {
-            grassLightMaterial_ = cache->GetResource<Material>("ForestScene/Grass/DynamicGrass_mat.xml");
-            grassDarkMaterial_ = cache->GetResource<Material>("ForestScene/Grass/DynamicGrass_mat2.xml");
+            grassLightMaterial_ = cache->GetResource<Material>("77/Grass/DynamicGrass_mat.xml");
+            grassDarkMaterial_ = cache->GetResource<Material>("77/Grass/DynamicGrass_mat2.xml");
         }
         else
         {
-            grassLightMaterial_ = cache->GetResource<Material>("ForestScene/Grass/StaticGrass_mat.xml");
-            grassDarkMaterial_ = cache->GetResource<Material>("ForestScene/Grass/StaticGrass_mat2.xml");
+            grassLightMaterial_ = cache->GetResource<Material>("77/Grass/StaticGrass_mat.xml");
+            grassDarkMaterial_ = cache->GetResource<Material>("77/Grass/StaticGrass_mat2.xml");
         }
         CreateGrass(terrainNode, grassRegionNode);
     }
@@ -635,8 +635,8 @@ void CharacterDemo::SetupTheme(bool dark)
     ghostCarNode->SetDeepEnabled(dark);
     auto carModel = carNode->GetComponent<StaticModel>();
     carModel->SetMaterial(0, dark
-        ? cache->GetResource<Material>("ForestScene/Car/Body_mat2.xml")
-        : cache->GetResource<Material>("ForestScene/Car/Body_mat.xml"));
+        ? cache->GetResource<Material>("77/Car/Body_mat2.xml")
+        : cache->GetResource<Material>("77/Car/Body_mat.xml"));
 
     // Replace grass
     Node* grassRegionNode = scene_->GetChild("GrassRegion", true);
@@ -649,16 +649,16 @@ void CharacterDemo::SetupTheme(bool dark)
     // Replace terrain
     Terrain* terrain = scene_->GetComponent<Terrain>(true);
     terrain->SetMaterial(dark
-        ? cache->GetResource<Material>("ForestScene/Terrain/Terrain_mat2.xml")
-        : cache->GetResource<Material>("ForestScene/Terrain/Terrain_mat.xml"));
+        ? cache->GetResource<Material>("77/Terrain/Terrain_mat2.xml")
+        : cache->GetResource<Material>("77/Terrain/Terrain_mat.xml"));
 
     // Replace trees
     for (Node* treeNode : scene_->GetChild("Trees")->GetChildren())
     {
         auto treeModel = treeNode->GetComponent<StaticModel>();
         treeModel->SetMaterial(0, dark
-            ? cache->GetResource<Material>("ForestScene/FirTree/Leaf_mat2.xml")
-            : cache->GetResource<Material>("ForestScene/FirTree/Leaf_mat.xml"));
+            ? cache->GetResource<Material>("77/FirTree/Leaf_mat2.xml")
+            : cache->GetResource<Material>("77/FirTree/Leaf_mat.xml"));
     }
 
     // Tune pushiness
