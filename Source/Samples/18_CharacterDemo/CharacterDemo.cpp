@@ -661,6 +661,9 @@ void CharacterDemo::SetupTheme(bool dark)
             : cache->GetResource<Material>("ForestScene/FirTree/Leaf_mat.xml"));
     }
 
+    // Tune pushiness
+    maxGrassPushiness_ = dark ? 0.7 : 0.8;
+
     // Finalize
     darkTheme_ = dark;
 }
@@ -890,10 +893,10 @@ void CharacterDemo::CreateInstructions()
 
     // Construct new Text object, set string to display and font to use
     auto* instructionText = ui->GetRoot()->CreateChild<Text>();
-    instructionText->SetText(
-        "Use WASD keys and mouse/touch to move\n"
-        "Space to jump, F to toggle 1st/3rd person\n"
-        "F5 to save scene, F7 to load"
+    instructionText->SetText(""
+//         "Use WASD keys and mouse/touch to move\n"
+//         "Space to jump, F to toggle 1st/3rd person\n"
+//         "F5 to save scene, F7 to load"
     );
     instructionText->SetFont(cache->GetResource<Font>("Fonts/Anonymous Pro.ttf"), 15);
     // The text has multiple rows. Center them in relation to each other
