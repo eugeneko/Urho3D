@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<node id="159">
+	<attribute name="Is Enabled" value="true" />
+	<attribute name="Name" value="FirTree" />
+	<attribute name="Tags" />
+	<attribute name="Position" value="14.3019 0.0154203 3.13366" />
+	<attribute name="Rotation" value="0.707022 0 -0.707192 0" />
+	<attribute name="Scale" value="0.0098244 0.0098244 0.0098244" />
+	<attribute name="Variables" />
+	<component type="StaticModel" id="238">
+		<attribute name="Model" value="Model;77/FirTree/FirTree.mdl" />
+		<attribute name="Material" value="Material;77/FirTree/Leaf_mat.xml;77/FirTree/Bark_mat.xml" />
+		<attribute name="Cast Shadows" value="true" />
+	</component>
+	<component type="RigidBody" id="239">
+		<attribute name="Physics Rotation" value="0.707022 0 -0.707192 0" />
+		<attribute name="Physics Position" value="14.3019 0.0154203 3.13366" />
+		<attribute name="Collision Layer" value="5" />
+	</component>
+	<component type="CollisionShape" id="240">
+		<attribute name="Shape Type" value="Cone" />
+		<attribute name="Size" value="100 300 100" />
+		<attribute name="Offset Position" value="0 150 0" />
+	</component>
+</node>

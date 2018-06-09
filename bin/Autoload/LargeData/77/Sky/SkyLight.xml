@@ -1,0 +1,9 @@
+<cubemap>
+    <face name="77/Sky/TropicalSunnyDayLeft2048.png" />
+    <face name="77/Sky/TropicalSunnyDayRight2048.png" />
+    <face name="77/Sky/TropicalSunnyDayUp2048.png" />
+    <face name="77/Sky/TropicalSunnyDayDown2048.png" />
+    <face name="77/Sky/TropicalSunnyDayFront2048.png" />
+    <face name="77/Sky/TropicalSunnyDayBack2048.png" />
+    <quality low="0" />
+</cubemap>
