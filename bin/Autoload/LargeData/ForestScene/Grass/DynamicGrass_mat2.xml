@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <material>
-	<technique name="ForestScene/Grass/DynamicGrassDiffEmissive_tech.xml" quality="0" loddistance="0" />
-	<texture unit="diffuse" name="ForestScene/Grass/Grass2.png" />
-    <texture unit="emissive" name="ForestScene/Grass/Grass2.png" />
+	<technique name="77/Grass/DynamicGrassDiffEmissive_tech.xml" quality="0" loddistance="0" />
+	<texture unit="diffuse" name="77/Grass/Grass2.png" />
+    <texture unit="emissive" name="77/Grass/Grass2.png" />
 	<shader vsdefines="GLOW" psdefines="ALPHAMASK GLOW" />
 	<parameter name="UOffset" value="1 0 0 0" />
 	<parameter name="VOffset" value="0 1 0 0" />

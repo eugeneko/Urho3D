@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <material>
-	<technique name="ForestScene/Grass/DynamicGrassDiff_tech.xml" quality="0" loddistance="0" />
-	<texture unit="diffuse" name="ForestScene/Grass/Grass.png" />
+	<technique name="77/Grass/DynamicGrassDiff_tech.xml" quality="0" loddistance="0" />
+	<texture unit="diffuse" name="77/Grass/Grass.png" />
 	<shader psdefines="ALPHAMASK" />
 	<parameter name="UOffset" value="1 0 0 0" />
 	<parameter name="VOffset" value="0 1 0 0" />

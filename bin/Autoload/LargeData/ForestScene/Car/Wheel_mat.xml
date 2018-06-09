@@ -1,9 +1,9 @@
 <?xml version="1.0"?>
 <material>
 	<technique name="Techniques/DiffNormalSpec.xml" quality="0" loddistance="0" />
-	<texture unit="diffuse" name="ForestScene/Car/Wheel_diffuse.tga" />
-	<texture unit="normal" name="ForestScene/Car/Wheel_normal.tga" />
-	<texture unit="specular" name="ForestScene/Car/Wheel_specular.tga" />
+	<texture unit="diffuse" name="77/Car/Wheel_diffuse.tga" />
+	<texture unit="normal" name="77/Car/Wheel_normal.tga" />
+	<texture unit="specular" name="77/Car/Wheel_specular.tga" />
 	<parameter name="UOffset" value="1 0 0 0" />
 	<parameter name="VOffset" value="0 1 0 0" />
 	<parameter name="MatDiffColor" value="1 1 1 1" />
