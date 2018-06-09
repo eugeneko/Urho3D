@@ -1,12 +1,13 @@
 <?xml version="1.0"?>
 <material>
-	<technique name="Techniques/Diff.xml" quality="0" loddistance="0" />
-	<texture unit="diffuse" name="ForestScene/Grass/Grass2.png" />
+	<technique name="Techniques/DiffEmissive.xml" quality="0" loddistance="0" />
+    <texture unit="diffuse" name="ForestScene/Grass/Grass2.png" />
+    <texture unit="emissive" name="ForestScene/Grass/Grass2.png" />
 	<shader psdefines="ALPHAMASK" />
 	<parameter name="UOffset" value="1 0 0 0" />
 	<parameter name="VOffset" value="0 1 0 0" />
 	<parameter name="MatDiffColor" value="0.8 0.8 0.8 1" />
-	<parameter name="MatEmissiveColor" value="0.02 0.02 0.05" />
+	<parameter name="MatEmissiveColor" value="0.07 0.07 0.1" />
 	<parameter name="MatEnvMapColor" value="1 1 1" />
 	<parameter name="MatSpecColor" value="0 0 0 1" />
 	<parameter name="Roughness" value="0.5" />
