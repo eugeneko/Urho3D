@@ -25,7 +25,7 @@ if (NOT URHO3D_PHYSICS)
 endif ()
 
 # Define target name
-set (TARGET_NAME 18_CharacterDemo)
+set (TARGET_NAME 77_Oddball)
 
 # Define source files
 define_source_files (EXTRA_H_FILES ${COMMON_SAMPLE_H_FILES})
