@@ -9,3 +9,6 @@ http://www.reinerstilesets.de/new-textures-billboard-grass/
 
 Grass texture from OpenGameArt
 https://opengameart.org/content/30-grass-textures-tilable
+
+Skyboxes by 93 interactive
+https://93i.de/p/free-skybox-texture-set/
