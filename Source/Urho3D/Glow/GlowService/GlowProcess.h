@@ -20,20 +20,20 @@
 // THE SOFTWARE.
 //
 
-#include <Atomic/IPC/IPCServer.h>
+//#include "../../IPC/IPCServer.h"
 
-using namespace Atomic;
+using namespace Urho3D;
 
 namespace AtomicGlow
 {
 
 class GlowProcessResultHandler;
 
-class GlowProcess : public IPCServer
+class GlowProcess : public Object
 {
     friend class GlowProcessResultHandler;
 
-    ATOMIC_OBJECT(GlowProcess, IPCServer)
+    URHO3D_OBJECT(GlowProcess, Object)
 
 public:
 
@@ -67,9 +67,9 @@ private:
 
 };
 
-class GlowProcessResultHandler : public IPCResultHandler
+class GlowProcessResultHandler : public Object
 {
-    ATOMIC_OBJECT(GlowProcessResultHandler, IPCResultHandler)
+    URHO3D_OBJECT(GlowProcessResultHandler, Object)
 
 public:
     /// Construct.
@@ -79,7 +79,7 @@ public:
 
     void HandleResult(unsigned cmdID, const VariantMap& cmdResult);
 
-private:    
+private:
 
     WeakPtr<GlowProcess> process_;
 

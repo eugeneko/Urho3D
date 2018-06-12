@@ -129,6 +129,11 @@ if (NOT ANDROID AND NOT ARM AND NOT WEB)
     if (NOT CMAKE_SYSTEM_NAME STREQUAL Linux)
         add_subdirectory (ThirdParty/LibCpuId)
     endif ()
+    add_subdirectory(ThirdParty/thekla)
+    add_subdirectory(ThirdParty/embree)
+    install_header_files (DIRECTORY ThirdParty/thekla/ DESTINATION ${DEST_INCLUDE_DIR}/ThirdParty/thekla FILES_MATCHING PATTERN *.h BUILD_TREE_ONLY)
+    install_header_files (DIRECTORY ThirdParty/embree/include/embree2/ DESTINATION ${DEST_INCLUDE_DIR}/ThirdParty/embree2 FILES_MATCHING PATTERN *.h BUILD_TREE_ONLY)
+
 endif ()
 
 # Urho3D game engine library

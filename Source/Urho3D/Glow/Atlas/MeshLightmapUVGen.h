@@ -3,7 +3,7 @@
 
 #include "ModelPacker.h"
 
-using namespace Atomic;
+using namespace Urho3D;
 
 namespace Thekla
 {
@@ -20,7 +20,7 @@ class ModelPacker;
 
 class MeshLightmapUVGen : public Object
 {
-    ATOMIC_OBJECT(MeshLightmapUVGen, Object)
+    URHO3D_OBJECT(MeshLightmapUVGen, Object)
 
 public:
 

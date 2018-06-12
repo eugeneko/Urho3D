@@ -26,7 +26,7 @@
 
 #include "Embree.h"
 
-#include <Atomic/IO/Log.h>
+#include "../../IO/Log.h"
 
 #include "BakeMesh.h"
 #include "EmbreeScene.h"
@@ -57,7 +57,7 @@ namespace AtomicGlow
 
 static void RTCErrorCallback(const RTCError code, const char* str)
 {
-    ATOMIC_LOGERRORF("RTC Error %d: %s", code, str);
+    URHO3D_LOGERRORF("RTC Error %d: %s", code, str);
 }
 
 

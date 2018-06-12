@@ -21,9 +21,9 @@
 
 #pragma once
 
-#include <Atomic/Math/Vector3.h>
+#include "../../Math/Vector3.h"
 
-using namespace Atomic;
+using namespace Urho3D;
 
 namespace AtomicGlow
 {

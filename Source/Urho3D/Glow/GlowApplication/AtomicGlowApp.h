@@ -23,10 +23,10 @@
 
 #pragma once
 
-#include <Atomic/Core/Timer.h>
+#include "../../Core/Timer.h>
 #include <AtomicApp/IPCClientApp.h>
 
-using namespace Atomic;
+using namespace Urho3D;
 
 namespace AtomicGlow
 {
@@ -35,7 +35,7 @@ namespace AtomicGlow
 
     class AtomicGlowApp : public IPCClientApp
     {
-        ATOMIC_OBJECT(AtomicGlowApp, IPCClientApp)
+        URHO3D_OBJECT(AtomicGlowApp, IPCClientApp)
 
     public:
         /// Construct.

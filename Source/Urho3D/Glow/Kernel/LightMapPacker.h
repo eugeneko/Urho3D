@@ -21,7 +21,7 @@
 
 #pragma once
 
-#include <Atomic/Core/Object.h>
+#include "../../Core/Object.h"
 
 #include "BakeMesh.h"
 #include "LightMap.h"
@@ -36,14 +36,14 @@ class Image;
 namespace AtomicGlow
 {
 
-using namespace Atomic;
+using namespace Urho3D;
 
 // on 4 pixel boundry to prevent bilinear bleeds and for DDS 4x4 compression
 static const int LIGHTMAP_PADDING = 4;
 
 class LightMapPacker : public Object
 {
-    ATOMIC_OBJECT(LightMapPacker, Object)
+    URHO3D_OBJECT(LightMapPacker, Object)
 
     public:
 

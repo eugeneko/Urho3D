@@ -21,17 +21,17 @@
 
 #pragma once
 
-#include <Atomic/Resource/Image.h>
-#include <Atomic/Graphics/Material.h>
+#include "../../Resource/Image.h"
+#include "../../Graphics/Material.h"
 
-using namespace Atomic;
+using namespace Urho3D;
 
 namespace AtomicGlow
 {
 
 class BakeMaterial : public Object
 {
-    ATOMIC_OBJECT(BakeMaterial, Object)
+    URHO3D_OBJECT(BakeMaterial, Object)
 
     public:
 
@@ -71,7 +71,7 @@ class BakeMaterialCache : public Object
 {
     friend class BakeMaterial;
 
-    ATOMIC_OBJECT(BakeMaterialCache, Object)
+    URHO3D_OBJECT(BakeMaterialCache, Object)
 
     public:
 

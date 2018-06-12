@@ -21,9 +21,10 @@
 
 #pragma once
 
-#include <Atomic/Core/Object.h>
+#include "../../Core/Object.h"
+#include "../../Resource/Image.h"
 
-#include <AtomicGlow/Common/GlowSettings.h>
+#include "../Common/GlowSettings.h"
 
 namespace Atomic
 {
@@ -35,11 +36,11 @@ class Image;
 namespace AtomicGlow
 {
 
-using namespace Atomic;
+using namespace Urho3D;
 
 class LightMap : public Object
 {
-    ATOMIC_OBJECT(LightMap, Object)
+    URHO3D_OBJECT(LightMap, Object)
 
     public:
 

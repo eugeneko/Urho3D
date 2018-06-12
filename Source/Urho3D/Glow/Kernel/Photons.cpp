@@ -21,7 +21,7 @@
 // THE SOFTWARE.
 //
 
-#include <Atomic/Core/StringUtils.h>
+#include "../../Core/StringUtils.h"
 
 #include "EmbreeScene.h"
 #include "SceneBaker.h"
@@ -320,7 +320,7 @@ void Photons::Trace(const LightAttenuation* attenuation, const Vector3& position
 
     // keep tracing
     Vector3 dir;
-    Vector3::GetRandomHemisphereDirection(dir, hitNormal);
+    RandomHemisphereDirection(dir, hitNormal);
     Trace( attenuation, hitPosition, dir, hitColor, depth + 1, ray.geomID, ray.primID );
 }
 

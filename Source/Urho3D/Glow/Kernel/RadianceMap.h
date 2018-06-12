@@ -21,7 +21,7 @@
 
 #pragma once
 
-#include <Atomic/Resource/Image.h>
+#include "../../Resource/Image.h"
 
 
 namespace AtomicGlow
@@ -29,11 +29,11 @@ namespace AtomicGlow
 
 class BakeMesh;
 
-using namespace Atomic;
+using namespace Urho3D;
 
 class RadianceMap : public Object
 {
-    ATOMIC_OBJECT(RadianceMap, Object)
+    URHO3D_OBJECT(RadianceMap, Object)
 
     public:
 

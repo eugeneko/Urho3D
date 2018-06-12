@@ -23,8 +23,8 @@
 
 #pragma once
 
-#include <Atomic/Core/Mutex.h>
-#include <Atomic/Math/Plane.h>
+#include "../../Core/Mutex.h"
+#include "../../Math/Plane.h"
 #include "BakeNode.h"
 
 namespace Atomic
@@ -33,7 +33,7 @@ class Light;
 class Zone;
 }
 
-using namespace Atomic;
+using namespace Urho3D;
 
 namespace AtomicGlow
 {
@@ -48,8 +48,6 @@ class LightVertexGenerator;
 /// LightCutoff class is a base for all cutoff models and represents an omni-directional light.
 class LightCutoff : public RefCounted
 {
-    ATOMIC_REFCOUNTED(LightCutoff)
-
 public:
 
     /// Constructs a LightCutoff instance.
@@ -71,8 +69,6 @@ protected:
 /// LightSpotCutoff is used for spot lights.
 class LightSpotCutoff : public LightCutoff
 {
-
-    ATOMIC_REFCOUNTED(LightSpotCutoff)
 
 public:
 
@@ -103,8 +99,6 @@ private:
 /// Light distance attenuation model.
 class LightAttenuation : public RefCounted
 {
-    ATOMIC_REFCOUNTED(LightAttenuation)
-
 public:
 
     /// Constructs a LightAttenuation instance.
@@ -125,9 +119,6 @@ protected:
 /// Linear light attenuation model.
 class LinearLightAttenuation : public LightAttenuation
 {
-
-    ATOMIC_REFCOUNTED(LinearLightAttenuation)
-
 public:
     /// Constructs a LinearLightAttenuation instance.
     LinearLightAttenuation( const BakeLight* light, float radius, float constant = 0.0f, float linear = 0.0f, float quadratic = 25.0f );
@@ -149,9 +140,6 @@ private:
 /// Light to point influence model.
 class LightInfluence : public RefCounted
 {
-
-    ATOMIC_REFCOUNTED(LightInfluence)
-
     public:
 
         /// Constructs a LightInfluence instance.
@@ -174,8 +162,6 @@ protected:
 ///  Directional light influence model.
 class DirectionalLightInfluence : public LightInfluence
 {
-    ATOMIC_REFCOUNTED(DirectionalLightInfluence)
-
     public:
 
         /// Constructs a DirectionalLightInfluence instance.
@@ -193,8 +179,6 @@ private:
 ///  Ambient occlusion influence model.
 class AmbientOcclusionInfluence : public LightInfluence
 {
-    ATOMIC_REFCOUNTED(AmbientOcclusionInfluence)
-
     public:
 
     /// Constructs a AmbientOcclusionInfluence instance.
@@ -212,8 +196,6 @@ private:
 /// Photon emitter is used to determine an amount of photons to be emitted by a given light.
 class PhotonEmitter : public RefCounted
 {
-    ATOMIC_REFCOUNTED(PhotonEmitter)
-
 public:
 
     // Constructs a new PhotonEmitter instance.
@@ -235,9 +217,6 @@ protected:
 /// Directional photon emitter emits photons with a given direction.
 class DirectionalPhotonEmitter : public PhotonEmitter
 {
-
-    ATOMIC_REFCOUNTED(DirectionalPhotonEmitter)
-
     public:
 
     // Constructs a new DirectionalPhotonEmitter instance.
@@ -260,7 +239,7 @@ private:
 
 class BakeLight : public BakeNode
 {
-    ATOMIC_OBJECT(BakeLight, BakeNode)
+    URHO3D_OBJECT(BakeLight, BakeNode)
 
     public:
 
@@ -268,7 +247,7 @@ class BakeLight : public BakeNode
     virtual ~BakeLight();
 
     /*
-    virtual void SetLight(Atomic::Light* light) = 0;
+    virtual void SetLight(Urho3D::Light* light) = 0;
     virtual void Light(LightRay* ray) = 0;
     */
 
@@ -433,8 +412,6 @@ typedef PODVector<LightVertex> LightVertexVector;
 /// A LightVertexGenerator used to generate a set of light points for mesh light sources.
 class LightVertexGenerator : public RefCounted
 {
-    ATOMIC_REFCOUNTED(LightVertexGenerator)
-
     public:
 
     /// Constructs a LightVertexGenerator instance.
@@ -471,9 +448,7 @@ protected:
 /// Face based generator can also perform a mesh tesselation.
 class FaceLightVertexGenerator : public LightVertexGenerator
 {
-    ATOMIC_REFCOUNTED(FaceLightVertexGenerator)
-
-    public:
+public:
 
     /// Constructs a FaceLightVertexGenerator instance.
     /// param mesh Source light mesh.

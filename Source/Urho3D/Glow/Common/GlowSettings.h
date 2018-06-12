@@ -22,11 +22,11 @@
 
 #pragma once
 
-#include <Atomic/Math/MathDefs.h>
-#include <Atomic/Container/Str.h>
-#include <Atomic/IO/VectorBuffer.h>
+#include "../../Math/MathDefs.h"
+#include "../../Container/Str.h"
+#include "../../IO/VectorBuffer.h"
 
-using namespace Atomic;
+using namespace Urho3D;
 
 namespace AtomicGlow
 
@@ -136,17 +136,17 @@ namespace AtomicGlow
             // always use 2048 for lightmap size
             lightmapSize_ = 2048;
 
-            sceneLexelDensityScale_ = Atomic::Clamp<float>(sceneLexelDensityScale_, 0.01f, 1.0f);
+            sceneLexelDensityScale_ = Urho3D::Clamp<float>(sceneLexelDensityScale_, 0.01f, 1.0f);
 
-            lexelDensity_ = Atomic::Clamp<float>(lexelDensity_, 0.01f, 1.0f);
-            nsamples_ = Atomic::Clamp<unsigned>(nsamples_, 16, 256);
+            lexelDensity_ = Urho3D::Clamp<float>(lexelDensity_, 0.01f, 1.0f);
+            nsamples_ = Urho3D::Clamp<unsigned>(nsamples_, 16, 256);
 
-            giMaxBounces_ = Atomic::Clamp<int>(giMaxBounces_, 0, 8);
-            giGranularity_ = Atomic::Clamp<int>(giGranularity_, 4, 16);
+            giMaxBounces_ = Urho3D::Clamp<int>(giMaxBounces_, 0, 8);
+            giGranularity_ = Urho3D::Clamp<int>(giGranularity_, 4, 16);
 
-            aoDepth_ = Atomic::Clamp<float>(aoDepth_, 0.01f, 10.0f);
-            aoMin_ = Atomic::Clamp<float>(aoMin_, 0.0f, 0.95f);
-            aoMultiply_ = Atomic::Clamp<float>(aoMultiply_, 0.01f, 100.0f);
+            aoDepth_ = Urho3D::Clamp<float>(aoDepth_, 0.01f, 10.0f);
+            aoMin_ = Urho3D::Clamp<float>(aoMin_, 0.0f, 0.95f);
+            aoMultiply_ = Urho3D::Clamp<float>(aoMultiply_, 0.01f, 100.0f);
         }
 
         void SetDefaults(GlowPreset preset = GLOW_PRESET_FAST_LOW_QUALITY)
@@ -201,7 +201,7 @@ namespace AtomicGlow
                     break;
 
                 case GLOW_PRESET_HIGH_QUALITY:
-                    lexelDensity_ = 0.5f;                    
+                    lexelDensity_ = 0.5f;
                     giEnabled_ = true;
                     nsamples_ = 256;
                     giGranularity_ = 8;

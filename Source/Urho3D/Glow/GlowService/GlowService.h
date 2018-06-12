@@ -22,12 +22,12 @@
 
 #pragma once
 
-#include <Atomic/Core/Object.h>
-#include <Atomic/Scene/Scene.h>
+#include "../../Core/Object.h"
+#include "../../Scene/Scene.h"
 
-#include <AtomicGlow/Common/GlowSettings.h>
+#include "../Common/GlowSettings.h"
 
-using namespace Atomic;
+using namespace Urho3D;
 
 namespace AtomicGlow
 {
@@ -38,7 +38,7 @@ class GlowService : public Object
 {
     friend class GlowProcess;
 
-    ATOMIC_OBJECT(GlowService, Object)
+    URHO3D_OBJECT(GlowService, Object)
 
 public:
     /// Construct.

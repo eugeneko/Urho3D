@@ -69,6 +69,15 @@ void StaticModel::RegisterObject(Context* context)
     URHO3D_ACCESSOR_ATTRIBUTE("LOD Bias", GetLodBias, SetLodBias, float, 1.0f, AM_DEFAULT);
     URHO3D_COPY_BASE_ATTRIBUTES(Drawable);
     URHO3D_ATTRIBUTE("Occlusion LOD Level", int, occlusionLodLevel_, M_MAX_UNSIGNED, AM_DEFAULT);
+
+    // ATOMIC BEGIN
+    URHO3D_ATTRIBUTE("Lightmap", bool, lightmap_, false, AM_DEFAULT);
+    URHO3D_ATTRIBUTE("Lightmap Scale", float, lightmapScale_, 1.0f, AM_DEFAULT);
+    URHO3D_ATTRIBUTE("Lightmap Size", unsigned, lightmapSize_, 0, AM_DEFAULT);
+
+    URHO3D_ATTRIBUTE("Lightmap Index", unsigned, lightmapIndex_, 0, AM_FILE | AM_NOEDIT);
+    URHO3D_ATTRIBUTE("Lightmap Tiling Offset", Vector4, lightmapTilingOffset_, Vector4(1.0f, 1.0f, 0.0f, 0.0f), AM_FILE | AM_NOEDIT);
+    // ATOMIC END
 }
 
 void StaticModel::ProcessRayQuery(const RayOctreeQuery& query, PODVector<RayQueryResult>& results)

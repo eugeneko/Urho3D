@@ -19,8 +19,8 @@
 // THE SOFTWARE.
 //
 
-#include <Atomic/IO/Log.h>
-#include <Atomic/Resource/ResourceCache.h>
+#include "../../IO/Log.h"
+#include "../../Resource/ResourceCache.h"
 
 #include "BakeModel.h"
 
@@ -78,7 +78,7 @@ bool BakeModel::LoadModel(Model *model)
 
     modelPacker_ = new ModelPacker(context_);
 
-    ATOMIC_LOGINFOF("Unpacking model: %s", model->GetName().CString());
+    URHO3D_LOGINFOF("Unpacking model: %s", model->GetName().CString());
 
     if (!modelPacker_->Unpack(model))
         return false;

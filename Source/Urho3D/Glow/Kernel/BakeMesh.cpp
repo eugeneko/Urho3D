@@ -21,11 +21,11 @@
 
 #include "EmbreeScene.h"
 
-#include <Atomic/Core/WorkQueue.h>
-#include <Atomic/IO/Log.h>
-#include <Atomic/Graphics/Zone.h>
+#include "../../Core/WorkQueue.h"
+#include "../../IO/Log.h"
+#include "../../Graphics/Zone.h"
 
-#include <AtomicGlow/Common/GlowSettings.h>
+#include "../Common/GlowSettings.h"
 
 #include "Raster.h"
 #include "LightRay.h"
@@ -440,7 +440,7 @@ bool BakeMesh::SetStaticModel(StaticModel* staticModel)
 
     if (staticModel_->GetNumGeometries() != lodLevel->mpGeometry_.Size())
     {
-        ATOMIC_LOGERROR("BakeMesh::Preprocess() - Geometry mismatch");
+        URHO3D_LOGERROR("BakeMesh::Preprocess() - Geometry mismatch");
         return false;
     }
 

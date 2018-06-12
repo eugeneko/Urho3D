@@ -1,6 +1,6 @@
 
-#include <Atomic/Graphics/IndexBuffer.h>
-#include <Atomic/Graphics/VertexBuffer.h>
+#include "../../Graphics/IndexBuffer.h"
+#include "../../Graphics/VertexBuffer.h"
 
 #include "ModelPacker.h"
 

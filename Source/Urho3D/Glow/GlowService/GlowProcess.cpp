@@ -20,10 +20,10 @@
 // THE SOFTWARE.
 //
 
-#include <Atomic/IO/Log.h>
-#include <Atomic/Core/Context.h>
-#include <Atomic/IPC/IPCBroker.h>
-#include <Atomic/IPC/IPCEvents.h>
+#include "../../IO/Log.h"
+#include "../../Core/Context.h"
+// #include "../../IPC/IPCBroker.h"
+// #include "../../IPC/IPCEvents.h"
 
 #include "../Common/GlowEvents.h"
 
@@ -36,7 +36,7 @@ namespace AtomicGlow
 
 
 // Atomic Glow Process
-GlowProcess::GlowProcess(Context* context) : IPCServer(context),
+GlowProcess::GlowProcess(Context* context) : Object(context),
     exitCalled_(false),
     resultHandler_(new GlowProcessResultHandler(context, this))
 {
@@ -71,7 +71,7 @@ bool GlowProcess::Start(const String &glowBinaryPath, const StringVector &baseAr
         return false;
     }
 
-    SubscribeToEvent(GetServerBroker(), E_ATOMICGLOWRESULT, ATOMIC_HANDLER(GlowProcess, HandleAtomicGlowResult));
+    SubscribeToEvent(GetServerBroker(), E_ATOMICGLOWRESULT, URHO3D_HANDLER(GlowProcess, HandleAtomicGlowResult));
 
     return true;
 }
@@ -80,7 +80,7 @@ void GlowProcess::HandleAtomicGlowResult(StringHash eventType, VariantMap& event
 {
     GlowService* glowService = GetSubsystem<GlowService>();
 
-    using namespace AtomicGlowResult;
+    using namespace Urho3DGlowResult;
 
     const String& result = eventData[P_RESULT].GetString();
 
@@ -136,7 +136,7 @@ void GlowProcess::HandleResult(unsigned cmdID, const VariantMap& cmdResult)
 
     if (!cmdResult.TryGetValue(P_COMMAND, variant) || variant.GetType() != VAR_STRING)
     {
-        ATOMIC_LOGERROR("GlowProcess::HandleResult() - Unable to process result, command key missing");
+        URHO3D_LOGERROR("GlowProcess::HandleResult() - Unable to process result, command key missing");
         return;
     }
 
@@ -144,7 +144,7 @@ void GlowProcess::HandleResult(unsigned cmdID, const VariantMap& cmdResult)
 
     if (!cmdResult.TryGetValue("result", variant) || variant.GetType() != VAR_STRING)
     {
-        ATOMIC_LOGERROR("GlowProcess::HandleResult() - Unable to process result, command key missing");
+        URHO3D_LOGERROR("GlowProcess::HandleResult() - Unable to process result, command key missing");
         return;
     }
 
@@ -179,7 +179,7 @@ void GlowProcessResultHandler::HandleResult(unsigned cmdID, const VariantMap& cm
 {
     if (!process_)
     {
-        ATOMIC_LOGWARNING("lowProcessResultHandler::HandleResult() - called without current Glow process");
+        URHO3D_LOGWARNING("lowProcessResultHandler::HandleResult() - called without current Glow process");
         return;
     }
 

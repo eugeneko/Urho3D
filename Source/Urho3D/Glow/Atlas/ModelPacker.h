@@ -1,11 +1,11 @@
 #pragma once
 
-#include <Atomic/Graphics/IndexBuffer.h>
-#include <Atomic/Graphics/VertexBuffer.h>
-#include <Atomic/Graphics/Geometry.h>
-#include <Atomic/Graphics/Model.h>
+#include "../../Graphics/IndexBuffer.h"
+#include "../../Graphics/VertexBuffer.h"
+#include "../../Graphics/Geometry.h"
+#include "../../Graphics/Model.h"
 
-using namespace Atomic;
+using namespace Urho3D;
 
 namespace AtomicGlow
 {
@@ -45,8 +45,6 @@ struct MPVertex
 
 class MPGeometry : public RefCounted
 {
-    ATOMIC_REFCOUNTED(MPGeometry)
-
 public:
 
     SharedPtr<Geometry> geometry_;
@@ -59,8 +57,6 @@ public:
 
 class MPLODLevel : public RefCounted
 {
-    ATOMIC_REFCOUNTED(MPLODLevel)
-
 public:
 
     /// Get the total vertex and index counts of all LOD geometry
@@ -77,7 +73,7 @@ public:
 /// Model packer/unpacker from/to packed representation (destructive!)
 class ModelPacker : public Object
 {
-    ATOMIC_OBJECT(ModelPacker, Object)
+    URHO3D_OBJECT(ModelPacker, Object)
 
 public:
 

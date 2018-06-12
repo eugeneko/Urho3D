@@ -21,10 +21,10 @@
 
 #pragma once
 
-#include <Atomic/Scene/Scene.h>
+#include "../../Scene/Scene.h"
 #include "GlowTypes.h"
 
-using namespace Atomic;
+using namespace Urho3D;
 
 namespace AtomicGlow
 {
@@ -36,12 +36,12 @@ class EmbreeScene;
 
 class SceneBaker : public Object
 {
-    ATOMIC_OBJECT(SceneBaker, Object)
+    URHO3D_OBJECT(SceneBaker, Object)
 
     public:
 
     SceneBaker(Context* context, const String& projectPath);
-    virtual ~SceneBaker();    
+    virtual ~SceneBaker();
 
     bool Light(const GlowLightMode lightMode);
     void LightFinishCycle();

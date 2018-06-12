@@ -1,3 +1,4 @@
+#if 0
 //
 // Copyright (c) 2008-2014 the Urho3D project.
 // Copyright (c) 2014-2015, THUNDERBEAST GAMES LLC All rights reserved
@@ -21,19 +22,19 @@
 // THE SOFTWARE.
 //
 
-#include <Atomic/Core/CoreEvents.h>
-#include <Atomic/Core/WorkQueue.h>
-#include <Atomic/Engine/EngineDefs.h>
-#include <Atomic/Engine/Engine.h>
-#include <Atomic/IO/FileSystem.h>
-#include <Atomic/IO/Log.h>
-#include <Atomic/IO/IOEvents.h>
+#include "../../Core/CoreEvents.h"
+#include "../../Core/WorkQueue.h"
+#include "../../Engine/EngineDefs.h"
+#include "../../Engine/Engine.h"
+#include "../../IO/FileSystem.h"
+#include "../../IO/Log.h"
+#include "../../IO/IOEvents.h"
 
-#include <Atomic/Resource/ResourceMapRouter.h>
-#include <Atomic/IPC/IPCEvents.h>
+// #include "../../Resource/ResourceMapRouter.h"
+// #include "../../IPC/IPCEvents.h"
 
-#include <ToolCore/ToolSystem.h>
-#include <ToolCore/ToolEnvironment.h>
+// #include <ToolCore/ToolSystem.h>
+// #include <ToolCore/ToolEnvironment.h>
 
 #include <AtomicGlow/Common/GlowSettings.h>
 #include <AtomicGlow/Common/GlowEvents.h>
@@ -94,7 +95,7 @@ namespace AtomicGlow
             VectorBuffer settingsBuffer = eventData["settings"].GetVectorBuffer();
             GlobalGlowSettings.Unpack(settingsBuffer);
 
-            ATOMIC_LOGINFOF("AtomicGlow baking scene: %s", sceneName.CString());
+            URHO3D_LOGINFOF("AtomicGlow baking scene: %s", sceneName.CString());
 
             sceneBaker_->SetStandaloneMode(false);
             sceneBaker_->LoadScene(sceneName);
@@ -108,7 +109,7 @@ namespace AtomicGlow
 
         if (cmd == "quit")
         {
-            ATOMIC_LOGINFO("AtomicGlow quit received, exiting");
+            URHO3D_LOGINFO("AtomicGlow quit received, exiting");
             GetSubsystem<WorkQueue>()->TerminateThreads();
             exitCode_ = EXIT_SUCCESS;
             engine_->Exit();
@@ -154,7 +155,7 @@ namespace AtomicGlow
         {
             String resultString = ToString("Scene lit in %i seconds", (int) (timer_.GetMSec(false) / 1000.0f));
 
-            ATOMIC_LOGINFO(resultString);
+            URHO3D_LOGINFO(resultString);
 
             UnsubscribeFromEvent(E_UPDATE);
 
@@ -170,7 +171,7 @@ namespace AtomicGlow
             }
             else
             {
-                using namespace AtomicGlowResult;
+                using namespace Urho3DGlowResult;
                 VariantMap eventData;
                 eventData[P_SUCCESS] = true;
                 eventData[P_RESULT] = resultString;
@@ -228,10 +229,10 @@ namespace AtomicGlow
         context_->RegisterSubsystem(new BakeMaterialCache(context_));
         context_->RegisterSubsystem(new BakeModelCache(context_));
 
-        SubscribeToEvent(E_UPDATE, ATOMIC_HANDLER(AtomicGlowApp, HandleUpdate));
-        SubscribeToEvent(E_LOGMESSAGE, ATOMIC_HANDLER(AtomicGlowApp, HandleLogMessage));
-        SubscribeToEvent(E_IPCMESSAGE, ATOMIC_HANDLER(AtomicGlowApp, HandleUpdate));
-        SubscribeToEvent(E_IPCCMD, ATOMIC_HANDLER(AtomicGlowApp, HandleIPCCmd));
+        SubscribeToEvent(E_UPDATE, URHO3D_HANDLER(AtomicGlowApp, HandleUpdate));
+        SubscribeToEvent(E_LOGMESSAGE, URHO3D_HANDLER(AtomicGlowApp, HandleLogMessage));
+        SubscribeToEvent(E_IPCMESSAGE, URHO3D_HANDLER(AtomicGlowApp, HandleUpdate));
+        SubscribeToEvent(E_IPCCMD, URHO3D_HANDLER(AtomicGlowApp, HandleIPCCmd));
 
         bool ipc = IPCClientApp::Initialize(arguments_);
 
@@ -337,3 +338,4 @@ namespace AtomicGlow
 }
 
 
+#endif // 0

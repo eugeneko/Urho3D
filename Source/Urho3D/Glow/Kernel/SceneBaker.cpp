@@ -24,15 +24,15 @@
 #include <cmath>
 #include <cfloat>
 
-#include <ThirdParty/STB/stb_rect_pack.h>
+#include <STB/stb_rect_pack.h>
 
-#include <Atomic/Core/WorkQueue.h>
-#include <Atomic/IO/Log.h>
-#include <Atomic/IO/FileSystem.h>
-#include <Atomic/Resource/ResourceCache.h>
-#include <Atomic/Graphics/Zone.h>
-#include <Atomic/Graphics/Light.h>
-#include <Atomic/Graphics/StaticModel.h>
+#include "../../Core/WorkQueue.h"
+#include "../../IO/Log.h"
+#include "../../IO/FileSystem.h"
+#include "../../Resource/ResourceCache.h"
+#include "../../Graphics/Zone.h"
+#include "../../Graphics/Light.h"
+#include "../../Graphics/StaticModel.h"
 
 #include "LightRay.h"
 #include "BakeModel.h"
@@ -64,7 +64,7 @@ bool SceneBaker::SaveLitScene()
 {
     if (!standaloneMode_)
     {
-        ATOMIC_LOGERROR("SceneBaker::SaveLitScene() - only supported in standalone mode");
+        URHO3D_LOGERROR("SceneBaker::SaveLitScene() - only supported in standalone mode");
         return false;
     }
 
@@ -100,7 +100,7 @@ bool SceneBaker::WriteBakeData(VectorBuffer& buffer)
 
 bool SceneBaker::GenerateLightmaps()
 {
-    ATOMIC_LOGINFO("Generating Lightmaps");
+    URHO3D_LOGINFO("Generating Lightmaps");
 
     for (unsigned i = 0; i < bakeMeshes_.Size(); i++)
     {
@@ -160,7 +160,7 @@ bool SceneBaker::LightDirect()
 
     if (!bakeMeshes_.Size())
     {
-        ATOMIC_LOGINFO("SceneBaker::LightDirect() - No bake meshes found");
+        URHO3D_LOGINFO("SceneBaker::LightDirect() - No bake meshes found");
         bakeLights_.Clear();
         return false;
     }
@@ -187,7 +187,7 @@ bool SceneBaker::EmitPhotons()
 
     int numPhotons = photons.Emit(bakeLights_);
 
-    ATOMIC_LOGINFOF("SceneBaker::EmitPhotons() - %i photons emitted", numPhotons);
+    URHO3D_LOGINFOF("SceneBaker::EmitPhotons() - %i photons emitted", numPhotons);
 
     if (!numPhotons)
     {
@@ -217,7 +217,7 @@ bool SceneBaker::LightGI()
         return false;
     }
 
-    ATOMIC_LOGINFOF("GI Pass #%i of %i", currentGIPass_ + 1, 1);
+    URHO3D_LOGINFOF("GI Pass #%i of %i", currentGIPass_ + 1, 1);
 
     bool photons = EmitPhotons();
 
@@ -247,11 +247,11 @@ bool SceneBaker::Light(const GlowLightMode lightMode)
         if (!LightDirect())
         {
             currentLightMode_ = GLOW_LIGHTMODE_COMPLETE;
-            ATOMIC_LOGINFO("Cycle: Direct Lighting - no work to be done");
+            URHO3D_LOGINFO("Cycle: Direct Lighting - no work to be done");
             return false;
         }
 
-        ATOMIC_LOGINFO("Cycle: Direct Lighting");
+        URHO3D_LOGINFO("Cycle: Direct Lighting");
 
         return true;
     }
@@ -265,7 +265,7 @@ bool SceneBaker::Light(const GlowLightMode lightMode)
             // We currently only need one GI pass
             if (GlobalGlowSettings.giEnabled_ && currentGIPass_ == 0)
             {
-                ATOMIC_LOGINFO("Cycle: GI - no work to be done");
+                URHO3D_LOGINFO("Cycle: GI - no work to be done");
             }
 
             return false;
@@ -350,7 +350,7 @@ bool SceneBaker::LoadScene(const String& filename)
     scene_->GetChildrenWithComponent<Zone>(zoneNodes, true);
 
     for (unsigned i = 0; i < zoneNodes.Size(); i++)
-    {        
+    {
         Zone* zone = zoneNodes[i]->GetComponent<Zone>();
 
         if (!zone->GetNode()->IsEnabled() || !zone->IsEnabled())
@@ -364,13 +364,13 @@ bool SceneBaker::LoadScene(const String& filename)
 
     // Lights
     PODVector<Node*> lightNodes;
-    scene_->GetChildrenWithComponent<Atomic::Light>(lightNodes, true);
+    scene_->GetChildrenWithComponent<Urho3D::Light>(lightNodes, true);
 
     for (unsigned i = 0; i < lightNodes.Size(); i++)
     {
         BakeLight* bakeLight = 0;
         Node* lightNode = lightNodes[i];
-        Atomic::Light* light = lightNode->GetComponent<Atomic::Light>();
+        Urho3D::Light* light = lightNode->GetComponent<Urho3D::Light>();
 
         if (!lightNode->IsEnabled() || !light->IsEnabled())
             continue;
@@ -433,7 +433,7 @@ bool SceneBaker::LoadScene(const String& filename)
 
                 if (!geo)
                 {
-                    ATOMIC_LOGERRORF("SceneBaker::LoadScene - model without geometry: %s", model->GetName().CString());
+                    URHO3D_LOGERRORF("SceneBaker::LoadScene - model without geometry: %s", model->GetName().CString());
                     return false;
                 }
 
@@ -447,7 +447,7 @@ bool SceneBaker::LoadScene(const String& filename)
 
                 if (!indexData || !indexSize || !vertexData || !vertexSize || !elements)
                 {
-                    ATOMIC_LOGERRORF("SceneBaker::LoadScene - Unable to inspect geometry elements: %s",  model->GetName().CString());
+                    URHO3D_LOGERRORF("SceneBaker::LoadScene - Unable to inspect geometry elements: %s",  model->GetName().CString());
                     return false;
                 }
 
@@ -464,7 +464,7 @@ bool SceneBaker::LoadScene(const String& filename)
 
                 if (texcoords < 2)
                 {
-                    ATOMIC_LOGERRORF("SceneBaker::LoadScene - Model without lightmap UV set, skipping: %s",  model->GetName().CString());
+                    URHO3D_LOGERRORF("SceneBaker::LoadScene - Model without lightmap UV set, skipping: %s",  model->GetName().CString());
                     continue;
                 }
 
@@ -537,7 +537,7 @@ Color SceneBaker::DirectLightFromPointSet( LightRay* lightRay, const BakeLight* 
     if (!vertexGenerator)
     {
         // this should not happen
-        ATOMIC_LOGERROR("SceneBaker::DirectLightFromPointSet - called without vertex generator");
+        URHO3D_LOGERROR("SceneBaker::DirectLightFromPointSet - called without vertex generator");
         return Color::BLACK;
     }
 
@@ -613,13 +613,13 @@ void SceneBaker::IndirectLight( LightRay* lightRay)
     for( int k = 0; k <nsamples; k++ )
     {
         Vector3 dir;
-        Vector3::GetRandomHemisphereDirection(dir, source.normal);
+        RandomHemisphereDirection(dir, source.normal);
 
         float influence = Max<float>( source.normal.DotProduct(dir), 0.0f );
 
         if (influence > 1.0f)
         {
-            // ATOMIC_LOGINFO("This shouldn't happen");
+            // URHO3D_LOGINFO("This shouldn't happen");
         }
 
         RTCRay& ray = lightRay->rtcRay_;
@@ -640,7 +640,7 @@ void SceneBaker::IndirectLight( LightRay* lightRay)
             }
 
             continue;
-        }               
+        }
 
         bakeMesh = GetEmbreeScene()->GetBakeMesh(ray.geomID);
 

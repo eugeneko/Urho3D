@@ -21,10 +21,10 @@
 // THE SOFTWARE.
 //
 
-#include <Atomic/IO/Log.h>
-#include <Atomic/Graphics/Zone.h>
+#include "../../IO/Log.h"
+#include "../../Graphics/Zone.h"
 
-#include <AtomicGlow/Common/GlowSettings.h>
+#include "../Common/GlowSettings.h"
 
 #include "EmbreeScene.h"
 
@@ -355,7 +355,7 @@ float AmbientOcclusionInfluence::Calculate(LightRay* lightRay, const Vector3& li
     for (unsigned nsamp = 0; nsamp < nsamples; nsamp++)
     {
         Vector3 rayDir;
-        Vector3::GetRandomHemisphereDirection(rayDir, source.normal);
+        RandomHemisphereDirection(rayDir, source.normal);
 
         float dotp = source.normal.x_ * rayDir.x_ +
                 source.normal.y_ * rayDir.y_ +
@@ -491,7 +491,7 @@ int PhotonEmitter::GetPhotonCount( void ) const
 void PhotonEmitter::Emit( SceneBaker* sceneBaker, Vector3& position, Vector3& direction ) const
 {
     position  = light_->GetPosition();
-    Vector3::GetRandomDirection(direction);
+    RandomDirection(direction);
 
 }
 
@@ -507,9 +507,9 @@ void DirectionalPhotonEmitter::Emit( SceneBaker* sceneBaker, Vector3& position, 
 {
     const BoundingBox& bounds = sceneBaker->GetSceneBounds();
 
-    Vector3 randomPoint(Lerp<float>(bounds.min_.x_, bounds.max_.x_, RandZeroOne()),
-                        Lerp<float>(bounds.min_.y_, bounds.max_.y_, RandZeroOne()),
-                        Lerp<float>(bounds.min_.z_, bounds.max_.z_, RandZeroOne()));
+    Vector3 randomPoint(Lerp<float>(bounds.min_.x_, bounds.max_.x_, Random(1.0f)),
+                        Lerp<float>(bounds.min_.y_, bounds.max_.y_, Random(1.0f)),
+                        Lerp<float>(bounds.min_.z_, bounds.max_.z_, Random(1.0f)));
 
 
     position  = plane_.Project(randomPoint) - direction_ * ( LIGHT_LARGE_DISTANCE * 0.5f);

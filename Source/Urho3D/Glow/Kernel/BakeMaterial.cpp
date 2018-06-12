@@ -19,10 +19,10 @@
 // THE SOFTWARE.
 //
 
-#include <Atomic/IO/Log.h>
-#include <Atomic/Resource/ResourceCache.h>
-#include <Atomic/Resource/XMLFile.h>
-#include <Atomic/Graphics/Material.h>
+#include "../../IO/Log.h"
+#include "../../Resource/ResourceCache.h"
+#include "../../Resource/XMLFile.h"
+#include "../../Graphics/Material.h"
 
 #include "BakeMaterial.h"
 
@@ -89,7 +89,7 @@ bool BakeMaterial::LoadMaterial(Material *material)
 {
     material_ = material;
 
-    ATOMIC_LOGINFOF("Material: %s", material->GetName().CString());
+    URHO3D_LOGINFOF("Material: %s", material->GetName().CString());
 
     ResourceCache* cache = GetSubsystem<ResourceCache>();
 
@@ -130,7 +130,7 @@ bool BakeMaterial::LoadMaterial(Material *material)
             if (diffuseTexture_.Null())
                 return false;
 
-            ATOMIC_LOGINFOF("diffuse: %s %ux%u", name.CString(), diffuseTexture_->GetWidth(), diffuseTexture_->GetHeight());
+            URHO3D_LOGINFOF("diffuse: %s %ux%u", name.CString(), diffuseTexture_->GetWidth(), diffuseTexture_->GetHeight());
         }
 
         textureElem = textureElem.GetNext("texture");

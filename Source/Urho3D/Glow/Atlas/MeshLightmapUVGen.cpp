@@ -1,7 +1,7 @@
 
-#include <ThirdParty/thekla/thekla_atlas.h>
+#include <thekla/thekla_atlas.h>
 
-#include <Atomic/IO/Log.h>
+#include "../../IO/Log.h"
 
 #include "ModelPacker.h"
 #include "MeshLightmapUVGen.h"
@@ -46,7 +46,7 @@ inline void MeshLightmapUVGen::EmitVertex(PODVector<MPVertex>& vertices, unsigne
 
 void MeshLightmapUVGen::WriteLightmapUVCoords()
 {
-    
+
     //Thekla::atlas_write_debug_textures(tOutputMesh_, tInputMesh_, ToString("/Users/jenge/Desktop/%s_lmWorldSpaceTexture.png", modelName.CString()).CString() ,
     //                                                              ToString("/Users/jenge/Desktop/%s_lmNormalTexture.png", modelName.CString()).CString() );
 
@@ -264,7 +264,7 @@ bool MeshLightmapUVGen::Generate()
 
                 if (tface.vertex_index[0] > totalVertices || tface.vertex_index[1] > totalVertices || tface.vertex_index[2] > totalVertices)
                 {
-                    ATOMIC_LOGERROR("Vertex overflow");
+                    URHO3D_LOGERROR("Vertex overflow");
                     return false;
                 }
 

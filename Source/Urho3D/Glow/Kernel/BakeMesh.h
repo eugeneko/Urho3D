@@ -23,9 +23,9 @@
 
 #include "Embree.h"
 
-#include <Atomic/Core/Thread.h>
-#include <Atomic/Core/Mutex.h>
-#include <Atomic/Graphics/StaticModel.h>
+#include "../../Core/Thread.h"
+#include "../../Core/Mutex.h"
+#include "../../Graphics/StaticModel.h"
 
 #include "BakeMaterial.h"
 #include "BakeModel.h"
@@ -36,7 +36,7 @@
 namespace AtomicGlow
 {
 
-using namespace Atomic;
+using namespace Urho3D;
 
 class LightRay;
 class SceneBaker;
@@ -48,7 +48,7 @@ class BakeMesh : public BakeNode
 {
     friend class BounceBakeLight;
 
-    ATOMIC_OBJECT(BakeMesh, BakeNode)
+    URHO3D_OBJECT(BakeMesh, BakeNode)
 
     public:
 
@@ -93,7 +93,7 @@ class BakeMesh : public BakeNode
     bool SetStaticModel(StaticModel* staticModel);
 
     /// Get world space bounding box
-    const BoundingBox& GetBoundingBox() const { return boundingBox_; }    
+    const BoundingBox& GetBoundingBox() const { return boundingBox_; }
     const SharedArrayPtr<MMVertex>& GetVertices(unsigned& numVertices) const { numVertices = numVertices_; return vertices_; }
     const SharedArrayPtr<MMTriangle>& GetTriangles(unsigned& numTriangles) const { numTriangles = numTriangles_; return triangles_; }
 
@@ -189,7 +189,7 @@ private:
 
     // resources
     PODVector<BakeMaterial*> bakeMaterials_;
-    SharedPtr<BakeModel> bakeModel_;    
+    SharedPtr<BakeModel> bakeModel_;
 
     // lights affecting this mesh
     PODVector<BakeLight*> bakeLights_;

@@ -101,6 +101,23 @@ public:
     /// Return materials attribute.
     const ResourceRefList& GetMaterialsAttr() const;
 
+    // ATOMIC BEGIN
+    bool GetLightmap() const { return lightmap_; }
+    void SetLightmap(bool lightmap) { lightmap_ = lightmap; }
+
+    float GetLightmapScale() const { return lightmapScale_; }
+    void SetLightmapScale(float scale) { lightmapScale_ = scale; }
+
+    unsigned GetLightmapSize() const { return lightmapSize_; }
+    void SetLightmapSize(unsigned size) { lightmapSize_ = size; }
+
+    unsigned GetLightmapIndex() const { return lightmapIndex_; }
+    void SetLightmapIndex(unsigned idx) { lightmapIndex_ = idx; }
+
+    const Vector4& GetLightmapTilingOffset() const { return lightmapTilingOffset_; }
+    void SetLightmapTilingOffset(Vector4 tilingOffset) { lightmapTilingOffset_ = tilingOffset; }
+    // ATOMIC END
+
 protected:
     /// Recalculate the world-space bounding box.
     void OnWorldBoundingBoxUpdate() override;
@@ -123,6 +140,17 @@ protected:
     unsigned occlusionLodLevel_;
     /// Material list attribute.
     mutable ResourceRefList materialsAttr_;
+
+    // ATOMIC BEGIN
+
+    bool lightmap_{};
+    float lightmapScale_{ 1.0f };
+    unsigned lightmapSize_{};
+
+    unsigned lightmapIndex_{};
+    Vector4 lightmapTilingOffset_{ 1.0f, 1.0f, 0.0f, 0.0f };
+
+    // ATOMIC END
 
 private:
     /// Handle model reload finished.

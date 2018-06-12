@@ -23,24 +23,24 @@
 
 #include "Embree.h"
 
-#include <Atomic/Core/Object.h>
+#include "../../Core/Object.h"
 
 namespace AtomicGlow
 {
 
-using namespace Atomic;
+using namespace Urho3D;
 
 class EmbreeScenePrivate;
 class BakeMesh;
 
 class EmbreeScene : public Object
 {
-    ATOMIC_OBJECT(EmbreeScene, Object)
+    URHO3D_OBJECT(EmbreeScene, Object)
 
     public:
 
     EmbreeScene(Context* context);
-    virtual ~EmbreeScene();    
+    virtual ~EmbreeScene();
 
     void Commit();
 

@@ -19,7 +19,7 @@
 // THE SOFTWARE.
 //
 
-#include <Atomic/Resource/Image.h>
+#include "../../Resource/Image.h"
 
 #include "LightMap.h"
 

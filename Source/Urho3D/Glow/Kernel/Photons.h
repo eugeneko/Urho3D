@@ -23,13 +23,13 @@
 
 #pragma once
 
-#include <Atomic/Container/RefCounted.h>
-#include <Atomic/Container/ArrayPtr.h>
+#include "../../Container/RefCounted.h"
+#include "../../Container/ArrayPtr.h"
 
 #include "LightRay.h"
 #include "BakeLight.h"
 
-using namespace Atomic;
+using namespace Urho3D;
 
 namespace AtomicGlow
 {
@@ -41,8 +41,6 @@ const int PHOTON_TRI_INVALID = -1;
 
 class PhotonMap : public RefCounted
 {
-    ATOMIC_REFCOUNTED(PhotonMap)
-
 public:
 
     struct Photon
@@ -201,9 +199,6 @@ private:
 
 class Photons : public RefCounted
 {
-
-    ATOMIC_REFCOUNTED(Photon)
-
 public:
 
     // Constructs a Photons instance.

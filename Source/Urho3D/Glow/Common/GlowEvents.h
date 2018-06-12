@@ -22,19 +22,19 @@
 
 #pragma once
 
-#include <Atomic/Core/Object.h>
+#include "../../Core/Object.h"
 
-using namespace Atomic;
+using namespace Urho3D;
 
 namespace AtomicGlow
 {
 
 // Glow process -> Glow Service event
-ATOMIC_EVENT(E_ATOMICGLOWRESULT, AtomicGlowResult)
+URHO3D_EVENT(E_ATOMICGLOWRESULT, AtomicGlowResult)
 {
-    ATOMIC_PARAM(P_SUCCESS, Success);    // bool
-    ATOMIC_PARAM(P_RESULT, Result);    // String
-    ATOMIC_PARAM(P_BAKEDATA, BakeData);  // VectorBuffer
+    URHO3D_PARAM(P_SUCCESS, Success);    // bool
+    URHO3D_PARAM(P_RESULT, Result);    // String
+    URHO3D_PARAM(P_BAKEDATA, BakeData);  // VectorBuffer
 }
 
 }

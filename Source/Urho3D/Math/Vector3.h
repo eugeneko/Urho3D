@@ -513,4 +513,39 @@ inline IntVector3 VectorMax(const IntVector3& lhs, const IntVector3& rhs) { retu
 /// Return a random value from [0, 1) from 3-vector seed.
 inline float StableRandom(const Vector3& seed) { return StableRandom(Vector2(StableRandom(Vector2(seed.x_, seed.y_)), seed.z_)); }
 
+inline void RandomDirection(Vector3& result)
+{
+    float  len;
+
+    do
+    {
+        result.x_ = (Random(1.0f) * 2.0f - 1.0f);
+        result.y_ = (Random(1.0f) * 2.0f - 1.0f);
+        result.z_ = (Random(1.0f) * 2.0f - 1.0f);
+        len = result.Length();
+
+    } while (len > 1.0f);
+
+    result /= len;
+}
+
+inline void RandomHemisphereDirection(Vector3& result, const Vector3& normal)
+{
+    RandomDirection(result);
+
+    if (result.DotProduct(normal) < 0)
+        result = -result;
+}
+
+inline float AreaOfTriangle(const Vector3& v0, const Vector3& v1, const Vector3& v2)
+{
+    float a = (v0 - v1).Length();
+    float b = (v1 - v2).Length();
+    float c = (v2 - v0).Length();
+
+    float s = (a + b + c) * 0.5f;
+
+    return (float)Sqrt<float>(s * (s - a) * (s - b) * (s - c));
+}
+
 }

@@ -21,14 +21,14 @@
 
 #pragma once
 
-#include <AtomicGlow/Atlas/ModelPacker.h>
+#include "../Atlas/ModelPacker.h"
 
 namespace AtomicGlow
 {
 
 class BakeModel : public Object
 {
-    ATOMIC_OBJECT(BakeModel, Object)
+    URHO3D_OBJECT(BakeModel, Object)
 
     public:
 
@@ -47,7 +47,7 @@ private:
 
 class BakeModelCache : public Object
 {
-    ATOMIC_OBJECT(BakeModelCache, Object)
+    URHO3D_OBJECT(BakeModelCache, Object)
 
     public:
 

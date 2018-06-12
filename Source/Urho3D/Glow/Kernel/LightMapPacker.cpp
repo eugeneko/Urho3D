@@ -19,11 +19,11 @@
 // THE SOFTWARE.
 //
 
-#include <ThirdParty/STB/stb_rect_pack.h>
+#include <STB/stb_rect_pack.h>
 
-#include <Atomic/IO/Log.h>
-#include <Atomic/IO/FileSystem.h>
-#include <Atomic/Resource/Image.h>
+#include "../../IO/Log.h"
+#include "../../IO/FileSystem.h"
+#include "../../Resource/Image.h"
 
 #include "BakeMesh.h"
 #include "LightMapPacker.h"
@@ -196,7 +196,7 @@ void LightMapPacker::EmitLightmap(unsigned lightMapID)
 
     if (!stbrp_pack_rects (&rectContext, (stbrp_rect *)rects.Get(), workingSet_.Size()))
     {
-        ATOMIC_LOGERROR("SceneBaker::Light() - not all rects packed");
+        URHO3D_LOGERROR("SceneBaker::Light() - not all rects packed");
         return;
     }
 
@@ -212,7 +212,7 @@ void LightMapPacker::EmitLightmap(unsigned lightMapID)
 
         if (!rect->was_packed)
         {
-            ATOMIC_LOGERROR("LightMapPacker::Light() - skipping unpacked lightmap");
+            URHO3D_LOGERROR("LightMapPacker::Light() - skipping unpacked lightmap");
             continue;
         }
 
@@ -248,7 +248,7 @@ void LightMapPacker::EmitLightmap(unsigned lightMapID)
 }
 
 bool LightMapPacker::SaveLightmaps(const String &projectPath, const String &scenePath)
-{    
+{
     FileSystem* fileSystem = GetSubsystem<FileSystem>();
 
     for (unsigned i = 0; i < lightMaps_.Size(); i++)
@@ -271,13 +271,13 @@ bool LightMapPacker::SaveLightmaps(const String &projectPath, const String &scen
 
         if (!fileSystem->DirExists(folder))
         {
-            ATOMIC_LOGERRORF("LightMapPacker::SaveLightmaps - Unable to create folder: %s", folder.CString());
+            URHO3D_LOGERRORF("LightMapPacker::SaveLightmaps - Unable to create folder: %s", folder.CString());
             return false;
         }
 
         String filename = ToString("%sLightmap%u.%s", folder.CString(), lightmap->GetID(), format);
 
-        ATOMIC_LOGINFOF("Saving Lightmap: %s", filename.CString());
+        URHO3D_LOGINFOF("Saving Lightmap: %s", filename.CString());
 
         GlobalGlowSettings.outputFormat_ == GLOW_OUTPUT_PNG ? lightmap->GetImage()->SavePNG(filename) : lightmap->GetImage()->SaveDDS(filename);
 

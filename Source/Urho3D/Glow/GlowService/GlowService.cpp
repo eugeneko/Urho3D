@@ -20,10 +20,10 @@
 // THE SOFTWARE.
 //
 
-#include <Atomic/IO/Log.h>
-#include <Atomic/IO/FileSystem.h>
-#include <Atomic/IPC/IPCEvents.h>
-#include <Atomic/Graphics/StaticModel.h>
+#include "../../IO/Log.h"
+#include "../../IO/FileSystem.h"
+// #include "../../IPC/IPCEvents.h"
+#include "../../Graphics/StaticModel.h"
 
 #include "GlowProcess.h"
 #include "GlowServiceEvents.h"
@@ -71,7 +71,7 @@ void GlowService::OnGlowProcessExited()
 
 void GlowService::OnBakeError(const String& result)
 {
-    ATOMIC_LOGERRORF("%s", result.CString());
+    URHO3D_LOGERRORF("%s", result.CString());
     glowProcess_->Exit();
 
     using namespace AtomicGlowServiceBakeResult;
@@ -91,7 +91,7 @@ void GlowService::OnBakeSuccess()
 
     VariantMap eventData;
     eventData[P_RESULT] = "success";
-    eventData[P_SUCCESS] = true;    
+    eventData[P_SUCCESS] = true;
 
     SendEvent(E_ATOMICGLOWSERVICEBAKERESULT, eventData);
 
@@ -101,7 +101,7 @@ void GlowService::ProcessBakeData(VectorBuffer& bakeData)
 {
     if (!scene_)
     {
-        ATOMIC_LOGERROR("GlowService::ProcessBakeData() - called with null scene");
+        URHO3D_LOGERROR("GlowService::ProcessBakeData() - called with null scene");
         return;
     }
 
@@ -131,7 +131,7 @@ void GlowService::ProcessBakeData(VectorBuffer& bakeData)
 
                 if (!staticModel || staticModel->GetID() != staticModelID)
                 {
-                    ATOMIC_LOGERROR("GlowService::ProcessBakeData() - mismatched node <-> static model ID");
+                    URHO3D_LOGERROR("GlowService::ProcessBakeData() - mismatched node <-> static model ID");
                     return;
                 }
 
@@ -142,7 +142,7 @@ void GlowService::ProcessBakeData(VectorBuffer& bakeData)
 
         if (!node)
         {
-            ATOMIC_LOGERROR("GlowService::ProcessBakeData() - unable to find node ID");
+            URHO3D_LOGERROR("GlowService::ProcessBakeData() - unable to find node ID");
             return;
         }
 
@@ -158,7 +158,7 @@ bool GlowService::Bake(const String& projectPath, Scene* scene, const GlowSettin
 {
     if (!scene)
     {
-        ATOMIC_LOGERROR("GlowService::Bake() - Called with null scene");
+        URHO3D_LOGERROR("GlowService::Bake() - Called with null scene");
         return false;
     }
 
@@ -166,26 +166,26 @@ bool GlowService::Bake(const String& projectPath, Scene* scene, const GlowSettin
 
     if (!sceneName.Length())
     {
-        ATOMIC_LOGERROR("GlowService::Bake() - Called with unnamed scene");
+        URHO3D_LOGERROR("GlowService::Bake() - Called with unnamed scene");
         return false;
     }
 
     if (!projectPath.Length())
     {
-        ATOMIC_LOGERROR("GlowService::Bake() - zero length projectPath");
+        URHO3D_LOGERROR("GlowService::Bake() - zero length projectPath");
         return false;
     }
 
 
     if (glowProcess_.NotNull())
     {
-        ATOMIC_LOGERROR("GlowService::Bake() - Called with existing glow process");
+        URHO3D_LOGERROR("GlowService::Bake() - Called with existing glow process");
         return false;
     }
 
     if (!glowBinaryPath_.Length())
     {
-        ATOMIC_LOGERROR("GlowService::Bake() - Called with empty glowBinaryPath_");
+        URHO3D_LOGERROR("GlowService::Bake() - Called with empty glowBinaryPath_");
         return false;
     }
 
@@ -204,7 +204,7 @@ bool GlowService::Bake(const String& projectPath, Scene* scene, const GlowSettin
 
     if (!glowProcess_->Start(glowBinaryPath_, args))
     {
-        ATOMIC_LOGERRORF("GlowService::Bake() - Glow process failed to start: %s", glowBinaryPath_.CString());
+        URHO3D_LOGERRORF("GlowService::Bake() - Glow process failed to start: %s", glowBinaryPath_.CString());
         return false;
     }
 
@@ -232,7 +232,7 @@ void GlowService::CancelBake()
 
     if (glowProcess_.Null())
     {
-        ATOMIC_LOGERROR("GlowService::CancelBake() - Called without existing glow process");
+        URHO3D_LOGERROR("GlowService::CancelBake() - Called without existing glow process");
         return;
     }
 
@@ -276,7 +276,7 @@ bool GlowService::LocateServiceExecutable()
 
     if (!fileSystem->FileExists(glowBinaryPath_))
     {
-        ATOMIC_LOGERRORF("AtomicGlow binary not found: %s", glowBinaryPath_.CString());
+        URHO3D_LOGERRORF("AtomicGlow binary not found: %s", glowBinaryPath_.CString());
 
         glowBinaryPath_.Clear();
         glowBaseArgs_.Clear();
@@ -307,7 +307,7 @@ bool GlowService::Start()
 {
     if (!LocateServiceExecutable())
     {
-        ATOMIC_LOGERROR("GlowService::Start() - Unable to start AtomicGlow service");
+        URHO3D_LOGERROR("GlowService::Start() - Unable to start AtomicGlow service");
         return false;
     }
 

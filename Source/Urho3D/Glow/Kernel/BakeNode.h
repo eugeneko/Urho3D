@@ -21,11 +21,11 @@
 
 #pragma once
 
-#include <Atomic/Scene/Node.h>
+#include "../../Scene/Node.h"
 
 #include "GlowTypes.h"
 
-using namespace Atomic;
+using namespace Urho3D;
 
 namespace AtomicGlow
 {
@@ -34,7 +34,7 @@ class SceneBaker;
 
 class BakeNode : public Object
 {
-    ATOMIC_OBJECT(BakeNode, Object)
+    URHO3D_OBJECT(BakeNode, Object)
 
 public:
 
