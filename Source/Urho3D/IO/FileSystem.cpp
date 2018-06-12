@@ -358,6 +358,58 @@ bool FileSystem::CreateDir(const String& pathName)
     return success;
 }
 
+bool FileSystem::CreateDirsRecursive(const String& directoryIn)
+{
+    String directory = AddTrailingSlash(GetInternalPath(directoryIn));
+
+    if (DirExists(directory))
+        return true;
+
+    if (FileExists(directory))
+        return false;
+
+    String parentPath = directory;
+
+    Vector<String> paths;
+
+    paths.Push(directory);
+
+    while (true)
+    {
+        parentPath = GetParentPath(parentPath);
+
+        if (!parentPath.Length())
+            break;
+
+        paths.Push(parentPath);
+    }
+
+    if (!paths.Size())
+        return false;
+
+    for (int i = (int)(paths.Size() - 1); i >= 0; i--)
+    {
+        const String& pathName = paths[i];
+
+        if (FileExists(pathName))
+            return false;
+
+        if (DirExists(pathName))
+            continue;
+
+        if (!CreateDir(pathName))
+            return false;
+
+        // double check
+        if (!DirExists(pathName))
+            return false;
+
+    }
+
+    return true;
+
+}
+
 void FileSystem::SetExecuteConsoleCommands(bool enable)
 {
     if (enable == executeConsoleCommands_)

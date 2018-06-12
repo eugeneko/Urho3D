@@ -171,7 +171,7 @@ namespace AtomicGlow
             }
             else
             {
-                using namespace Urho3DGlowResult;
+                using namespace AtomicGlowResult;
                 VariantMap eventData;
                 eventData[P_SUCCESS] = true;
                 eventData[P_RESULT] = resultString;

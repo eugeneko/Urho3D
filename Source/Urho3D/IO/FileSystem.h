@@ -53,6 +53,10 @@ public:
     bool SetCurrentDir(const String& pathName);
     /// Create a directory.
     bool CreateDir(const String& pathName);
+    // ATOMIC BEGIN
+    bool CreateDirsRecursive(const String& directoryIn);
+    // ATOMIC END
+
     /// Set whether to execute engine console commands as OS-specific system command.
     void SetExecuteConsoleCommands(bool enable);
     /// Run a program using the command interpreter, block until it exits and return the exit code. Will fail if any allowed paths are defined.

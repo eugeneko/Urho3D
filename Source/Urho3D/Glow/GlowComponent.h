@@ -95,6 +95,8 @@ private:
     float aoMin_;
     float aoMultiply_;
 
+    // TODO Remove this hack
+    static bool stub_;
 };
 
 

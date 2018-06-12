@@ -321,19 +321,11 @@ bool SceneBaker::Preprocess()
     return true;
 }
 
-bool SceneBaker::LoadScene(const String& filename)
+bool SceneBaker::LoadScene(const XMLElement& sceneXML)
 {
-    ResourceCache* cache = GetSubsystem<ResourceCache>();
-    SharedPtr<File> file = cache->GetFile(filename);
-
-    if (!file || !file->IsOpen())
-    {
-        return false;
-    }
-
     scene_ = new Scene(context_);
 
-    if (!scene_->LoadXML(*file))
+    if (!scene_->LoadXML(sceneXML))
     {
         scene_ = 0;
         return false;

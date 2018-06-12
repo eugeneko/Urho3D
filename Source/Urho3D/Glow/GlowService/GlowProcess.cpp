@@ -1,3 +1,4 @@
+#if 0
 //
 // Copyright (c) 2014-2017 THUNDERBEAST GAMES LLC
 //
@@ -80,7 +81,7 @@ void GlowProcess::HandleAtomicGlowResult(StringHash eventType, VariantMap& event
 {
     GlowService* glowService = GetSubsystem<GlowService>();
 
-    using namespace Urho3DGlowResult;
+    using namespace AtomicGlowResult;
 
     const String& result = eventData[P_RESULT].GetString();
 
@@ -164,7 +165,7 @@ void GlowProcess::HandleResult(unsigned cmdID, const VariantMap& cmdResult)
 // Result Handler
 
 GlowProcessResultHandler::GlowProcessResultHandler(Context* context, GlowProcess* process) :
-    IPCResultHandler(context),
+    Object(context),
     process_(process)
 {
 
@@ -190,3 +191,4 @@ void GlowProcessResultHandler::HandleResult(unsigned cmdID, const VariantMap& cm
 
 }
 
+#endif // 0

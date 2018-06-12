@@ -1,3 +1,4 @@
+#if 0
 //
 // Copyright (c) 2014-2017 THUNDERBEAST GAMES LLC
 //
@@ -318,3 +319,4 @@ bool GlowService::Start()
 
 
 }
+#endif // 0

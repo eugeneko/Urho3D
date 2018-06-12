@@ -48,18 +48,18 @@ inline const T & _clamp(const T & x, const T & a, const T & b)
 
 inline bool isFinite(const float f)
 {
-
-#ifdef ATOMIC_PLATFORM_WINDOWS
-    return _finite(f) != 0;
-#endif
-
-#ifdef ATOMIC_PLATFORM_OSX
-    return isfinite(f);
-#endif
-
-#ifdef ATOMIC_PLATFORM_LINUX
-    return finitef(f);
-#endif
+    return std::isfinite(f);
+// #ifdef ATOMIC_PLATFORM_WINDOWS
+//     return _finite(f) != 0;
+// #endif
+//
+// #ifdef ATOMIC_PLATFORM_OSX
+//     return isfinite(f);
+// #endif
+//
+// #ifdef ATOMIC_PLATFORM_LINUX
+//     return finitef(f);
+// #endif
 
 }
 

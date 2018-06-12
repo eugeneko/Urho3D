@@ -22,11 +22,17 @@
 
 #include "../IO/Log.h"
 #include "../Core/Context.h"
+#include "../Graphics/StaticModel.h"
+#include "../Resource/XMLFile.h"
 
 // #include <ToolCore/ToolSystem.h>
 // #include <ToolCore/Project/Project.h>
 
-#include "Glow/GlowService/GlowService.h"
+#include "Common/GlowSettings.h"
+#include "Common/GlowEvents.h"
+#include "Kernel/BakeModel.h"
+#include "Kernel/BakeMaterial.h"
+#include "Kernel/SceneBaker.h"
 #include "GlowComponent.h"
 
 // using namespace ToolCore;
@@ -80,40 +86,105 @@ void GlowComponent::CopyToGlowSettings(GlowSettings& settings) const
     settings.aoMultiply_ = aoMultiply_;
 }
 
+bool GlowComponent::stub_ = false;
+
 bool GlowComponent::Bake()
 {
+    const String projectPath = "D:/";
+    auto sceneCopy = MakeShared<XMLFile>(context_);
+    GetScene()->SaveXML(sceneCopy->GetOrCreateRoot("scene"));
 
-    GlowService* glowService = GetSubsystem<GlowService>();
+    auto sceneBaker = MakeShared<SceneBaker>(context_, projectPath);
+    sceneBaker->SetStandaloneMode(false);
+    sceneBaker->LoadScene(sceneCopy->GetRoot());
 
-    if (!glowService)
+    while (sceneBaker->GetCurrentLightMode() != GLOW_LIGHTMODE_COMPLETE)
     {
-        URHO3D_LOGERROR("GlowComponent::Bake() - Unable ot get glow service");
-        return false;
+        if (sceneBaker->GetCurrentLightMode() == GLOW_LIGHTMODE_UNDEFINED)
+        {
+
+            // light mode will either move to direct or complete, depending on work to do
+            sceneBaker->Light(GLOW_LIGHTMODE_DIRECT);
+            continue;
+        }
+
+        if (sceneBaker->GetCurrentLightMode() == GLOW_LIGHTMODE_DIRECT)
+        {
+            sceneBaker->LightFinishCycle();
+
+            // light mode will either move to indirect or complete, depending on work to do
+            sceneBaker->Light(GLOW_LIGHTMODE_INDIRECT);
+            continue;
+        }
+
+        if (sceneBaker->GetCurrentLightMode() == GLOW_LIGHTMODE_INDIRECT)
+        {
+            sceneBaker->LightFinishCycle();
+
+            // light mode will either move to indirect or complete, depending on work to do
+            sceneBaker->Light(GLOW_LIGHTMODE_INDIRECT);
+            continue;
+        }
     }
 
-    SubscribeToEvent(E_ATOMICGLOWSERVICEBAKERESULT, URHO3D_HANDLER(GlowComponent, HandleAtomicGlowServiceBakeResult));
-    SubscribeToEvent(E_ATOMICGLOWSERVICELOGEVENT, URHO3D_HANDLER(GlowComponent, HandleAtomicGlowServiceLogEvent));
-    SubscribeToEvent(E_ATOMICGLOWBAKECANCEL, URHO3D_HANDLER(GlowComponent, HandleAtomicGlowBakeCancel));
+    // if we're done, exit in standalone mode, or send IPC event if
+    // running off Glow service
+    sceneBaker->GenerateLightmaps();
 
-    GlowSettings settings;
-    CopyToGlowSettings(settings);
-    settings.Validate();
-    SetFromGlowSettings(settings);
+    VectorBuffer bakeData = sceneBaker->GetBakeData();
 
-    ToolSystem* toolSystem = GetSubsystem<ToolSystem>();
-    if (!toolSystem)
-        return false;
+    unsigned count = bakeData.ReadUInt();
 
-    Project* project = toolSystem->GetProject();
-    if (!project)
-        return false;
+    PODVector<Node*> children;
 
-    return glowService->Bake(project->GetProjectPath(), GetScene(), settings);
+    GetScene()->GetChildrenWithComponent<StaticModel>(children, true);
+
+    for (unsigned i = 0; i < count; i++)
+    {
+        Node* node = 0;
+        StaticModel* staticModel = 0;
+
+        unsigned nodeID = bakeData.ReadUInt();
+        unsigned staticModelID = bakeData.ReadUInt();
+        unsigned lightMask = bakeData.ReadUInt();
+        unsigned lightmapIndex = bakeData.ReadUInt();
+        Vector4 tilingOffset = bakeData.ReadVector4();
+
+        for (unsigned j = 0; j < children.Size(); j++)
+        {
+            if (children[j]->GetID() == nodeID)
+            {
+                node = children[j];
+                staticModel = node->GetComponent<StaticModel>();
+
+                if (!staticModel || staticModel->GetID() != staticModelID)
+                {
+                    URHO3D_LOGERROR("GlowService::ProcessBakeData() - mismatched node <-> static model ID");
+                    return false;
+                }
+
+                break;
+            }
+
+        }
+
+        if (!node)
+        {
+            URHO3D_LOGERROR("GlowService::ProcessBakeData() - unable to find node ID");
+            return false;
+        }
+
+        staticModel->SetLightMask(lightMask);
+        staticModel->SetLightmapIndex(lightmapIndex);
+        staticModel->SetLightmapTilingOffset(tilingOffset);
+    }
+
+    return true;
 }
 
 void GlowComponent::HandleAtomicGlowBakeCancel(StringHash eventType, VariantMap& eventData)
 {
-    GetSubsystem<GlowService>()->CancelBake();
+//     GetSubsystem<GlowService>()->CancelBake();
 }
 
 void GlowComponent::HandleAtomicGlowServiceBakeResult(StringHash eventType, VariantMap& eventData)
@@ -149,6 +220,8 @@ void GlowComponent::RegisterObject(Context* context)
     URHO3D_ATTRIBUTE("AO Samples", int, nsamples_, 64, AM_FILE);
     URHO3D_ATTRIBUTE("AO Min", float, aoMin_, 0.45f, AM_FILE);
     URHO3D_ATTRIBUTE("AO Multiply", float, aoMultiply_, 1.0f, AM_FILE);
+
+    URHO3D_ATTRIBUTE("Bake", bool, stub_, false, AM_EDIT);
 
 }
 

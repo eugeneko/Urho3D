@@ -46,7 +46,7 @@ class SceneBaker : public Object
     bool Light(const GlowLightMode lightMode);
     void LightFinishCycle();
 
-    bool LoadScene(const String& filename);
+    bool LoadScene(const XMLElement& sceneXML);
 
     bool GenerateLightmaps();
 
