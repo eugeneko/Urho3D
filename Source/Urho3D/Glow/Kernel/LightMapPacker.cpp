@@ -19,14 +19,15 @@
 // THE SOFTWARE.
 //
 
-#include <STB/stb_rect_pack.h>
-
 #include "../../IO/Log.h"
 #include "../../IO/FileSystem.h"
 #include "../../Resource/Image.h"
 
 #include "BakeMesh.h"
 #include "LightMapPacker.h"
+
+#define STB_RECT_PACK_IMPLEMENTATION
+#include <STB/stb_rect_pack.h>
 
 namespace AtomicGlow
 {

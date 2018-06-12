@@ -43,6 +43,11 @@
 #include "SceneBaker.h"
 #include "Photons.h"
 
+// #define STRINGIFY(x) #x
+// #define TOSTRING(x) STRINGIFY(x)
+// #define PRINT(x) static_assert(0, TOSTRING(x))
+// PRINT(RTCORE_API);
+
 namespace AtomicGlow
 {
 
