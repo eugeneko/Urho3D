@@ -156,8 +156,8 @@ bool ModelPacker::Pack()
                 startIndexOffset = 0;
             }
 
-            unsigned char* vertexData = vb->GetShadowData();
-            unsigned char* indexData = ib->GetShadowData();
+            unsigned char* vertexData = (unsigned char*)vb->Lock(0, totalVertices);
+            unsigned char* indexData = (unsigned char*)ib->Lock(0, totalIndices);
 
             assert(vertexData);
             assert(indexData);
@@ -210,7 +210,7 @@ bool ModelPacker::Pack()
                         *vertexDest++ = vertex.normal_.y_;
                         *vertexDest++ = vertex.normal_.z_;
                     }
-                    if (element.type_ == TYPE_UBYTE4 && element.semantic_ == SEM_COLOR)
+                    if ((element.type_ == TYPE_UBYTE4 || element.type_ == TYPE_UBYTE4_NORM) && element.semantic_ == SEM_COLOR)
                     {
                         *((unsigned*)vertexDest) = vertex.color_;
                         vertexDest++;
@@ -246,6 +246,8 @@ bool ModelPacker::Pack()
             // Update geometry, note that this assumes geometry center, etc are consistent with original
             Geometry* geom = mpGeo->geometry_;
 
+            ib->Unlock();
+            vb->Unlock();
             geom->SetIndexBuffer(ib);
             geom->SetVertexBuffer(0, vb);
             geom->SetDrawRange(TRIANGLE_LIST, startIndexOffset, mpGeo->numIndices_, true);
@@ -384,7 +386,7 @@ bool ModelPacker::UnpackGeometry(MPLODLevel *level, Geometry* geometry)
         {
             normalData = vertexData + element.offset_;
         }
-        else if (element.type_ == TYPE_UBYTE4 && element.semantic_ == SEM_COLOR)
+        else if ((element.type_ == TYPE_UBYTE4 || element.type_ == TYPE_UBYTE4_NORM) && element.semantic_ == SEM_COLOR)
         {
             colorData = vertexData + element.offset_;
         }

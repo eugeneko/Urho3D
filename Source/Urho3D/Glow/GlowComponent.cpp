@@ -22,6 +22,7 @@
 
 #include "../IO/Log.h"
 #include "../Core/Context.h"
+#include "../Core/WorkQueue.h"
 #include "../Graphics/StaticModel.h"
 #include "../Resource/XMLFile.h"
 
@@ -90,16 +91,31 @@ bool GlowComponent::stub_ = false;
 
 bool GlowComponent::Bake()
 {
+    if (!GetSubsystem<BakeModelCache>())
+    {
+        context_->RegisterSubsystem<BakeModelCache>();
+    }
+    if (!GetSubsystem<BakeMaterialCache>())
+    {
+        context_->RegisterSubsystem<BakeMaterialCache>();
+    }
+
     const String projectPath = "D:/";
     auto sceneCopy = MakeShared<XMLFile>(context_);
     GetScene()->SaveXML(sceneCopy->GetOrCreateRoot("scene"));
 
     auto sceneBaker = MakeShared<SceneBaker>(context_, projectPath);
     sceneBaker->SetStandaloneMode(false);
-    sceneBaker->LoadScene(sceneCopy->GetRoot());
+    if (!sceneBaker->LoadScene(sceneCopy->GetRoot()))
+    {
+        assert(0);
+        return false;
+    }
 
     while (sceneBaker->GetCurrentLightMode() != GLOW_LIGHTMODE_COMPLETE)
     {
+        GetSubsystem<WorkQueue>()->Complete(M_MAX_UNSIGNED);
+
         if (sceneBaker->GetCurrentLightMode() == GLOW_LIGHTMODE_UNDEFINED)
         {
 
@@ -132,6 +148,7 @@ bool GlowComponent::Bake()
     sceneBaker->GenerateLightmaps();
 
     VectorBuffer bakeData = sceneBaker->GetBakeData();
+    bakeData.Seek(0);
 
     unsigned count = bakeData.ReadUInt();
 

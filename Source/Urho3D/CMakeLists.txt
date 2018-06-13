@@ -571,7 +571,7 @@ if (URHO3D_SCP_TO_TARGET)
         COMMENT "Scp-ing Urho3D library to target system")
 endif ()
 
-target_link_libraries(Urho3D embree)
+target_link_libraries(Urho3D embree nvmesh)
 if (EMBREE_STATIC_LIB)
     add_definitions(-DEMBREE_STATIC_LIB)
 endif ()
