@@ -34,6 +34,7 @@
 #include "../Graphics/VertexBuffer.h"
 #include "../Graphics/View.h"
 #include "../Scene/Scene.h"
+#include "../Resource/ResourceCache.h"
 
 #include "../DebugNew.h"
 
@@ -258,6 +259,11 @@ void Batch::Prepare(View* view, Camera* camera, bool setModelTransform, bool all
             else
                 graphics->SetShaderParameter(VSP_BILLBOARDROT, cameraNode->GetWorldRotation().RotationMatrix());
         }
+    }
+
+    if (lightmapTilingOffset_)
+    {
+        graphics->SetShaderParameter(VSP_LMOFFSET, *lightmapTilingOffset_);
     }
 
     // Set zone-related shader parameters
@@ -606,8 +612,18 @@ void Batch::Prepare(View* view, Camera* camera, bool setModelTransform, bool all
         const HashMap<TextureUnit, SharedPtr<Texture> >& textures = material_->GetTextures();
         for (HashMap<TextureUnit, SharedPtr<Texture> >::ConstIterator i = textures.Begin(); i != textures.End(); ++i)
         {
+            if (i->first_ == TU_EMISSIVE && lightmapTilingOffset_)
+                continue;
+
             if (graphics->HasTextureUnit(i->first_))
                 graphics->SetTexture(i->first_, i->second_.Get());
+        }
+
+        Scene* scene = view->GetScene();
+        if (lightmapTilingOffset_ && scene)
+        {
+            auto cache = view->GetSubsystem<ResourceCache>();
+            graphics->SetTexture(TU_EMISSIVE, cache->GetResource<Texture2D>("Lightmap0.png"));
         }
     }
 

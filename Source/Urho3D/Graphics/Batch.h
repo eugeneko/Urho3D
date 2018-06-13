@@ -63,7 +63,9 @@ struct Batch
         numWorldTransforms_(rhs.numWorldTransforms_),
         instancingData_(rhs.instancingData_),
         lightQueue_(nullptr),
-        geometryType_(rhs.geometryType_)
+        geometryType_(rhs.geometryType_),
+        lightmapTilingOffset_(rhs.lightmapTilingOffset_),
+        lightmapTextureID_(rhs.lightmapTextureID_)
     {
     }
 
@@ -106,6 +108,9 @@ struct Batch
     ShaderVariation* pixelShader_{};
     /// %Geometry type.
     GeometryType geometryType_{};
+
+    Vector4* lightmapTilingOffset_;
+    unsigned lightmapTextureID_{};
 };
 
 /// Data for one geometry instance.

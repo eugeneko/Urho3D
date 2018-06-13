@@ -102,6 +102,9 @@ struct URHO3D_API SourceBatch
     void* instancingData_{};
     /// %Geometry type.
     GeometryType geometryType_{GEOM_STATIC};
+    Vector4* lightmapTilingOffset_{};
+    unsigned lightmapTextureID_{};
+
 };
 
 /// Base class for visible components.

@@ -73,6 +73,9 @@ void StaticScene::Start()
 
 void StaticScene::CreateScene()
 {
+    auto* renderer = GetSubsystem<Renderer>();
+    renderer->SetDynamicInstancing(false);
+
     auto* cache = GetSubsystem<ResourceCache>();
 
     scene_ = new Scene(context_);
@@ -93,9 +96,17 @@ void StaticScene::CreateScene()
     };
 
     auto planeModel = cache->GetResource<Model>("Models/Plane.mdl");
-    auto mushroomModel = cache->GetResource<Model>("Models/Mushroom.mdl");
+    auto mushroomModel = cache->GetResource<Model>("Models/Mushroom.mdl"); //Mushroom
+    planeModel->SetNumGeometryLodLevels(0, 1);
+    mushroomModel->SetNumGeometryLodLevels(0, 1);
     generateLightmapUV(planeModel);
     generateLightmapUV(mushroomModel);
+    auto planeMaterial = cache->GetResource<Material>("Materials/DefaultGrey.xml");
+    auto mushroomMaterial = cache->GetResource<Material>("Materials/Mushroom.xml"); //Mushroom
+    mushroomMaterial->SetVertexShaderDefines(mushroomMaterial->GetVertexShaderDefines() + " LIGHTMAP");
+    mushroomMaterial->SetPixelShaderDefines(mushroomMaterial->GetPixelShaderDefines() + " LIGHTMAP");
+    planeMaterial->SetVertexShaderDefines(planeMaterial->GetVertexShaderDefines() + " LIGHTMAP");
+    planeMaterial->SetPixelShaderDefines(planeMaterial->GetPixelShaderDefines() + " LIGHTMAP");
 
     // Create the Octree component to the scene. This is required before adding any drawable components, or else nothing will
     // show up. The default octree volume will be from (-1000, -1000, -1000) to (1000, 1000, 1000) in world coordinates; it
@@ -110,16 +121,22 @@ void StaticScene::CreateScene()
     planeNode->SetScale(Vector3(100.0f, 1.0f, 100.0f));
     auto* planeObject = planeNode->CreateComponent<StaticModel>();
     planeObject->SetModel(planeModel);
-    planeObject->SetMaterial(cache->GetResource<Material>("Materials/StoneTiled.xml"));
+    planeObject->SetMaterial(planeMaterial);
     planeObject->SetLightmap(true);
+//     planeObject->SetCastShadows(true);
 
     // Create a directional light to the world so that we can see something. The light scene node's orientation controls the
     // light direction; we will use the SetDirection() function which calculates the orientation from a forward direction vector.
     // The light will use default settings (white light, no shadows)
     Node* lightNode = scene_->CreateChild("DirectionalLight");
-    lightNode->SetDirection(Vector3(0.6f, -1.0f, 0.8f)); // The direction vector does not need to be normalized
+//     lightNode->SetDirection(Vector3(0.6f, -1.0f, 0.8f)); // The direction vector does not need to be normalized
+    lightNode->SetPosition(Vector3(0.0f, 5.0f, 0.0f));
     auto* light = lightNode->CreateComponent<Light>();
-    light->SetLightType(LIGHT_DIRECTIONAL);
+//     light->SetLightType(LIGHT_DIRECTIONAL);
+    light->SetLightType(LIGHT_POINT);
+    light->SetRange(50.0f);
+    light->SetCastShadows(true);
+    light->SetColor(Color::WHITE);
 
     // Create more StaticModel objects to the scene, randomly positioned, rotated and scaled. For rotation, we construct a
     // quaternion from Euler angles where the Y angle (rotation about the Y axis) is randomized. The mushroom model contains
@@ -132,12 +149,13 @@ void StaticScene::CreateScene()
     {
         Node* mushroomNode = scene_->CreateChild("Mushroom");
         mushroomNode->SetPosition(Vector3(Random(90.0f) - 45.0f, 0.0f, Random(90.0f) - 45.0f));
-        mushroomNode->SetRotation(Quaternion(0.0f, Random(360.0f), 0.0f));
+        //mushroomNode->SetRotation(Quaternion(0.0f, Random(360.0f), 0.0f));
         mushroomNode->SetScale(0.5f + Random(2.0f));
         auto* mushroomObject = mushroomNode->CreateComponent<StaticModel>();
         mushroomObject->SetModel(mushroomModel);
-        mushroomObject->SetMaterial(cache->GetResource<Material>("Materials/Mushroom.xml"));
+        mushroomObject->SetMaterial(mushroomMaterial);
         mushroomObject->SetLightmap(true);
+        mushroomObject->SetCastShadows(true);
     }
 
     // Create a scene node for the camera, which we will move around

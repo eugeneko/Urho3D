@@ -263,7 +263,7 @@ bool LightMapPacker::SaveLightmaps(const String &projectPath, const String &scen
         // to Cache with GUID
         String sceneName = GetFileName(scenePath);
 
-        String folder = ToString("%sResources/AtomicGlow/Scenes/%s/Lightmaps/",  projectPath.CString(), sceneName.CString());
+        String folder = projectPath;
 
         if (!fileSystem->DirExists(folder))
         {

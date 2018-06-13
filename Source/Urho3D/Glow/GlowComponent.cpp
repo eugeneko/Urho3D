@@ -24,6 +24,7 @@
 #include "../Core/Context.h"
 #include "../Core/WorkQueue.h"
 #include "../Graphics/StaticModel.h"
+#include "../Resource/ResourceCache.h"
 #include "../Resource/XMLFile.h"
 
 // #include <ToolCore/ToolSystem.h>
@@ -100,7 +101,9 @@ bool GlowComponent::Bake()
         context_->RegisterSubsystem<BakeMaterialCache>();
     }
 
-    const String projectPath = "D:/";
+    auto cache = GetSubsystem<ResourceCache>();
+
+    const String projectPath = cache->GetResourceDirs().Back();
     auto sceneCopy = MakeShared<XMLFile>(context_);
     GetScene()->SaveXML(sceneCopy->GetOrCreateRoot("scene"));
 

@@ -67,16 +67,19 @@ SceneBaker::~SceneBaker()
 
 bool SceneBaker::SaveLitScene()
 {
-    if (!standaloneMode_)
-    {
-        URHO3D_LOGERROR("SceneBaker::SaveLitScene() - only supported in standalone mode");
-        return false;
-    }
+    assert(0);
+    return false;
 
-    String sceneFilename = AddTrailingSlash(projectPath_) + "Resources/" + scene_->GetFileName();
-
-    File saveFile(context_, sceneFilename, FILE_WRITE);
-    return scene_->SaveXML(saveFile);
+//     if (!standaloneMode_)
+//     {
+//         URHO3D_LOGERROR("SceneBaker::SaveLitScene() - only supported in standalone mode");
+//         return false;
+//     }
+//
+//     String sceneFilename = AddTrailingSlash(projectPath_) + "Resources/" + scene_->GetFileName();
+//
+//     File saveFile(context_, sceneFilename, FILE_WRITE);
+//     return scene_->SaveXML(saveFile);
 }
 
 bool SceneBaker::WriteBakeData(VectorBuffer& buffer)
