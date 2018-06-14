@@ -47,6 +47,7 @@ GlowComponent::GlowComponent(Context *context) : Component(context)
 {
     GlowSettings glowSettings;
     glowSettings.SetDefaults();
+    glowSettings.giEnabled_ = false;
     SetFromGlowSettings(glowSettings);
 }
 

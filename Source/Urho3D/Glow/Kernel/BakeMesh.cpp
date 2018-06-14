@@ -365,7 +365,7 @@ void BakeMesh::Preprocess()
                                         v2->position_);
         }
 
-        totalarea = Clamp<float>(totalarea, 1, 64.0f);
+//         totalarea = Clamp<float>(totalarea, 1, 64.0f);
 
         lmSize = CalcLightMapSize(totalarea * 64.0f * lmScale * GlobalGlowSettings.lexelDensity_ * GlobalGlowSettings.sceneLexelDensityScale_);
 
@@ -374,8 +374,11 @@ void BakeMesh::Preprocess()
     if (lmSize < 32)
         lmSize = 32;
 
-    if (lmSize > 2048)
-        lmSize = 2048;
+    if (lmSize > 1024)
+        lmSize = 1024;
+
+//     if (lmSize > 2048)
+//         lmSize = 2048;
 
     radianceWidth_ = lmSize;
     radianceHeight_ = lmSize;

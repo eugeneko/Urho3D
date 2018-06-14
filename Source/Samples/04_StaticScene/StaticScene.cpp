@@ -31,6 +31,7 @@
 #include <Urho3D/Graphics/Octree.h>
 #include <Urho3D/Graphics/Renderer.h>
 #include <Urho3D/Graphics/StaticModel.h>
+#include <Urho3D/Graphics/Zone.h>
 #include <Urho3D/Input/Input.h>
 #include <Urho3D/Resource/ResourceCache.h>
 #include <Urho3D/Scene/Scene.h>
@@ -102,7 +103,7 @@ void StaticScene::CreateScene()
     generateLightmapUV(planeModel);
     generateLightmapUV(mushroomModel);
     auto planeMaterial = cache->GetResource<Material>("Materials/DefaultGrey.xml");
-    auto mushroomMaterial = cache->GetResource<Material>("Materials/Mushroom.xml"); //Mushroom
+    auto mushroomMaterial = cache->GetResource<Material>("Materials/DefaultGrey.xml"); //Mushroom
     mushroomMaterial->SetVertexShaderDefines(mushroomMaterial->GetVertexShaderDefines() + " LIGHTMAP");
     mushroomMaterial->SetPixelShaderDefines(mushroomMaterial->GetPixelShaderDefines() + " LIGHTMAP");
     planeMaterial->SetVertexShaderDefines(planeMaterial->GetVertexShaderDefines() + " LIGHTMAP");
@@ -114,11 +115,17 @@ void StaticScene::CreateScene()
     // optimizing manner
     scene_->CreateComponent<Octree>();
 
+    Node* zoneNode = scene_->CreateChild("Zone");
+    Zone* zone = zoneNode->CreateComponent<Zone>();
+    zone->SetBoundingBox(BoundingBox(-1000, 1000));
+    zone->SetAmbientColor(Color::WHITE * 0.1f);
+
     // Create a child scene node (at world origin) and a StaticModel component into it. Set the StaticModel to show a simple
     // plane mesh with a "stone" material. Note that naming the scene nodes is optional. Scale the scene node larger
     // (100 x 100 world units)
     Node* planeNode = scene_->CreateChild(/*"Plane"*/);
-    planeNode->SetScale(Vector3(100.0f, 1.0f, 100.0f));
+//     planeNode->SetPosition(Vector3(0, -6, 0));
+    planeNode->SetScale(100.0f);
     auto* planeObject = planeNode->CreateComponent<StaticModel>();
     planeObject->SetModel(planeModel);
     planeObject->SetMaterial(planeMaterial);
@@ -129,12 +136,13 @@ void StaticScene::CreateScene()
     // light direction; we will use the SetDirection() function which calculates the orientation from a forward direction vector.
     // The light will use default settings (white light, no shadows)
     Node* lightNode = scene_->CreateChild("DirectionalLight");
-//     lightNode->SetDirection(Vector3(0.6f, -1.0f, 0.8f)); // The direction vector does not need to be normalized
-    lightNode->SetPosition(Vector3(0.0f, 5.0f, 0.0f));
+    lightNode->SetDirection(Vector3(0.6f, -0.5f, 0.8f)); // The direction vector does not need to be normalized
+//     lightNode->SetPosition(Vector3(0.0f, 1.5f, 0.0f));
+//     lightNode->SetPosition(Vector3(0.0f, 0.0f, 0.0f));
     auto* light = lightNode->CreateComponent<Light>();
-//     light->SetLightType(LIGHT_DIRECTIONAL);
-    light->SetLightType(LIGHT_POINT);
-    light->SetRange(50.0f);
+    light->SetLightType(LIGHT_DIRECTIONAL);
+//     light->SetLightType(LIGHT_POINT);
+//     light->SetRange(10.0f);
     light->SetCastShadows(true);
     light->SetColor(Color::WHITE);
 
@@ -148,8 +156,10 @@ void StaticScene::CreateScene()
     for (unsigned i = 0; i < NUM_OBJECTS; ++i)
     {
         Node* mushroomNode = scene_->CreateChild("Mushroom");
+        //mushroomNode->SetScale(Vector3(2.0f, 2.0f, 2.0f));
+        //mushroomNode->SetPosition(Vector3(0.0f, 3.0f, 0.0f));
         mushroomNode->SetPosition(Vector3(Random(90.0f) - 45.0f, 0.0f, Random(90.0f) - 45.0f));
-        //mushroomNode->SetRotation(Quaternion(0.0f, Random(360.0f), 0.0f));
+        mushroomNode->SetRotation(Quaternion(0.0f, Random(360.0f), 0.0f));
         mushroomNode->SetScale(0.5f + Random(2.0f));
         auto* mushroomObject = mushroomNode->CreateComponent<StaticModel>();
         mushroomObject->SetModel(mushroomModel);
