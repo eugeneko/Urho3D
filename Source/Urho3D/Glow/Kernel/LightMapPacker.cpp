@@ -248,7 +248,7 @@ void LightMapPacker::EmitLightmap(unsigned lightMapID)
 
 }
 
-bool LightMapPacker::SaveLightmaps(const String &projectPath, const String &scenePath)
+bool LightMapPacker::SaveLightmaps(const String &projectPath, const String &scenePath, Vector<String>& lightmapNames)
 {
     FileSystem* fileSystem = GetSubsystem<FileSystem>();
 
@@ -276,7 +276,9 @@ bool LightMapPacker::SaveLightmaps(const String &projectPath, const String &scen
             return false;
         }
 
-        String filename = ToString("%sLightmap%u.%s", folder.CString(), lightmap->GetID(), format);
+        String shortFilename = ToString("Lightmap%u.%s", lightmap->GetID(), format);
+        lightmapNames.Push(shortFilename);
+        String filename = folder + shortFilename;
 
         URHO3D_LOGINFOF("Saving Lightmap: %s", filename.CString());
 

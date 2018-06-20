@@ -26,6 +26,7 @@
 #include "../Core/CoreEvents.h"
 #include "../Core/Profiler.h"
 #include "../Core/WorkQueue.h"
+#include "../Graphics/Texture2D.h"
 #include "../IO/File.h"
 #include "../IO/Log.h"
 #include "../IO/PackageFile.h"
@@ -69,7 +70,8 @@ Scene::Scene(Context* context) :
     snapThreshold_(DEFAULT_SNAP_THRESHOLD),
     updateEnabled_(true),
     asyncLoading_(false),
-    threadedUpdate_(false)
+    threadedUpdate_(false),
+    lightmaps_(Texture2D::GetTypeStatic())
 {
     // Assign an ID to self so that nodes can refer to this node as a parent
     SetID(GetFreeNodeID(REPLICATED));
@@ -109,6 +111,7 @@ void Scene::RegisterObject(Context* context)
     URHO3D_ATTRIBUTE("Next Local Component ID", unsigned, localComponentID_, FIRST_LOCAL_ID, AM_FILE | AM_NOEDIT);
     URHO3D_ATTRIBUTE("Variables", VariantMap, vars_, Variant::emptyVariantMap, AM_FILE); // Network replication of vars uses custom data
     URHO3D_MIXED_ACCESSOR_ATTRIBUTE("Variable Names", GetVarNamesAttr, SetVarNamesAttr, String, String::EMPTY, AM_FILE | AM_NOEDIT);
+    URHO3D_ATTRIBUTE("Lightmaps", ResourceRefList, lightmaps_, ResourceRefList(Texture2D::GetTypeStatic()), AM_DEFAULT);
 }
 
 bool Scene::Load(Deserializer& source)
@@ -212,6 +215,29 @@ void Scene::AddReplicationState(NodeReplicationState* state)
     // This is the first update for a new connection. Mark all replicated nodes dirty
     for (HashMap<unsigned, Node*>::ConstIterator i = replicatedNodes_.Begin(); i != replicatedNodes_.End(); ++i)
         state->sceneState_->dirtyNodes_.Insert(i->first_);
+}
+
+void Scene::AddLightmap(const String& lightmapTextureName)
+{
+    lightmaps_.names_.Push(lightmapTextureName);
+    lightmapTexturesDirty_ = true;
+}
+
+Texture2D* Scene::GetLightmapTexture(unsigned index)
+{
+    if (lightmapTexturesDirty_)
+    {
+        auto cache = GetSubsystem<ResourceCache>();
+        lightmapTextures_.Clear();
+        for (const String& lightmapTextureName : lightmaps_.names_)
+        {
+            SharedPtr<Texture2D> texture{ cache->GetResource<Texture2D>(lightmapTextureName) };
+            lightmapTextures_.Push(texture);
+        }
+
+        lightmapTexturesDirty_ = false;
+    }
+    return lightmapTextures_[index];
 }
 
 bool Scene::LoadXML(Deserializer& source)

@@ -149,7 +149,10 @@ bool GlowComponent::Bake()
 
     // if we're done, exit in standalone mode, or send IPC event if
     // running off Glow service
-    sceneBaker->GenerateLightmaps();
+    Vector<String> lightmapNames;
+    sceneBaker->GenerateLightmaps(lightmapNames);
+    for (const String& lightmapName : lightmapNames)
+        GetScene()->AddLightmap(lightmapName);
 
     VectorBuffer bakeData = sceneBaker->GetBakeData();
     bakeData.Seek(0);

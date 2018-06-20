@@ -47,8 +47,7 @@ class SceneBaker : public Object
     void LightFinishCycle();
 
     bool LoadScene(const XMLElement& sceneXML);
-
-    bool GenerateLightmaps();
+    bool GenerateLightmaps(Vector<String>& lightmapNames);
 
     const VectorBuffer& GetBakeData() const { return bakeData_; }
 

@@ -34,7 +34,6 @@
 #include "../Graphics/VertexBuffer.h"
 #include "../Graphics/View.h"
 #include "../Scene/Scene.h"
-#include "../Resource/ResourceCache.h"
 
 #include "../DebugNew.h"
 
@@ -622,8 +621,7 @@ void Batch::Prepare(View* view, Camera* camera, bool setModelTransform, bool all
         Scene* scene = view->GetScene();
         if (lightmapTilingOffset_ && scene)
         {
-            auto cache = view->GetSubsystem<ResourceCache>();
-            graphics->SetTexture(TU_EMISSIVE, cache->GetResource<Texture2D>("Lightmap0.png"));
+            graphics->SetTexture(TU_EMISSIVE, scene->GetLightmapTexture(lightmapTextureID_));
         }
     }
 

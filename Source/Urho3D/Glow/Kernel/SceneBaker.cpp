@@ -48,6 +48,8 @@
 // #define PRINT(x) static_assert(0, TOSTRING(x))
 // PRINT(RTCORE_API);
 
+using namespace Urho3D;
+
 namespace AtomicGlow
 {
 
@@ -106,7 +108,7 @@ bool SceneBaker::WriteBakeData(VectorBuffer& buffer)
     return true;
 }
 
-bool SceneBaker::GenerateLightmaps()
+bool SceneBaker::GenerateLightmaps(Vector<String>& lightmapNames)
 {
     URHO3D_LOGINFO("Generating Lightmaps");
 
@@ -133,7 +135,7 @@ bool SceneBaker::GenerateLightmaps()
 
     packer->Pack();
 
-    if (!packer->SaveLightmaps(projectPath_, scene_->GetFileName()))
+    if (!packer->SaveLightmaps(projectPath_, scene_->GetFileName(), lightmapNames))
     {
         return false;
     }
