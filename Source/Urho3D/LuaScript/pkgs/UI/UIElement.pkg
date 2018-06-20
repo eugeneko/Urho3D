@@ -358,6 +358,53 @@ static const PODVector<UIElement*>& UIElementGetChildrenWithTag(const UIElement*
     return dest;
 }
 
+#define TOLUA_DISABLE_tolua_UILuaAPI_UIElement_SetDragDropMode00
+static int tolua_UILuaAPI_UIElement_SetDragDropMode00(lua_State* tolua_S)
+{
+#ifndef TOLUA_RELEASE
+ tolua_Error tolua_err;
+ if (
+ !tolua_isusertype(tolua_S,1,"UIElement",0,&tolua_err) ||
+ !tolua_isnumber(tolua_S,2,0,&tolua_err) ||
+ !tolua_isnoobj(tolua_S,3,&tolua_err)
+ )
+ goto tolua_lerror;
+ else
+#endif
+ {
+  UIElement* self = (UIElement*)  tolua_tousertype(tolua_S,1,0);
+  unsigned mode = ((unsigned)  tolua_tonumber(tolua_S,2,0));
+#ifndef TOLUA_RELEASE
+ if (!self) tolua_error(tolua_S,"invalid 'self' in function 'SetDragDropMode'", NULL);
+#endif
+ {
+  self->SetDragDropMode(DragAndDropModeFlags(mode));
+ }
+ }
+ return 0;
+#ifndef TOLUA_RELEASE
+ tolua_lerror:
+ tolua_error(tolua_S,"#ferror in function 'SetDragDropMode'.",&tolua_err);
+ return 0;
+#endif
+}
+
+#define TOLUA_DISABLE_tolua_set_UIElement_dragDropMode
+static int tolua_set_UIElement_dragDropMode(lua_State* tolua_S)
+{
+  UIElement* self = (UIElement*)  tolua_tousertype(tolua_S,1,0);
+#ifndef TOLUA_RELEASE
+ tolua_Error tolua_err;
+ if (!self) tolua_error(tolua_S,"invalid 'self' in accessing variable 'dragDropMode'",NULL);
+ if (!tolua_isnumber(tolua_S,2,0,&tolua_err))
+ tolua_error(tolua_S,"#vinvalid type in variable assignment.",&tolua_err);
+#endif
+  self->SetDragDropMode(DragAndDropModeFlags((unsigned)  tolua_tonumber(tolua_S,2,0))
+)
+;
+ return 0;
+}
+
 #define GetStyle GetAppliedStyle
 #define SetColorAttr SetColor
 $}
